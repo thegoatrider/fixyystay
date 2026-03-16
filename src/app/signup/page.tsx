@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label'
 
 export default async function SignupPage(
   props: {
-    searchParams: Promise<{ message: string, role?: string }>
+    searchParams: Promise<{ message: string, role?: string, next?: string }>
   }
 ) {
   const searchParams = await props.searchParams;
   const requestedRole = searchParams.role || 'guest';
+  const next = searchParams.next || '/';
   
   let title = "Create a Guest Account"
   if (requestedRole === 'owner') title = "Register as a Property Owner"
@@ -37,6 +38,7 @@ export default async function SignupPage(
         
         {/* Hidden role input based on intent */}
         <input type="hidden" name="role" value={requestedRole} />
+        <input type="hidden" name="next" value={next} />
         
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Full Name</Label>
@@ -71,7 +73,7 @@ export default async function SignupPage(
         
         <div className="text-center mt-4 text-sm text-gray-500">
           Already have an account?{" "}
-          <Link href={`/login?role=${requestedRole}`} className="text-blue-600 font-semibold hover:underline">
+          <Link href={`/login?role=${requestedRole}&next=${encodeURIComponent(next)}`} className="text-blue-600 font-semibold hover:underline">
             Sign in
           </Link>
         </div>

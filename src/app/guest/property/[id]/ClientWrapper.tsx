@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { logClick, bookRoom } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,14 +24,16 @@ export default function PropertyDetailClient({
   influencerId,
   initialCheckin,
   initialCheckout,
-  initialGuests
+  initialGuests,
+  isLoggedIn
 }: { 
   property: any, 
   availableRooms: any[], 
   influencerId: string | null,
   initialCheckin: string | null,
   initialCheckout: string | null,
-  initialGuests: string | null
+  initialGuests: string | null,
+  isLoggedIn: boolean
 }) {
   const [selectedRoomId, setSelectedRoomId] = useState<string>(availableRooms[0]?.id || '')
   const [checkin, setCheckin] = useState(initialCheckin || '')
@@ -172,6 +175,22 @@ export default function PropertyDetailClient({
         {availableRooms.length === 0 ? (
           <div className="p-4 bg-orange-50 text-orange-800 rounded-lg text-sm border border-orange-200">
             Sorry, no rooms are currently available for this property.
+          </div>
+        ) : !isLoggedIn ? (
+          <div className="flex flex-col gap-6 items-center text-center p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+            <div className="space-y-2">
+              <h3 className="font-bold text-lg text-gray-900">Sign in to Book</h3>
+              <p className="text-sm text-gray-600">You need to be logged in as a guest to make a reservation.</p>
+            </div>
+            <Button 
+              onClick={() => window.location.href=`/login?role=guest&next=/guest/property/${property.id}`}
+              className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg shadow-md"
+            >
+              Login to Book
+            </Button>
+            <p className="text-xs text-gray-400">
+              New to FixStay? <Link href={`/signup?role=guest&next=/guest/property/${property.id}`} className="text-blue-600 hover:underline">Create an account</Link>
+            </p>
           </div>
         ) : (
           <form action={handleBook} className="flex flex-col gap-5">

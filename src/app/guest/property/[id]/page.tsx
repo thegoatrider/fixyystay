@@ -17,6 +17,9 @@ export default async function PropertyDetailPage(
   const propertyId = params.id
   const supabase = await createClient()
 
+  const { data: { session } } = await supabase.auth.getSession()
+  const isLoggedIn = !!session
+
   const { data: property, error } = await supabase
     .from('properties')
     .select(`
@@ -77,6 +80,7 @@ export default async function PropertyDetailPage(
         initialCheckin={checkin || null}
         initialCheckout={checkout || null}
         initialGuests={guests || null}
+        isLoggedIn={isLoggedIn}
       />
     </div>
   )

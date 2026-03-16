@@ -15,12 +15,14 @@ export async function login(formData: FormData) {
     password,
   })
 
+  const next = formData.get('next') as string || '/'
+
   if (error) {
-    redirect('/login?message=Could not authenticate user')
+    redirect(`/login?message=Could not authenticate user&next=${encodeURIComponent(next)}`)
   }
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect(next)
 }
 
 export async function signup(formData: FormData) {
@@ -30,15 +32,16 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string
   const name = formData.get('name') as string
   const role = formData.get('role') as string // 'guest' | 'owner' | 'influencer'
+  const next = formData.get('next') as string || '/'
 
   if (!email || !password || !name || !role) {
-    redirect('/signup?message=All fields are required')
+    redirect(`/signup?message=All fields are required&next=${encodeURIComponent(next)}`)
   }
 
   // Prevent users from signing up as admin
   const allowedRoles = ['guest', 'owner', 'influencer']
   if (!allowedRoles.includes(role)) {
-    redirect('/signup?message=Invalid role specified')
+    redirect(`/signup?message=Invalid role specified&next=${encodeURIComponent(next)}`)
   }
 
   // 1. Sign up user and store role in user_metadata
@@ -54,7 +57,7 @@ export async function signup(formData: FormData) {
   })
 
   if (authError || !authData.user) {
-    redirect(`/signup?message=${authError?.message || 'Failed to sign up'}`)
+    redirect(`/signup?message=${authError?.message || 'Failed to sign up'}&next=${encodeURIComponent(next)}`)
   }
 
   const userId = authData.user.id
@@ -91,8 +94,8 @@ export async function signup(formData: FormData) {
   // Usually, it requires email confirmation, but we will redirect to / (or specific dashboards)
   // If email confirm is on, authData.session is null.
   if (!authData.session) {
-    redirect('/login?message=Check your email to continue sign in process')
+    redirect(`/login?message=Check your email to continue sign in process&next=${encodeURIComponent(next)}`)
   } else {
-    redirect('/')
+    redirect(next)
   }
 }

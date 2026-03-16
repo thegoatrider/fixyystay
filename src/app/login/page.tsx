@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label'
 
 export default async function LoginPage(
   props: {
-    searchParams: Promise<{ message: string, role?: string }>
+    searchParams: Promise<{ message: string, role?: string, next?: string }>
   }
 ) {
   const searchParams = await props.searchParams;
   const requestedRole = searchParams.role || 'guest';
+  const next = searchParams.next || '/';
   
   let title = "Sign in (Guest)"
   if (requestedRole === 'owner') title = "Property Owner Sign in"
@@ -25,6 +26,7 @@ export default async function LoginPage(
       </div>
 
       <form className="flex-1 flex flex-col w-full justify-center gap-4 text-foreground">
+        <input type="hidden" name="next" value={searchParams.next || ''} />
         
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
