@@ -40,6 +40,14 @@ export default function PropertyDetailClient({
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isConfirmed, setIsConfirmed] = useState(false)
+
+  useEffect(() => {
+    const confirmed = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]')
+    if (confirmed.includes(property.id)) {
+      setIsConfirmed(true)
+    }
+  }, [property.id])
 
   const selectedRoom = availableRooms.find(r => r.id === selectedRoomId)
   
@@ -120,12 +128,39 @@ export default function PropertyDetailClient({
           </p>
           
           <h3 className="font-bold text-lg mb-3">Amenities</h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-8">
             {property.amenities?.map((amenity: String, i: number) => (
               <span key={i} className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
                 {amenity}
               </span>
             ))}
+          </div>
+
+          <div className="border-t pt-6">
+            <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+              <MapPin className="text-red-500 w-5 h-5" /> Location
+            </h3>
+            {isConfirmed ? (
+              <div>
+                <p className="text-gray-700 font-medium mb-2">{property.city_area}</p>
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${property.latitude},${property.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:underline bg-blue-50 px-4 py-2 rounded-lg border border-blue-100"
+                >
+                  <MapPin className="w-4 h-4" /> Open Precise Location on Google Maps
+                </a>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-dashed rounded-xl p-4">
+                <p className="text-gray-900 font-bold mb-1 uppercase text-xs tracking-wider opacity-50">Rough Area</p>
+                <p className="text-gray-700 text-lg mb-3">{property.city_area || 'Location details restricted'}</p>
+                <div className="flex items-center gap-2 text-sm text-gray-500 bg-white/50 p-2 rounded-lg italic">
+                  <CheckCircle className="w-4 h-4 text-green-500" /> Precise location will be shared automatically after booking confirmation.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

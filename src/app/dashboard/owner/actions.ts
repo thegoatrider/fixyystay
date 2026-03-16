@@ -19,7 +19,9 @@ export async function createProperty(formData: FormData) {
   const description = formData.get('description') as string
   const amenities = (formData.get('amenities') as string).split(',').map(s => s.trim())
   const priceBucket = formData.get('priceBucket') as string
-  const helpdeskNumber = formData.get('helpdeskNumber') as string
+  const latitude = Number(formData.get('latitude')) || 0
+  const longitude = Number(formData.get('longitude')) || 0
+  const cityArea = formData.get('cityArea') as string
   
   // Handle Image Upload
   const imageFile = formData.get('image') as File
@@ -53,9 +55,10 @@ export async function createProperty(formData: FormData) {
       description,
       amenities,
       image_url,
-      helpdesk_number: helpdeskNumber,
-      latitude: 0,
-      longitude: 0,
+      helpdesk_number: formData.get('helpdeskNumber') as string,
+      city_area: cityArea,
+      latitude,
+      longitude,
       approved: false // starts false as per prompt
     }])
     .select()

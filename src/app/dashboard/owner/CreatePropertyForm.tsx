@@ -84,6 +84,40 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="cityArea">Rough Area / City (e.g. Alibag, Varsoli)</Label>
+        <Input name="cityArea" required placeholder="This will be shown to all guests" />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Label>Precise Location</Label>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                  (document.querySelector('input[name="latitude"]') as HTMLInputElement).value = pos.coords.latitude.toString();
+                  (document.querySelector('input[name="longitude"]') as HTMLInputElement).value = pos.coords.longitude.toString();
+                  alert('Location captured successfully!')
+                })
+              } else {
+                alert('Geolocation is not supported by your browser.')
+              }
+            }}
+          >
+            Use Current Location
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Input name="latitude" required placeholder="Latitude" readOnly className="bg-gray-50 text-gray-500" />
+          <Input name="longitude" required placeholder="Longitude" readOnly className="bg-gray-50 text-gray-500" />
+        </div>
+        <p className="text-[10px] text-gray-400">Guests will only see the precise location after booking.</p>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="helpdeskNumber">Helpdesk Number</Label>
         <Input name="helpdeskNumber" required placeholder="e.g. +91 98765 43210" />
       </div>

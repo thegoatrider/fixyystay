@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         },
       ],
       mode: 'payment',
-      success_url: `${origin}/guest/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/guest/success?session_id={CHECKOUT_SESSION_ID}&pid=${propertyId}`,
       cancel_url: `${origin}/guest/property/${propertyId}`,
       metadata: {
         propertyId,

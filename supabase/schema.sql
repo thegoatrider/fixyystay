@@ -22,6 +22,7 @@ CREATE TABLE public.properties (
   longitude NUMERIC,
   image_url TEXT,
   helpdesk_number TEXT,
+  city_area TEXT, -- Rough area for guest side (e.g. Alibag, Varsoli)
   approved BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
