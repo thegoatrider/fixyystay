@@ -5,16 +5,35 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProperty } from './actions'
+import { useRouter } from 'next/navigation'
 
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+    const formData = new FormData(e.currentTarget)
+    
+    try {
+      const result = await createProperty(formData)
+      if (result?.error) {
+        alert(result.error)
+        setIsLoading(false)
+      } else if (result?.success) {
+        router.push(`/dashboard/owner/property/${result.id}`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An unexpected error occurred. Please try again.')
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <form action={(formData) => {
-      setIsLoading(true)
-      createProperty(formData).catch(() => setIsLoading(false))
-    }} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="space-y-2">
         <Label htmlFor="name">Property Name</Label>
         <Input name="name" required placeholder="e.g. Beachfront Villa" />

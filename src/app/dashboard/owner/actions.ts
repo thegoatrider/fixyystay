@@ -8,11 +8,17 @@ export async function createProperty(formData: FormData) {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
-  if (user?.user_metadata?.role !== 'owner') throw new Error('Unauthorized')
+  if (!user) return { error: 'A valid session is required. Please log in.' }
+  
+  if (user?.user_metadata?.role !== 'owner') {
+    return { error: 'Access denied. You must be an Owner to create properties.' }
+  }
 
-  // Get owner id
-  const { data: owner } = await supabase.from('owners').select('id').eq('user_id', user.id).single()
-  if (!owner) throw new Error('Owner record not found')
+  const { data: owner, error: ownerError } = await supabase.from('owners').select('id').eq('user_id', user.id).single()
+  if (ownerError || !owner) {
+    console.error('Owner fetch error:', ownerError)
+    return { error: 'Owner record not found. Was your account verified as an owner?' }
+  }
 
   const name = formData.get('name') as string
   const type = formData.get('type') as string
@@ -66,12 +72,12 @@ export async function createProperty(formData: FormData) {
 
   if (error) {
     console.error('Failed to create property:', error)
-    throw new Error('Failed to create property')
+    return { error: 'Failed to create property record in database' }
   }
 
   // Automatically provision a default room so the property inherits the max price bucket
   if (priceBucket) {
-    await supabase.from('rooms').insert([{
+    const { error: roomError } = await supabase.from('rooms').insert([{
       property_id: data.id,
       name: type === 'villa' ? 'Entire Villa' : 'Standard Room',
       category: 'Standard',
@@ -79,13 +85,12 @@ export async function createProperty(formData: FormData) {
       price_bucket: priceBucket,
       image_url: null
     }])
-  }
-
-  if (error) {
-    console.error('Failed to create property:', error)
-    throw new Error('Failed to create property')
+    if (roomError) {
+      console.error('Failed to create default room:', roomError)
+      // We don't necessarily fail the whole thing, but it's good to know
+    }
   }
 
   revalidatePath('/dashboard/owner')
-  redirect(`/dashboard/owner/property/${data.id}`)
+  return { success: true, id: data.id }
 }
