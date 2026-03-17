@@ -37,6 +37,39 @@ function CheckinForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
 
+  // File Preview State
+  const [previews, setPreviews] = useState<Record<string, string>>({})
+  
+  // Cleanup object URLs to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      Object.values(previews).forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [previews])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setPreviews(prev => ({ ...prev, [key]: url }))
+    }
+  }
+
+  const removeFile = (key: string) => {
+    setPreviews(prev => {
+      const newPreviews = { ...prev }
+      if (newPreviews[key]) {
+        URL.revokeObjectURL(newPreviews[key])
+        delete newPreviews[key]
+      }
+      return newPreviews
+    })
+    
+    // Also reset the input value
+    const input = document.getElementsByName(key)[0] as HTMLInputElement
+    if (input) input.value = ''
+  }
+
   if (!propertyId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
@@ -194,26 +227,28 @@ function CheckinForm() {
 
           <div className="space-y-2">
             <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4"/> Number of People Staying</Label>
-            <Input 
+            <select 
               id="pax" 
-              type="number" 
-              min={1} 
-              max={20} 
+              className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               required 
               value={numPeople}
               onChange={(e) => setNumPeople(parseInt(e.target.value))}
-            />
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+              ))}
+            </select>
           </div>
 
           <div className="mt-4">
             <Label className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
                Government ID Verification
             </Label>
-            <p className="text-sm text-gray-500 mb-6">Upload one valid govt. ID (Aadhar, PAN, Passport) for each person.</p>
+            <p className="text-sm text-gray-500 mb-6">Upload mandatory front and back ID photos for each guest.</p>
             
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6">
               {Array.from({ length: numPeople }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-4 p-5 border rounded-2xl bg-gray-50 shadow-sm">
+                <div key={i} className="flex flex-col gap-4 p-5 border rounded-2xl bg-gray-50 shadow-sm border-gray-200">
                   <div className="flex justify-between items-center px-1">
                     <span className="text-sm font-bold text-gray-700">Guest {i + 1} Documents</span>
                     <span className="text-[10px] font-bold uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Mandatory</span>
@@ -222,38 +257,66 @@ function CheckinForm() {
                   <div className="grid grid-cols-2 gap-4">
                     {/* Front ID */}
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Front Side of ID</Label>
-                      <div className="relative group">
-                        <input 
-                          type="file" 
-                          name={`guestID_front_${i}`}
-                          accept="image/*" 
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                          required
-                        />
-                        <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
-                          <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                          <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Click to Upload Front</span>
+                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Front Side</Label>
+                      {previews[`guestID_front_${i}`] ? (
+                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border-2 border-blue-400 group">
+                          <img src={previews[`guestID_front_${i}`]} alt="Front ID Preview" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => removeFile(`guestID_front_${i}`)}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                          </button>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="relative group">
+                          <input 
+                            type="file" 
+                            name={`guestID_front_${i}`}
+                            accept="image/*" 
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                            required
+                            onChange={(e) => handleFileChange(e, `guestID_front_${i}`)}
+                          />
+                          <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                            <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                            <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Front</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Back ID */}
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Back Side of ID</Label>
-                      <div className="relative group">
-                        <input 
-                          type="file" 
-                          name={`guestID_back_${i}`}
-                          accept="image/*" 
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                          required
-                        />
-                        <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
-                          <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                          <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Click to Upload Back</span>
+                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Back Side</Label>
+                      {previews[`guestID_back_${i}`] ? (
+                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border-2 border-blue-400 group">
+                          <img src={previews[`guestID_back_${i}`]} alt="Back ID Preview" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => removeFile(`guestID_back_${i}`)}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                          </button>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="relative group">
+                          <input 
+                            type="file" 
+                            name={`guestID_back_${i}`}
+                            accept="image/*" 
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                            required
+                            onChange={(e) => handleFileChange(e, `guestID_back_${i}`)}
+                          />
+                          <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                            <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                            <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Back</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -264,14 +327,14 @@ function CheckinForm() {
           <Button 
             type="submit" 
             size="lg" 
-            className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4"
+            className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4 shadow-lg shadow-blue-100"
             disabled={isLoading || !isOtpVerified}
           >
             {isLoading ? 'Processing Check-in...' : 'Complete Check-in'}
           </Button>
 
-          <p className="text-center text-xs text-gray-400 mt-2">
-            Your data is secured and will only be shared with the property.
+          <p className="text-center text-[10px] text-gray-400 mt-2 font-medium">
+             Security Policy: All IDs are stored securely in our encrypted vaults.
           </p>
         </form>
       </div>
