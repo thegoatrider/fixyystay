@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Owners Table
-CREATE TABLE public.owners (
+CREATE TABLE IF NOT EXISTS public.owners (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id), -- Map to Supabase Auth
   name TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE public.owners (
 );
 
 -- 2. Properties Table
-CREATE TABLE public.properties (
+CREATE TABLE IF NOT EXISTS public.properties (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE public.properties (
 );
 
 -- 3. Rooms Table
-CREATE TABLE public.rooms (
+CREATE TABLE IF NOT EXISTS public.rooms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE public.rooms (
 );
 
 -- 4. Room Rates Table
-CREATE TABLE public.room_rates (
+CREATE TABLE IF NOT EXISTS public.room_rates (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE public.room_rates (
 );
 
 -- 5. Room Availability Table
-CREATE TABLE public.room_availability (
+CREATE TABLE IF NOT EXISTS public.room_availability (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE public.room_availability (
 );
 
 -- 6. Influencers Table
-CREATE TABLE public.influencers (
+CREATE TABLE IF NOT EXISTS public.influencers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE public.influencers (
 );
 
 -- 7. Influencer Properties (Assignment by Admin)
-CREATE TABLE public.influencer_properties (
+CREATE TABLE IF NOT EXISTS public.influencer_properties (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   influencer_id UUID REFERENCES public.influencers(id) ON DELETE CASCADE,
@@ -75,7 +75,7 @@ CREATE TABLE public.influencer_properties (
 );
 
 -- 8. Influencer Clicks
-CREATE TABLE public.influencer_clicks (
+CREATE TABLE IF NOT EXISTS public.influencer_clicks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   influencer_id UUID REFERENCES public.influencers(id) ON DELETE CASCADE,
@@ -83,7 +83,7 @@ CREATE TABLE public.influencer_clicks (
 );
 
 -- 9. Bookings Table
-CREATE TABLE public.bookings (
+CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE,
@@ -95,7 +95,7 @@ CREATE TABLE public.bookings (
 );
 
 -- 10. Leads Table
-CREATE TABLE public.leads (
+CREATE TABLE IF NOT EXISTS public.leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
@@ -108,7 +108,7 @@ CREATE TABLE public.leads (
 );
 
 -- 11. Guest Check-ins Table
-CREATE TABLE public.guest_checkins (
+CREATE TABLE IF NOT EXISTS public.guest_checkins (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
