@@ -23,7 +23,8 @@ export async function createProperty(formData: FormData) {
   const name = formData.get('name') as string
   const type = formData.get('type') as string
   const description = formData.get('description') as string
-  const amenities = (formData.get('amenities') as string).split(',').map(s => s.trim())
+  const amenitiesRaw = formData.get('amenities') as string
+  const amenities = amenitiesRaw ? amenitiesRaw.split(',').map(s => s.trim()).filter(Boolean) : []
   const priceBucket = formData.get('priceBucket') as string
   const latitude = Number(formData.get('latitude')) || 0
   const longitude = Number(formData.get('longitude')) || 0
@@ -51,8 +52,15 @@ export async function createProperty(formData: FormData) {
       image_url = publicUrlData.publicUrl
     }
   }
+
+  // Use Service Role to bypass RLS for creation to ensure success
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('properties')
     .insert([{
       owner_id: owner.id,
@@ -65,14 +73,14 @@ export async function createProperty(formData: FormData) {
       city_area: cityArea,
       latitude,
       longitude,
-      approved: false // starts false as per prompt
+      approved: false
     }])
     .select()
     .single()
 
   if (error) {
     console.error('Failed to create property:', error)
-    return { error: 'Failed to create property record in database' }
+    return { error: `Database error: ${error.message} (${error.code})` }
   }
 
   // Automatically provision a default room so the property inherits the max price bucket

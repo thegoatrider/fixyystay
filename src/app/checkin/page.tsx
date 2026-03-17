@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -140,7 +141,7 @@ function CheckinForm() {
               <ShieldCheck className="w-5 h-5" /> Important Info
             </h3>
             <p className="text-blue-800 text-sm leading-relaxed">
-              We've received your details. Please head to the property entrance. This is **FixyStay**. 
+              We've received your details. Please head to the property entrance. This is **Fixy Stays**. 
             </p>
             <div className="mt-4 pt-4 border-t border-blue-200">
               <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Helpdesk Number</div>
@@ -160,7 +161,9 @@ function CheckinForm() {
     <div className="min-h-screen bg-gray-50 py-12 px-6">
       <div className="max-w-2xl mx-auto flex flex-col gap-8">
         <div className="text-center">
-          <div className="font-bold text-2xl text-blue-600 mb-4">FixyStay</div>
+          <Link href="/" className="font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition">
+            Fixy Stays
+          </Link>
           <h1 className="text-4xl font-extrabold text-gray-900">Guest Check-in</h1>
           <p className="text-gray-500 mt-2">Please provide your details and ID for a smooth entry.</p>
         </div>

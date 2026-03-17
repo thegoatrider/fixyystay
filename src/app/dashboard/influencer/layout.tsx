@@ -21,8 +21,8 @@ export default async function InfluencerLayout({
       <header className="bg-white border-b shadow-sm sticky top-0 z-10 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/influencer" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
-              FixStay Influencers / Agents
+            <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
+              Fixy Stays
             </Link>
           </div>
           <div className="flex items-center gap-4">

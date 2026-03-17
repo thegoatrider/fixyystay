@@ -31,18 +31,17 @@ export default async function InfluencerDashboard() {
   const totalRevenue = bookings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0
   const totalCommission = totalRevenue * 0.10
 
-  // Host info assuming app is served on localhost loopback or standard Vercel url
-  // Using a placeholder environment variable or hardcoded origin if not available.
-  const appOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  // Use production domain for affiliate links
+  const appOrigin = 'https://www.fixystays.com'
 
   return (
     <div className="flex flex-col gap-10">
       
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 min-h-[30vh] pt-16 pb-12 px-6 shadow-inner relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 min-h-[30vh] pt-16 pb-12 px-6 shadow-init relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-white text-center md:text-left drop-shadow-sm min-w-0 flex-1">
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2 whitespace-nowrap overflow-ellipsis">Influencer / Agent Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-2 whitespace-nowrap overflow-ellipsis">Fixy Stays Influencer Dashboard</h1>
             <p className="text-blue-100/90 text-lg max-w-xl truncate">
               Manage your unique links and track your commissions.
             </p>

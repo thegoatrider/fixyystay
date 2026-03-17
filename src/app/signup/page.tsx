@@ -30,7 +30,9 @@ export default async function SignupPage(
   return (
     <div className="flex-1 flex flex-col w-full px-8 sm:max-w-md justify-center gap-2 mx-auto min-h-screen">
       <div className="flex flex-col gap-2 mb-8 items-center text-center">
-        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">FixStay</h1>
+        <Link href="/">
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-80 transition">Fixy Stays</h1>
+        </Link>
         <p className="text-gray-500">{title}</p>
       </div>
 
