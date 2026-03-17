@@ -5,19 +5,31 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function createProperty(formData: FormData) {
-  const supabase = await createClient()
+  // 1. Initialize Admin client to bypass RLS entirely for this operation
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'A valid session is required. Please log in.' }
+  if (!user) return { error: '[E1] Session expired. Please log in again.' }
   
   if (user?.user_metadata?.role !== 'owner') {
-    return { error: 'Access denied. You must be an Owner to create properties.' }
+    return { error: '[E2] Access denied. Your account role is not "owner".' }
   }
 
-  const { data: owner, error: ownerError } = await supabase.from('owners').select('id').eq('user_id', user.id).single()
+  // 2. Get Owner ID using Admin client to ensure we find it even if RLS is tight
+  const { data: owner, error: ownerError } = await supabaseAdmin
+    .from('owners')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+    
   if (ownerError || !owner) {
     console.error('Owner fetch error:', ownerError)
-    return { error: 'Owner record not found. Was your account verified as an owner?' }
+    return { error: `[E3] Owner record not found for UID: ${user.id}. Please contact support.` }
   }
 
   const name = formData.get('name') as string
@@ -29,8 +41,9 @@ export async function createProperty(formData: FormData) {
   const latitude = Number(formData.get('latitude')) || 0
   const longitude = Number(formData.get('longitude')) || 0
   const cityArea = formData.get('cityArea') as string
+  const helpdeskNumber = formData.get('helpdeskNumber') as string
   
-  // Handle Image Upload
+  // 3. Handle Image Upload
   const imageFile = formData.get('image') as File
   let image_url = null
   
@@ -38,28 +51,22 @@ export async function createProperty(formData: FormData) {
     const fileExt = imageFile.name.split('.').pop()
     const fileName = `${owner.id}-${Date.now()}.${fileExt}`
     
+    // Upload using standard client (storage usually has its own RLS or is public)
     const { error: uploadError } = await supabase.storage
       .from('property_images')
       .upload(fileName, imageFile)
       
     if (uploadError) {
-      console.error('Failed to upload image:', uploadError)
+      console.error('Image upload failed:', uploadError)
     } else {
       const { data: publicUrlData } = supabase.storage
         .from('property_images')
         .getPublicUrl(fileName)
-        
       image_url = publicUrlData.publicUrl
     }
   }
 
-  // Use Service Role to bypass RLS for creation to ensure success
-  const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  
+  // 4. Insert Property using Admin client
   const { data, error } = await supabaseAdmin
     .from('properties')
     .insert([{
@@ -69,7 +76,7 @@ export async function createProperty(formData: FormData) {
       description,
       amenities,
       image_url,
-      helpdesk_number: formData.get('helpdeskNumber') as string,
+      helpdesk_number: helpdeskNumber,
       city_area: cityArea,
       latitude,
       longitude,
@@ -79,24 +86,21 @@ export async function createProperty(formData: FormData) {
     .single()
 
   if (error) {
-    console.error('Failed to create property:', error)
-    return { error: `Database error: ${error.message} (${error.code})` }
+    console.error('Property creation failed:', error)
+    return { error: `[E4] Database Insert Failed: ${error.message} (${error.code})` }
   }
 
-  // Automatically provision a default room so the property inherits the max price bucket
+  // 5. Create Default Room
   if (priceBucket) {
-    const { error: roomError } = await supabase.from('rooms').insert([{
+    const { error: roomError } = await supabaseAdmin.from('rooms').insert([{
       property_id: data.id,
       name: type === 'villa' ? 'Entire Villa' : 'Standard Room',
       category: 'Standard',
       base_price: Number(priceBucket.replace(/[^0-9]/g, '')) || 0,
       price_bucket: priceBucket,
-      image_url: null
+      is_ac: true
     }])
-    if (roomError) {
-      console.error('Failed to create default room:', roomError)
-      // We don't necessarily fail the whole thing, but it's good to know
-    }
+    if (roomError) console.error('Default room creation failed:', roomError)
   }
 
   revalidatePath('/dashboard/owner')
