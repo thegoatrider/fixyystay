@@ -113,14 +113,22 @@ export default async function PropertyDetailPage(
                   <Label htmlFor="name">Room Name / Label</Label>
                   <Input name="name" placeholder="e.g. Room 101" required />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <select name="category" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
-                    <option value="Non AC Standard">Non AC Standard</option>
-                    <option value="AC Standard">AC Standard</option>
-                    <option value="Deluxe">Deluxe</option>
-                    <option value="Premium Suite">Premium Suite</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="acType">AC / Non AC</Label>
+                    <select name="acType" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+                      <option value="AC">AC</option>
+                      <option value="Non AC">Non AC</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <select name="category" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+                      <option value="Standard">Standard</option>
+                      <option value="Premium">Premium</option>
+                      <option value="Deluxe">Deluxe</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="basePrice">Base Price (₹ per night)</Label>

@@ -213,22 +213,47 @@ function CheckinForm() {
             
             <div className="flex flex-col gap-4">
               {Array.from({ length: numPeople }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-2 p-4 border rounded-2xl bg-gray-50">
+                <div key={i} className="flex flex-col gap-4 p-5 border rounded-2xl bg-gray-50 shadow-sm">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-sm font-bold text-gray-700">Person {i + 1}</span>
-                    <span className="text-[10px] font-bold uppercase text-gray-400">Mandatory</span>
+                    <span className="text-sm font-bold text-gray-700">Guest {i + 1} Documents</span>
+                    <span className="text-[10px] font-bold uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Mandatory</span>
                   </div>
-                  <div className="relative group">
-                    <input 
-                      type="file" 
-                      name={`guestID_${i}`}
-                      accept="image/*,application/pdf" 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                      required
-                    />
-                    <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-4 transition-all flex flex-col items-center justify-center gap-1">
-                      <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                      <span className="text-sm text-gray-400 group-hover:text-blue-600">Select Image/PDF</span>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Front ID */}
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Front Side of ID</Label>
+                      <div className="relative group">
+                        <input 
+                          type="file" 
+                          name={`guestID_front_${i}`}
+                          accept="image/*" 
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                          required
+                        />
+                        <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                          <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                          <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Click to Upload Front</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Back ID */}
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Back Side of ID</Label>
+                      <div className="relative group">
+                        <input 
+                          type="file" 
+                          name={`guestID_back_${i}`}
+                          accept="image/*" 
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                          required
+                        />
+                        <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                          <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                          <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Click to Upload Back</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

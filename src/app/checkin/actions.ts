@@ -27,29 +27,38 @@ export async function submitCheckin(formData: FormData) {
   const idDocuments = []
   
   for (let i = 0; i < numPeople; i++) {
-    const file = formData.get(`guestID_${i}`) as File
-    if (file && file.size > 0) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${propertyId}-${Date.now()}-${i}.${fileExt}`
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('property_images') // Using existing bucket for simplicity, or could be 'guest_ids'
-        .upload(`guest_ids/${fileName}`, file)
+    const frontFile = formData.get(`guestID_front_${i}`) as File
+    const backFile = formData.get(`guestID_back_${i}`) as File
+    
+    const personDocs: any = { personIndex: i + 1 }
 
-      if (uploadError) {
-        console.error(`ID Upload failed for person ${i + 1}:`, uploadError)
-      } else {
-        const { data: publicUrlData } = supabase.storage
-          .from('property_images')
-          .getPublicUrl(`guest_ids/${fileName}`)
-        
-        idDocuments.push({
-          personIndex: i + 1,
-          fileName: file.name,
-          url: publicUrlData.publicUrl
-        })
+    if (frontFile && frontFile.size > 0) {
+      const fileExt = frontFile.name.split('.').pop()
+      const fileName = `${propertyId}-${Date.now()}-${i}-front.${fileExt}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('property_images')
+        .upload(`guest_ids/${fileName}`, frontFile)
+
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
+        personDocs.frontUrl = publicUrlData.publicUrl
       }
     }
+
+    if (backFile && backFile.size > 0) {
+      const fileExt = backFile.name.split('.').pop()
+      const fileName = `${propertyId}-${Date.now()}-${i}-back.${fileExt}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('property_images')
+        .upload(`guest_ids/${fileName}`, backFile)
+
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
+        personDocs.backUrl = publicUrlData.publicUrl
+      }
+    }
+
+    idDocuments.push(personDocs)
   }
 
   // Insert check-in record

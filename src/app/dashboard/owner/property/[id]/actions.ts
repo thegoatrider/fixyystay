@@ -7,7 +7,9 @@ export async function addRoom(propertyId: string, formData: FormData) {
   const supabase = await createClient()
   
   const name = formData.get('name') as string
-  const category = formData.get('category') as string
+  const acType = formData.get('acType') as string
+  const roomCategory = formData.get('category') as string
+  const category = `${acType} ${roomCategory}`
   const basePrice = Number(formData.get('basePrice'))
   
   const priceBucket = formData.get('priceBucket') as string
