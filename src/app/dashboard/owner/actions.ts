@@ -32,8 +32,7 @@ export async function createProperty(formData: FormData) {
   const name = formData.get('name') as string
   const type = formData.get('type') as string
   const description = formData.get('description') as string
-  const amenitiesRaw = formData.get('amenities') as string
-  const amenities = amenitiesRaw ? amenitiesRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+  const amenities = formData.getAll('amenities') as string[]
   const priceBucket = formData.get('priceBucket') as string
   const latitude = parseFloat(formData.get('latitude') as string) || 0
   const longitude = parseFloat(formData.get('longitude') as string) || 0

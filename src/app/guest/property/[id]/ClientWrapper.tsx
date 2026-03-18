@@ -180,7 +180,7 @@ export default function PropertyDetailClient({
           <div className="flex flex-col gap-6 items-center text-center p-4 bg-blue-50/50 rounded-xl border border-blue-100">
             <div className="space-y-2">
               <h3 className="font-bold text-lg text-gray-900">Sign in to Book</h3>
-              <p className="text-sm text-gray-600">You need to be logged in as a guest to make a reservation.</p>
+              <p className="text-sm text-gray-600">You need to be logged in to make a reservation.</p>
             </div>
             <Button 
               onClick={() => window.location.href=`/login?role=guest&next=/guest/property/${property.id}`}

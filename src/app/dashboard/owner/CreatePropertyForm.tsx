@@ -76,9 +76,25 @@ export default function CreatePropertyForm() {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="amenities">Amenities</Label>
-        <Input name="amenities" required placeholder="WiFi, Pool, AC (comma separated)" />
+      <div className="space-y-3">
+        <Label>Amenities</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+          {[
+            'WiFi', 'Pool', 'AC', 'Parking', 'Kitchen', 'TV', 
+            'Power Backup', 'Geyser', 'Caretaker', 'Music System',
+            'Bonfire', 'BBQ', 'Pet Friendly', 'First Aid', 'Security'
+          ].map((amenity) => (
+            <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                name="amenities" 
+                value={amenity}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">{amenity}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">

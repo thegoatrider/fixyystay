@@ -8,8 +8,15 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
+    const { data: { user }, error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (!sessionError && user) {
+      // Ensure user has a default role if they signed up via OAuth
+      if (!user.user_metadata?.role) {
+        await supabase.auth.updateUser({
+          data: { role: 'guest' }
+        })
+      }
       return NextResponse.redirect(`${origin}/auth/confirm-success`)
     }
   }
