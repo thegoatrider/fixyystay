@@ -1,8 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { approveProperty, assignInfluencer, discardProperty } from './actions'
+import { approveProperty, assignInfluencer } from './actions'
 import { CheckCircle, Users } from 'lucide-react'
 import Link from 'next/link'
+import DeletePropertyButton from './DeletePropertyButton'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -80,11 +81,7 @@ export default async function AdminDashboard() {
                 </div>
                 
                 <div className="mt-auto flex gap-2">
-                  <form action={discardProperty.bind(null, prop.id)} className="w-1/3">
-                    <Button type="submit" variant="destructive" className="w-full">
-                      Discard
-                    </Button>
-                  </form>
+                  <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/3" />
                   <form action={approveProperty.bind(null, prop.id)} className="w-2/3">
                     <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white">
                       Approve
@@ -122,7 +119,7 @@ export default async function AdminDashboard() {
                   <td className="px-6 py-4 font-medium">{prop.name}</td>
                   <td className="px-6 py-4">{prop.owners?.name}</td>
                   <td className="px-6 py-4 capitalize">{prop.type}</td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-4">
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
                     <form action={async (formData) => {
                       'use server'
                       const infId = formData.get('influencerId') as string
@@ -140,6 +137,7 @@ export default async function AdminDashboard() {
                     <Button asChild size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50">
                       <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
                     </Button>
+                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
                   </td>
                 </tr>
               ))}
