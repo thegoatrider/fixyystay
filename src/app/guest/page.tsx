@@ -39,11 +39,26 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
         category,
         base_price,
         price_bucket,
+        image_url,
         room_availability (date, available),
         bookings (id, created_at)
       )
     `)
     .eq('approved', true)
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const isInfluencer = user?.user_metadata?.role === 'influencer'
+
+  // Prepare simple helper for image fallbacks
+  const getPropImage = (prop: any) => {
+    if (prop.image_urls && prop.image_urls.length > 0) return prop.image_urls[0];
+    if (prop.image_url) return prop.image_url;
+    if (prop.rooms && prop.rooms.length > 0) {
+      const roomWithImg = prop.rooms.find((r: any) => r.image_url);
+      if (roomWithImg) return roomWithImg.image_url;
+    }
+    return null;
+  };
 
   // Filter properties logic: available_rooms > 0
   const todayStr = new Date().toISOString().split('T')[0]
@@ -153,10 +168,10 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
               <Link href={buildPropertyUrl(prop.id)} key={prop.id} className="group flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
                 <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
                   {/* Property Image Placeholder */}
-                  {(prop.image_urls && prop.image_urls.length > 0) || prop.image_url ? (
+                  {getPropImage(prop) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img 
-                      src={(prop.image_urls && prop.image_urls[0]) || prop.image_url} 
+                      src={getPropImage(prop)} 
                       alt={prop.name} 
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
