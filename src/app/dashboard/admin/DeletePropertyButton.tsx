@@ -35,16 +35,13 @@ export default function DeletePropertyButton({
 
   return (
     <Button 
-      variant={variant} 
+      variant="destructive" 
       size="sm" 
       onClick={handleDelete} 
       disabled={isLoading}
-      className={cn(
-        variant === 'destructive' ? 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border-red-100' : '',
-        className
-      )}
+      className={cn("flex-shrink-0 gap-1", className)}
     >
-      {isLoading ? '...' : <><Trash2 className="w-4 h-4 mr-1" /> Delete</>}
+      {isLoading ? '...' : <><Trash2 className="w-4 h-4" /> Delete</>}
     </Button>
   )
 }
