@@ -1,10 +1,12 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function addRoom(propertyId: string, formData: FormData) {
   const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
   
   const name = formData.get('name') as string
   const acType = formData.get('acType') as string
@@ -26,12 +28,12 @@ export async function addRoom(propertyId: string, formData: FormData) {
       const fileExt = imageFile.name.split('.').pop()
       const fileName = `room-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
       
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabaseAdmin.storage
         .from('property_images')
         .upload(fileName, imageFile)
         
       if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage
+        const { data: publicUrlData } = supabaseAdmin.storage
           .from('property_images')
           .getPublicUrl(fileName)
           

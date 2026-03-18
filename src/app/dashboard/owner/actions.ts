@@ -46,14 +46,14 @@ export async function createProperty(formData: FormData) {
   for (const imageFile of imageFiles) {
     if (imageFile && imageFile.size > 0) {
       const fileExt = imageFile.name.split('.').pop()
-      const fileName = `${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+      const fileName = `prop-${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
       
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabaseAdmin.storage
         .from('property_images')
         .upload(fileName, imageFile)
         
       if (!uploadError) {
-        const { data: urlData } = supabase.storage.from('property_images').getPublicUrl(fileName)
+        const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
         image_urls.push(urlData.publicUrl)
       } else {
         console.error('Image upload failed:', uploadError)

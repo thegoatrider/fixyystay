@@ -136,15 +136,24 @@ export default function PropertyDetailClient({
         {/* Main Image Gallery */}
         <div className="flex flex-col gap-3">
           <div className="h-[400px] bg-gray-100 rounded-3xl overflow-hidden shadow-sm relative group border-2 border-white ring-1 ring-gray-100">
-            {(property.image_urls && property.image_urls.length > 0) || property.image_url ? (
-              <img 
-                src={activeImage || (property.image_urls && property.image_urls[0]) || property.image_url} 
-                alt={property.name} 
-                className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105" 
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">🏨</div>
-            )}
+            {/* Logic to determine main image and gallery images */}
+            {(() => {
+              const propImages = property.image_urls || []
+              const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
+              const allImages = [...propImages, ...roomImages]
+              const mainImg = activeImage || allImages[0] || property.image_url
+              
+              if (mainImg) {
+                return (
+                  <img 
+                    src={mainImg} 
+                    alt={property.name} 
+                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105" 
+                  />
+                )
+              }
+              return <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">🏨</div>
+            })()}
             
             {/* Overlay Tag */}
             <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 shadow-xl border border-white">
@@ -153,28 +162,37 @@ export default function PropertyDetailClient({
           </div>
 
           {/* Thumbnails */}
-          {property.image_urls && property.image_urls.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2 px-1 scrollbar-hide">
-              {property.image_urls.map((url: string, i: number) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveImage(url)}
-                  className={cn(
-                    "relative w-24 h-20 rounded-2xl overflow-hidden flex-shrink-0 transition-all duration-300 border-2",
-                    (activeImage === url || (!activeImage && i === 0)) 
-                      ? "border-blue-600 ring-4 ring-blue-50 scale-95 shadow-lg" 
-                      : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
-                  )}
-                >
-                  <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
-                  <div className={cn(
-                    "absolute inset-0 transition-colors",
-                    (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
-                  )} />
-                </button>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const propImages = property.image_urls || []
+            const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
+            const allImages = [...new Set([...propImages, ...roomImages])] // Unique images
+            
+            if (allImages.length > 1) {
+              return (
+                <div className="flex gap-3 overflow-x-auto pb-2 px-1 scrollbar-hide">
+                  {allImages.map((url: string, i: number) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(url)}
+                      className={cn(
+                        "relative w-24 h-20 rounded-2xl overflow-hidden flex-shrink-0 transition-all duration-300 border-2",
+                        (activeImage === url || (!activeImage && i === 0)) 
+                          ? "border-blue-600 ring-4 ring-blue-50 scale-95 shadow-lg" 
+                          : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
+                      )}
+                    >
+                      <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                      <div className={cn(
+                        "absolute inset-0 transition-colors",
+                        (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
+                      )} />
+                    </button>
+                  ))}
+                </div>
+              )
+            }
+            return null
+          })()}
         </div>
         
         <div className="bg-white p-6 rounded-xl border shadow-sm">
