@@ -143,7 +143,7 @@ export default function CreatePropertyForm() {
 
       <div className="space-y-2">
         <Label htmlFor="image">Property Image</Label>
-        <Input name="image" type="file" accept="image/*" />
+        <Input name="image" type="file" accept="image/*" multiple />
       </div>
 
       <Button type="submit" className="w-full mt-2" disabled={isLoading}>

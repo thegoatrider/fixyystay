@@ -152,7 +152,7 @@ export default async function PropertyDetailPage(
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="image">Room Photo</Label>
-                  <Input type="file" name="image" accept="image/*" />
+                  <Input type="file" name="image" accept="image/*" multiple />
                 </div>
                 <Button type="submit" className="w-full">Add Room</Button>
               </form>

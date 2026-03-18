@@ -195,25 +195,42 @@ export default function PropertyDetailClient({
         ) : (
           <form action={handleBook} className="flex flex-col gap-5">
             <div className="space-y-2">
-              <Label htmlFor="roomSelection">Select a Room</Label>
-              <div className="flex flex-col gap-2">
+              <Label>Available Room Types</Label>
+              <div className="flex flex-col gap-3">
                 {availableRooms.map(room => (
-                  <label key={room.id} className={`flex justify-between items-center p-3 rounded-lg border cursor-pointer transition-colors ${selectedRoomId === room.id ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="radio" 
-                        name="roomId" 
-                        value={room.id}
-                        checked={selectedRoomId === room.id}
-                        onChange={() => setSelectedRoomId(room.id)}
-                        className="text-blue-600 focus:ring-blue-600"
-                      />
-                      <div>
-                        <div className="font-semibold">{room.name}</div>
-                        <div className="text-xs text-gray-500">{room.category}</div>
+                  <label
+                    key={room.id}
+                    className={`flex gap-4 items-center p-3 rounded-xl border cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-600 bg-blue-50 shadow-sm' : 'hover:bg-gray-50 border-gray-200'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="roomId"
+                      value={room.id}
+                      checked={selectedRoomId === room.id}
+                      onChange={() => setSelectedRoomId(room.id)}
+                      className="sr-only"
+                    />
+                    {/* Room image */}
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border">
+                      {room.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={room.image_url} alt={room.category} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">No Img</div>
+                      )}
+                    </div>
+                    {/* Room info — no name/number shown */}
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-900">
+                        {room.category} Room
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {room.is_ac === false ? '❄️ Non-AC' : '❄️ AC'} &nbsp;·&nbsp; per night
                       </div>
                     </div>
-                    <div className="font-bold text-green-600">₹{room.currentPrice || room.base_price}</div>
+                    <div className="font-extrabold text-green-600 text-lg shrink-0">
+                      ₹{room.currentPrice || room.base_price}
+                    </div>
                   </label>
                 ))}
               </div>
