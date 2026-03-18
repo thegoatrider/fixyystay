@@ -78,7 +78,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
         <div className="flex flex-col gap-1">
           <Label className="text-[10px] font-bold uppercase text-gray-400">Selected Room</Label>
           <select 
-            className="border rounded-lg px-3 py-2 text-sm bg-white font-semibold shadow-sm min-w-[280px] focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            className="border rounded-lg px-3 py-2 text-sm bg-white font-semibold shadow-sm min-w-[220px] focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             value={selectedRoom}
             onChange={e => {
               setSelectedRoom(e.target.value)
@@ -139,13 +139,13 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
           const monthDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
           
           return (
-            <div key={mIndex} className="min-w-full snap-start p-4">
-              <div className="grid grid-cols-7 gap-1 mb-2">
+            <div key={mIndex} className="min-w-full snap-start p-2">
+              <div className="grid grid-cols-7 gap-0.5 mb-1">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2">{day}</div>
+                  <div key={day} className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1">{day}</div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-0.5">
                 {monthDays.map((date) => {
                   const dateStr = format(date, 'yyyy-MM-dd')
                   const isCurrentMonth = isSameMonth(date, monthDate)
@@ -165,7 +165,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                       key={dateStr}
                       onClick={() => setSelectedDateDetails(date)}
                       className={`
-                        min-h-[90px] lg:min-h-[110px] border rounded-lg p-2 flex flex-col transition shadow-sm cursor-pointer relative
+                        min-h-[64px] border rounded-md p-1.5 flex flex-col transition cursor-pointer relative
                         ${!isCurrentMonth ? 'bg-gray-50/30 border-transparent opacity-20 pointer-events-none' : 'bg-white border-gray-100 hover:border-blue-300 hover:shadow-md'}
                         ${!isAvailable && isCurrentMonth ? 'bg-red-50/30' : ''}
                         ${selectedDateStr === dateStr ? 'ring-2 ring-blue-500 border-transparent z-10' : ''}
@@ -196,7 +196,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                               handleToggleAvailability(date, isAvailable);
                             }}
                             className={`
-                              text-[9px] py-1 rounded-md font-bold uppercase tracking-tighter transition-colors
+                              text-[8px] py-0.5 rounded font-bold uppercase tracking-tighter transition-colors
                               ${isAvailable 
                                 ? 'bg-blue-50 text-blue-600 hover:bg-red-50 hover:text-red-600' 
                                 : 'bg-red-100 text-red-700 hover:bg-blue-100 hover:text-blue-600'}
