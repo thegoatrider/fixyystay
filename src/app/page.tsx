@@ -58,20 +58,20 @@ export default async function Index() {
             </div>
 
             {/* Role-specific Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
               <Link href="/login?role=owner" className="w-full">
-                <Button variant="outline" className="w-full h-12 bg-white">
-                  Property Owner
+                <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight">
+                  Are you a property owner? <br/> <span className="text-blue-600 font-bold">Click here</span>
                 </Button>
               </Link>
               <Link href="/login?role=influencer" className="w-full">
-                <Button variant="outline" className="w-full h-12 bg-white">
-                  Influencer / Agent
+                <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight">
+                  Are you an influencer? <br/> <span className="text-blue-600 font-bold">Click here</span>
                 </Button>
               </Link>
               <Link href="/login?role=admin" className="w-full">
-                <Button variant="outline" className="w-full h-12 bg-white">
-                  Admin Login
+                <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight">
+                  Admin <br/> <span className="text-blue-600 font-bold">Login</span>
                 </Button>
               </Link>
             </div>
