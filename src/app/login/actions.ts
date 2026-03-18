@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 
 export async function login(formData: FormData) {
@@ -45,6 +46,7 @@ export async function signup(formData: FormData) {
   }
 
   // 1. Sign up user and store role in user_metadata
+  const origin = (await headers()).get('origin')
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -53,6 +55,7 @@ export async function signup(formData: FormData) {
         name,
         role,
       },
+      emailRedirectTo: `${origin}/auth/callback`,
     },
   })
 

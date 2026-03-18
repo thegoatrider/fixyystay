@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { addRoom } from './actions'
 import BookingCalendar from './Calendar'
 import { ArrowLeft, CheckCircle, Clock } from 'lucide-react'
+import AddRoomForm from './AddRoomForm'
 
 export default async function PropertyDetailPage(
   props: {
@@ -106,57 +107,7 @@ export default async function PropertyDetailPage(
           </div>
 
           {property.type !== 'villa' && (
-            <div className="bg-white border rounded-lg p-5 shadow-sm sticky top-24">
-              <h3 className="font-bold mb-4">Add a New Room</h3>
-              <form action={addRoom.bind(null, propertyId)} className="flex flex-col gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Room Name / Label</Label>
-                  <Input name="name" placeholder="e.g. Room 101" required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="acType">AC / Non AC</Label>
-                    <select name="acType" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
-                      <option value="AC">AC</option>
-                      <option value="Non AC">Non AC</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <select name="category" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
-                      <option value="Standard">Standard</option>
-                      <option value="Premium">Premium</option>
-                      <option value="Deluxe">Deluxe</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="basePrice">Base Price (₹ per night)</Label>
-                  <Input type="number" name="basePrice" placeholder="2000" min="0" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="priceBucket">Price Cap / Bucket</Label>
-                  <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
-                    <option value="" disabled selected>Select price bucket...</option>
-                    <option value="₹799">₹799</option>
-                    <option value="₹999">₹999</option>
-                    <option value="₹1299">₹1299</option>
-                    <option value="₹1499">₹1499</option>
-                    <option value="₹1999">₹1999</option>
-                    <option value="₹2499">₹2499</option>
-                    <option value="₹2999">₹2999</option>
-                    <option value="₹3499">₹3499</option>
-                    <option value="₹3999">₹3999</option>
-                    <option value="₹6999">₹6999</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="image">Room Photo</Label>
-                  <Input type="file" name="image" accept="image/*" multiple />
-                </div>
-                <Button type="submit" className="w-full">Add Room</Button>
-              </form>
-            </div>
+            <AddRoomForm propertyId={propertyId} />
           )}
         </div>
 

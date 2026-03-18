@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
   const [isLoading, setIsLoading] = useState(false)
+  const [previews, setPreviews] = useState<string[]>([])
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -30,6 +31,17 @@ export default function CreatePropertyForm() {
       alert('An unexpected error occurred. Please try again.')
       setIsLoading(false)
     }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    // Clean up old previews
+    previews.forEach(url => URL.revokeObjectURL(url))
+
+    const newPreviews = Array.from(files).map(file => URL.createObjectURL(file))
+    setPreviews(newPreviews)
   }
 
   return (
@@ -142,8 +154,29 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="image">Property Image</Label>
-        <Input name="image" type="file" accept="image/*" multiple />
+        <Label htmlFor="image">Property Images</Label>
+        <Input 
+          name="image" 
+          type="file" 
+          accept="image/*" 
+          multiple 
+          onChange={handleFileChange}
+          className="cursor-pointer"
+        />
+        
+        {previews.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+            {previews.map((url, index) => (
+              <div key={index} className="relative w-20 h-20 rounded-md overflow-hidden border bg-white group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="text-white font-bold text-[10px]">{index + 1}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Button type="submit" className="w-full mt-2" disabled={isLoading}>

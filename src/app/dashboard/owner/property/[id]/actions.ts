@@ -17,26 +17,28 @@ export async function addRoom(propertyId: string, formData: FormData) {
     throw new Error('Price Bucket must be selected.')
   }
 
-  // Handle Image Upload
-  const imageFile = formData.get('image') as File
-  let image_url = null
+  // Handle Multiple Image Uploads
+  const imageFiles = formData.getAll('image') as File[]
+  const image_urls: string[] = []
   
-  if (imageFile && imageFile.size > 0) {
-    const fileExt = imageFile.name.split('.').pop()
-    const fileName = `room-${propertyId}-${Date.now()}.${fileExt}`
-    
-    const { error: uploadError } = await supabase.storage
-      .from('property_images')
-      .upload(fileName, imageFile)
+  for (const imageFile of imageFiles) {
+    if (imageFile && imageFile.size > 0) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `room-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
       
-    if (uploadError) {
-      console.error('Failed to upload room image:', uploadError)
-    } else {
-      const { data: publicUrlData } = supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('property_images')
-        .getPublicUrl(fileName)
+        .upload(fileName, imageFile)
         
-      image_url = publicUrlData.publicUrl
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage
+          .from('property_images')
+          .getPublicUrl(fileName)
+          
+        image_urls.push(publicUrlData.publicUrl)
+      } else {
+        console.error('Failed to upload room image:', uploadError)
+      }
     }
   }
 
@@ -46,7 +48,8 @@ export async function addRoom(propertyId: string, formData: FormData) {
     category,
     base_price: basePrice,
     price_bucket: priceBucket,
-    image_url
+    image_urls,
+    image_url: image_urls[0] || null // Backward compatibility
   }])
 
   if (error) {

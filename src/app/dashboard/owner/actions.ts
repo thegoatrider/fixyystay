@@ -40,18 +40,25 @@ export async function createProperty(formData: FormData) {
   const cityArea = formData.get('cityArea') as string
   const helpdeskNumber = formData.get('helpdeskNumber') as string
 
-  // 4. Handle optional image upload
-  let image_url: string | null = null
-  const imageFile = formData.get('image') as File
-  if (imageFile && imageFile.size > 0) {
-    const fileExt = imageFile.name.split('.').pop()
-    const fileName = `${owner.id}-${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage
-      .from('property_images')
-      .upload(fileName, imageFile)
-    if (!uploadError) {
-      const { data: urlData } = supabase.storage.from('property_images').getPublicUrl(fileName)
-      image_url = urlData.publicUrl
+  // 4. Handle multiple image uploads
+  const imageFiles = formData.getAll('image') as File[]
+  const image_urls: string[] = []
+  
+  for (const imageFile of imageFiles) {
+    if (imageFile && imageFile.size > 0) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('property_images')
+        .upload(fileName, imageFile)
+        
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('property_images').getPublicUrl(fileName)
+        image_urls.push(urlData.publicUrl)
+      } else {
+        console.error('Image upload failed:', uploadError)
+      }
     }
   }
 
@@ -64,7 +71,8 @@ export async function createProperty(formData: FormData) {
       type,
       description,
       amenities,
-      image_url,
+      image_urls,
+      image_url: image_urls[0] || null, // Keep for backward compatibility
       helpdesk_number: helpdeskNumber,
       city_area: cityArea,
       latitude,
