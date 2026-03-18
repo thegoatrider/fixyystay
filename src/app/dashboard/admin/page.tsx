@@ -124,7 +124,7 @@ export default async function AdminDashboard() {
                       'use server'
                       const infId = formData.get('influencerId') as string
                       if (infId) await assignInfluencer(prop.id, infId)
-                    }} className="flex items-center gap-2">
+                    }} className="flex-shrink-0 flex items-center gap-2">
                       <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50" required defaultValue="">
                         <option value="" disabled>Select Influencer...</option>
                         {influencers?.map(inf => (
@@ -133,11 +133,11 @@ export default async function AdminDashboard() {
                       </select>
                       <Button type="submit" size="sm" variant="secondary">Assign</Button>
                     </form>
-                    <div className="w-px h-6 bg-gray-200" />
-                    <Button asChild size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                    <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
+                    <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
                       <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
                     </Button>
-                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
                   </td>
                 </tr>
               ))}
