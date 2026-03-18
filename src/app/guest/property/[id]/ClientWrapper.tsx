@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { format } from 'date-fns'
 import Link from 'next/link'
 import { logClick, bookRoom } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MapPin, User, Phone, CheckCircle } from 'lucide-react'
+import { Calendar } from '@/components/ui/calendar'
+import { cn } from '@/lib/utils'
 
 // Simple client wrapper for logging click
 function ClickTracker({ propertyId, refId }: { propertyId: string, refId: string }) {
@@ -44,6 +47,20 @@ export default function PropertyDetailClient({
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isConfirmed, setIsConfirmed] = useState(false)
+  
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const calendarRef = useRef<HTMLDivElement>(null)
+
+  // Handle click outside to close calendar
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setIsCalendarOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     const confirmed = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]')
@@ -235,28 +252,49 @@ export default function PropertyDetailClient({
                 ))}
               </div>
             </div>
+                   <div className="grid grid-cols-2 gap-4 relative" ref={calendarRef}>
+              <div className="space-y-2">
+                <Label>Check-in</Label>
+                <div 
+                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors items-center font-medium"
+                >
+                  {checkin ? format(new Date(checkin), 'MMM dd, yyyy') : 'Select date'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Check-out</Label>
+                <div 
+                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors items-center font-medium"
+                >
+                  {checkout ? format(new Date(checkout), 'MMM dd, yyyy') : 'Select date'}
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="checkin">Check-in</Label>
-                <Input 
-                  type="date" 
-                  name="checkin" 
-                  value={checkin} 
-                  onChange={(e) => setCheckin(e.target.value)} 
-                  required 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="checkout">Check-out</Label>
-                <Input 
-                  type="date" 
-                  name="checkout" 
-                  value={checkout} 
-                  onChange={(e) => setCheckout(e.target.value)} 
-                  required 
-                />
-              </div>
+              {isCalendarOpen && (
+                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-50 bg-white border-2 border-blue-50 shadow-2xl rounded-2xl p-2 animate-in fade-in zoom-in-95 duration-200">
+                  <Calendar
+                    mode="range"
+                    selected={{
+                      from: checkin ? new Date(checkin) : undefined,
+                      to: checkout ? new Date(checkout) : undefined
+                    }}
+                    onSelect={(range) => {
+                      if (range?.from) setCheckin(format(range.from, 'yyyy-MM-dd'))
+                      if (range?.to) {
+                        setCheckout(format(range.to, 'yyyy-MM-dd'))
+                        setIsCalendarOpen(false)
+                      } else {
+                        setCheckout('')
+                      }
+                    }}
+                    numberOfMonths={1}
+                    disabled={{ before: new Date() }}
+                    className="rounded-xl"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -265,14 +303,15 @@ export default function PropertyDetailClient({
                 name="guests"
                 value={guests}
                 onChange={(e) => setGuests(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
               >
-                <option value="1">1 Guest</option>
-                <option value="2">2 Guests</option>
-                <option value="3">3 Guests</option>
-                <option value="4">4+ Guests</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                  <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+                ))}
+                <option value="11+">11+ Guests</option>
               </select>
             </div>
+      
 
             <div className="space-y-2 mt-2">
               <Label htmlFor="guestName" className="flex items-center gap-1"><User className="w-4 h-4" /> Guest Name</Label>
