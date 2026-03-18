@@ -42,6 +42,7 @@ export default function PropertyDetailClient({
   const [checkin, setCheckin] = useState(initialCheckin || '')
   const [checkout, setCheckout] = useState(initialCheckout || '')
   const [guests, setGuests] = useState(initialGuests || '2')
+  const [activeImage, setActiveImage] = useState<string | null>(null)
   
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -132,8 +133,48 @@ export default function PropertyDetailClient({
       
       {/* Property Details */}
       <div className="flex flex-col gap-6">
-        <div className="h-64 bg-gray-200 rounded-xl overflow-hidden shadow-inner flex items-center justify-center border">
-          <span className="text-gray-400 text-3xl">Property Image Preview</span>
+        {/* Main Image Gallery */}
+        <div className="flex flex-col gap-3">
+          <div className="h-[400px] bg-gray-100 rounded-3xl overflow-hidden shadow-sm relative group border-2 border-white ring-1 ring-gray-100">
+            {(property.image_urls && property.image_urls.length > 0) || property.image_url ? (
+              <img 
+                src={activeImage || (property.image_urls && property.image_urls[0]) || property.image_url} 
+                alt={property.name} 
+                className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105" 
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">🏨</div>
+            )}
+            
+            {/* Overlay Tag */}
+            <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 shadow-xl border border-white">
+              {property.type}
+            </div>
+          </div>
+
+          {/* Thumbnails */}
+          {property.image_urls && property.image_urls.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2 px-1 scrollbar-hide">
+              {property.image_urls.map((url: string, i: number) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveImage(url)}
+                  className={cn(
+                    "relative w-24 h-20 rounded-2xl overflow-hidden flex-shrink-0 transition-all duration-300 border-2",
+                    (activeImage === url || (!activeImage && i === 0)) 
+                      ? "border-blue-600 ring-4 ring-blue-50 scale-95 shadow-lg" 
+                      : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
+                  )}
+                >
+                  <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                  <div className={cn(
+                    "absolute inset-0 transition-colors",
+                    (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
+                  )} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         
         <div className="bg-white p-6 rounded-xl border shadow-sm">
