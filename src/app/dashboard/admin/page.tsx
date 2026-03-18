@@ -101,7 +101,7 @@ export default async function AdminDashboard() {
       {/* SECTION 2: All Properties */}
       <section>
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <CheckCircle className="text-green-500" /> Approved Properties (LIVE DEPLOY)
+          <CheckCircle className="text-green-500" /> Approved Properties
         </h2>
         <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
           <table className="w-full text-sm text-left">
