@@ -119,25 +119,27 @@ export default async function AdminDashboard() {
                   <td className="px-6 py-4 font-medium">{prop.name}</td>
                   <td className="px-6 py-4">{prop.owners?.name}</td>
                   <td className="px-6 py-4 capitalize">{prop.type}</td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                    <form action={async (formData) => {
-                      'use server'
-                      const infId = formData.get('influencerId') as string
-                      if (infId) await assignInfluencer(prop.id, infId)
-                    }} className="flex-shrink-0 flex items-center gap-2">
-                      <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50" required defaultValue="">
-                        <option value="" disabled>Select Influencer...</option>
-                        {influencers?.map(inf => (
-                          <option key={inf.id} value={inf.id}>{inf.name}</option>
-                        ))}
-                      </select>
-                      <Button type="submit" size="sm" variant="secondary">Assign</Button>
-                    </form>
-                    <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
-                    <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
-                      <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
-                    </Button>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <form action={async (formData) => {
+                        'use server'
+                        const infId = formData.get('influencerId') as string
+                        if (infId) await assignInfluencer(prop.id, infId)
+                      }} className="flex-shrink-0 flex items-center gap-2">
+                        <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50" required defaultValue="">
+                          <option value="" disabled>Select Influencer...</option>
+                          {influencers?.map(inf => (
+                            <option key={inf.id} value={inf.id}>{inf.name}</option>
+                          ))}
+                        </select>
+                        <Button type="submit" size="sm" variant="secondary" className="flex-shrink-0">Assign</Button>
+                      </form>
+                      <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+                      <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
+                      <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
+                        <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
