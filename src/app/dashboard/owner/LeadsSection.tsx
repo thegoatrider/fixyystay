@@ -58,7 +58,7 @@ export default function LeadsSection({
     if (result.success && result.lead) {
       // WhatsApp Integration
       const propertyName = properties.find(p => p.id === selectedPropertyId)?.name || 'Property'
-      const propertyUrl = `${window.location.origin}/guest/property/${selectedPropertyId}`
+      const propertyUrl = `https://www.fixystays.com/guest/property/${selectedPropertyId}`
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. You can view the property details here: ${propertyUrl}`
       const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
       
@@ -232,7 +232,7 @@ export default function LeadsSection({
                   <td className="px-6 py-4">
                     <a 
                       href={`https://wa.me/${lead.phone_number.replace(/\D/g, '')}?text=${encodeURIComponent(
-                        `Hello! I am the owner of ${lead.properties.name}. I am following up on your enquiry for the dates ${lead.checkin_date || 'TBD'} to ${lead.checkout_date || 'TBD'}. You can view the property details here: ${typeof window !== 'undefined' ? window.location.origin : 'https://fixyystay.vercel.app'}/guest/property/${lead.property_id}`
+                        `Hello! I am the owner of ${lead.properties.name}. I am following up on your enquiry for the dates ${lead.checkin_date || 'TBD'} to ${lead.checkout_date || 'TBD'}. You can view the property details here: https://www.fixystays.com/guest/property/${lead.property_id}`
                       )}`} 
                       target="_blank" 
                       rel="noopener noreferrer"

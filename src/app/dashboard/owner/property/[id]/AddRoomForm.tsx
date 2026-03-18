@@ -12,17 +12,27 @@ interface AddRoomFormProps {
 
 export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
 
-    // Clean up old previews
-    previews.forEach(url => URL.revokeObjectURL(url))
+    const newFiles = Array.from(files)
+    const newPreviews = newFiles.map(file => URL.createObjectURL(file))
+    
+    setSelectedFiles(prev => [...prev, ...newFiles])
+    setPreviews(prev => [...prev, ...newPreviews])
+    
+    // Reset the input so the same file can be selected again if removed
+    e.target.value = ''
+  }
 
-    const newPreviews = Array.from(files).map(file => URL.createObjectURL(file))
-    setPreviews(newPreviews)
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(previews[index])
+    setPreviews(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -30,11 +40,18 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
     setIsLoading(true)
     const formData = new FormData(e.currentTarget)
     
+    // Clear 'image' and manually append our state-managed files
+    formData.delete('image')
+    selectedFiles.forEach(file => {
+      formData.append('image', file)
+    })
+    
     try {
       await addRoom(propertyId, formData)
-      // Reset previews on success
+      // Reset state on success
       previews.forEach(url => URL.revokeObjectURL(url))
       setPreviews([])
+      setSelectedFiles([])
       e.currentTarget.reset()
     } catch (err) {
       console.error(err)
@@ -103,9 +120,18 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
           {previews.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-dashed border-gray-200">
               {previews.map((url, index) => (
-                <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border bg-white shadow-sm">
+                <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border bg-white shadow-sm group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>

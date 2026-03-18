@@ -10,14 +10,22 @@ import { useRouter } from 'next/navigation'
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    
     const formData = new FormData(e.currentTarget)
     
+    // Clear the original 'image' file inputs and manually append our state-managed files
+    formData.delete('image')
+    selectedFiles.forEach(file => {
+      formData.append('image', file)
+    })
+
     try {
       const result = await createProperty(formData)
       if (result?.error) {
@@ -37,11 +45,20 @@ export default function CreatePropertyForm() {
     const files = e.target.files
     if (!files) return
 
-    // Clean up old previews
-    previews.forEach(url => URL.revokeObjectURL(url))
+    const newFiles = Array.from(files)
+    const newPreviews = newFiles.map(file => URL.createObjectURL(file))
+    
+    setSelectedFiles(prev => [...prev, ...newFiles])
+    setPreviews(prev => [...prev, ...newPreviews])
+    
+    // Reset the input so the same file can be selected again if removed
+    e.target.value = ''
+  }
 
-    const newPreviews = Array.from(files).map(file => URL.createObjectURL(file))
-    setPreviews(newPreviews)
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(previews[index])
+    setPreviews(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   return (
@@ -181,13 +198,23 @@ export default function CreatePropertyForm() {
         />
         
         {previews.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <div className="flex flex-wrap gap-3 mt-2 max-h-64 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
             {previews.map((url, index) => (
-              <div key={index} className="relative w-20 h-20 rounded-md overflow-hidden border bg-white group">
+              <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 bg-white group shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span className="text-white font-bold text-[10px]">{index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removeImage(index)}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
+                  title="Remove image"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
+                  {index + 1}
                 </div>
               </div>
             ))}
