@@ -69,3 +69,20 @@ export async function updateLeadMarking(leadId: string, marking: string) {
   revalidatePath('/dashboard/owner')
   return { success: true }
 }
+
+export async function deleteLead(leadId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .delete()
+    .eq('id', leadId)
+
+  if (error) {
+    console.error('Error deleting lead:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/dashboard/owner')
+  return { success: true }
+}
