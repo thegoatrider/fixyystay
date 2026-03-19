@@ -39,6 +39,7 @@ export async function createProperty(formData: FormData) {
   const cityArea = formData.get('cityArea') as string
   const helpdeskNumber = formData.get('helpdeskNumber') as string
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
+  const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
   const extra_per_pax = parseFloat(formData.get('extra_per_pax') as string) || 0
 
   // 4. Handle multiple image uploads
@@ -80,6 +81,7 @@ export async function createProperty(formData: FormData) {
       longitude,
       approved: false,
       max_guests,
+      max_capacity,
       extra_per_pax,
     })
     .select('id')

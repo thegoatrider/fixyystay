@@ -148,9 +148,9 @@ export default function CreatePropertyForm() {
       </div>
 
       {/* Guest Pricing Fields */}
-      <div className="grid grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
         <div className="space-y-2">
-          <Label htmlFor="max_guests">Max Guests (included in base price)</Label>
+          <Label htmlFor="max_guests">Base Guests (included in price)</Label>
           <select
             name="max_guests"
             defaultValue="2"
@@ -161,7 +161,21 @@ export default function CreatePropertyForm() {
               <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
             ))}
           </select>
-          <p className="text-[11px] text-gray-400">Number of guests the base price covers</p>
+          <p className="text-[11px] text-gray-400">Guests the base price covers</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="max_capacity">Maximum Capacity</Label>
+          <Input
+            name="max_capacity"
+            type="number"
+            min="1"
+            step="1"
+            defaultValue="10"
+            placeholder="e.g. 15"
+            required
+          />
+          <p className="text-[11px] text-gray-400">Absolute max guests allowed — dropdown stops here</p>
         </div>
 
         <div className="space-y-2">
@@ -172,9 +186,9 @@ export default function CreatePropertyForm() {
             min="0"
             step="1"
             defaultValue="0"
-            placeholder="e.g. 499"
+            placeholder="e.g. 2999"
           />
-          <p className="text-[11px] text-gray-400">₹0 = no extra charge beyond max guests</p>
+          <p className="text-[11px] text-gray-400">₹0 = no extra charge beyond base guests</p>
         </div>
       </div>
 
