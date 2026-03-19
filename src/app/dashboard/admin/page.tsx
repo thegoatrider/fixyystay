@@ -4,6 +4,7 @@ import { approveProperty, assignInfluencer } from './actions'
 import { CheckCircle, Users } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
+import FeaturedToggle from './FeaturedToggle'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -110,6 +111,7 @@ export default async function AdminDashboard() {
                 <th className="px-6 py-3">Property Name</th>
                 <th className="px-6 py-3">Owner</th>
                 <th className="px-6 py-3">Type</th>
+                <th className="px-6 py-3 text-center">Featured</th>
                 <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -119,6 +121,11 @@ export default async function AdminDashboard() {
                   <td className="px-6 py-4 font-medium">{prop.name}</td>
                   <td className="px-6 py-4">{prop.owners?.name}</td>
                   <td className="px-6 py-4 capitalize">{prop.type}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center">
+                      <FeaturedToggle propertyId={prop.id} featured={!!prop.featured} />
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <form action={async (formData) => {
