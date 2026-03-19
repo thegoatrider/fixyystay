@@ -93,13 +93,26 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  
-  // Usually, it requires email confirmation, but we will redirect to / (or specific dashboards)
-  // If email confirm is on, authData.session is null.
-  if (!authData.session) {
-    redirect(`/login?message=Check your email to continue sign in process&next=${encodeURIComponent(next)}`)
-  } else {
+
+  // Immediately sign the user in — don't rely on authData.session (unreliable even with email confirm off)
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (signInError) {
+    // Account created but auto-login failed — send to login with a helpful message
+    redirect(`/login?message=Account created! Please log in.&role=${role}&next=${encodeURIComponent(next)}`)
+  }
+
+  revalidatePath('/', 'layout')
+
+  // Redirect to role-specific dashboard
+  if (next && next !== '/') {
     redirect(next)
+  } else if (role === 'owner') {
+    redirect('/dashboard/owner')
+  } else if (role === 'influencer') {
+    redirect('/dashboard/influencer')
+  } else {
+    redirect('/guest')
   }
 }
 
