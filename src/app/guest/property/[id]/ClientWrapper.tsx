@@ -77,6 +77,7 @@ export default function PropertyDetailClient({
 
   // Guest count pricing
   const maxGuests: number = property.max_guests || 0
+  const maxCapacity: number = property.max_capacity || 20
   const extraPerPax: number = property.extra_per_pax || 0
   const guestCount = parseInt(guests) || 2
   const extraGuests = maxGuests > 0 && guestCount > maxGuests ? guestCount - maxGuests : 0
@@ -372,11 +373,13 @@ export default function PropertyDetailClient({
                 onChange={(e) => setGuests(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
               >
-                {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                {Array.from({ length: maxCapacity }, (_, i) => i + 1).map(n => (
                   <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                 ))}
-                <option value="21">21+ Guests</option>
               </select>
+              {maxCapacity > 0 && (
+                <p className="text-[11px] text-gray-400">Max capacity: {maxCapacity} guests</p>
+              )}
             </div>
 
             {/* Price Breakdown */}
