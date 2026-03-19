@@ -75,6 +75,14 @@ export default function PropertyDetailClient({
   // Real pricing would consider dates. Here we just take today's price or base price.
   const roomPrice = selectedRoom?.currentPrice || selectedRoom?.base_price || 0
 
+  // Guest count pricing
+  const maxGuests: number = property.max_guests || 0
+  const extraPerPax: number = property.extra_per_pax || 0
+  const guestCount = parseInt(guests) || 2
+  const extraGuests = maxGuests > 0 && guestCount > maxGuests ? guestCount - maxGuests : 0
+  const extraCharge = extraGuests * extraPerPax
+  const totalPrice = roomPrice + extraCharge
+
   async function handleBook(formData: FormData) {
     if (!selectedRoomId) return
     setIsLoading(true)
@@ -364,13 +372,43 @@ export default function PropertyDetailClient({
                 onChange={(e) => setGuests(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
               >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
                   <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                 ))}
-                <option value="11+">11+ Guests</option>
+                <option value="21">21+ Guests</option>
               </select>
             </div>
-      
+
+            {/* Price Breakdown */}
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">
+                  Base price
+                  {maxGuests > 0 && (
+                    <span className="text-gray-400 ml-1">(up to {maxGuests} guests)</span>
+                  )}
+                </span>
+                <span className="font-bold text-gray-900">₹{roomPrice.toLocaleString()}</span>
+              </div>
+
+              {extraGuests > 0 && extraPerPax > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-orange-600">
+                    +{extraGuests} extra {extraGuests === 1 ? 'guest' : 'guests'} × ₹{extraPerPax}
+                  </span>
+                  <span className="font-bold text-orange-600">+₹{extraCharge.toLocaleString()}</span>
+                </div>
+              )}
+
+              {maxGuests > 0 && guestCount <= maxGuests && extraPerPax > 0 && (
+                <p className="text-xs text-green-600 font-medium">✓ Within base guest limit — no extra charge</p>
+              )}
+
+              <div className="border-t pt-2 flex justify-between items-center">
+                <span className="font-bold text-gray-900">Total per night</span>
+                <span className="font-extrabold text-xl text-green-600">₹{totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
 
             <div className="space-y-2 mt-2">
               <Label htmlFor="guestName" className="flex items-center gap-1"><User className="w-4 h-4" /> Guest Name</Label>
@@ -389,7 +427,7 @@ export default function PropertyDetailClient({
             )}
 
             <Button type="submit" size="lg" className="w-full mt-2 text-lg" disabled={isLoading}>
-              {isLoading ? 'Processing...' : `Pay ₹${roomPrice}`}
+              {isLoading ? 'Processing...' : `Pay ₹${totalPrice.toLocaleString()}`}
             </Button>
             
             <p className="text-xs text-center text-gray-500 mt-2">
