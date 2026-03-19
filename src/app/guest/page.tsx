@@ -100,6 +100,50 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999']
   const villaBuckets = ['₹4999', '₹7999', '₹9999', '₹14999', '₹19999', '₹24999', '₹29999', '₹39999', '₹49999']
 
+  // Group by area — only when a bucket filter is active
+  const propertiesByArea: Record<string, typeof availableProperties> = {}
+  if (selectedBucket) {
+    availableProperties.forEach(prop => {
+      const area = prop.city_area || 'Other'
+      if (!propertiesByArea[area]) propertiesByArea[area] = []
+      propertiesByArea[area].push(prop)
+    })
+  }
+  const sortedAreas = Object.keys(propertiesByArea).sort()
+
+  // Shared card component (inline)
+  const PropertyCard = (prop: any) => (
+    <Link href={buildPropertyUrl(prop.id)} key={prop.id} className="group flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+      <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
+        {getPropImage(prop) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={getPropImage(prop)} alt={prop.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🏨</span>
+        )}
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
+        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-blue-800 shadow-sm">
+          {prop.type}
+        </div>
+      </div>
+      <div className="p-6 flex-1 flex flex-col">
+        <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{prop.name}</h3>
+        <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+          <MapPin className="w-3 h-3" /> {prop.city_area || 'Alibag Region'}
+        </p>
+        <p className="text-gray-500 text-sm line-clamp-2 mb-6 leading-relaxed">{prop.description}</p>
+        <div className="mt-auto flex justify-between items-end pt-4 border-t border-gray-100">
+          <div className="text-sm font-medium text-gray-500">
+            {prop.type === 'villa' ? 'Entire Villa' : `${prop.available_rooms} Rooms`}
+          </div>
+          <div className="text-sm font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100/50">
+            {prop.type === 'villa' ? 'Bookable' : `${prop.available_rooms} Available`}
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+
   return (
     <div className="flex flex-col gap-10">
       
@@ -112,17 +156,9 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
           </h3>
           <div className="flex flex-wrap gap-3">
             {roomBuckets.map(b => (
-              <Link 
-                key={b} 
-                href={buildUrl({ bucket: b })}
-                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${
-                  selectedBucket === b 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'
-                }`}
-              >
-                {b}
-              </Link>
+              <Link key={b} href={buildUrl({ bucket: b })}
+                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === b ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
+              >{b}</Link>
             ))}
           </div>
         </div>
@@ -131,17 +167,9 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
           <h3 className="text-xl font-bold text-gray-900 mb-3">Villas under</h3>
           <div className="flex flex-wrap gap-3">
             {villaBuckets.map(b => (
-              <Link 
-                key={b} 
-                href={buildUrl({ bucket: b })}
-                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${
-                  selectedBucket === b 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'
-                }`}
-              >
-                {b}
-              </Link>
+              <Link key={b} href={buildUrl({ bucket: b })}
+                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === b ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
+              >{b}</Link>
             ))}
           </div>
         </div>
@@ -149,10 +177,10 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
 
       <div>
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <Star className="text-yellow-500" /> 
+          <Star className="text-yellow-500" />
           {selectedBucket ? `Properties under ${selectedBucket}` : 'Featured Properties'}
         </h2>
-        
+
         {availableProperties.length === 0 ? (
           <div className="text-center p-12 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
             <p className="text-gray-500 text-lg">No properties found matching your selection.</p>
@@ -162,44 +190,29 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
               </Link>
             )}
           </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availableProperties.map(prop => (
-              <Link href={buildPropertyUrl(prop.id)} key={prop.id} className="group flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
-                <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
-                  {/* Property Image Placeholder */}
-                  {getPropImage(prop) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={getPropImage(prop)} 
-                      alt={prop.name} 
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                    />
-                  ) : (
-                    <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🏨</span>
-                  )}
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
-                  
-                  {/* Tag */}
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-blue-800 shadow-sm">
-                    {prop.type}
-                  </div>
+        ) : selectedBucket ? (
+          /* Grouped by area when bucket is active */
+          <div className="flex flex-col gap-10">
+            {sortedAreas.map(area => (
+              <div key={area}>
+                <div className="flex items-center gap-3 mb-4">
+                  <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                  <h3 className="text-xl font-bold text-gray-800">{area}</h3>
+                  <span className="text-sm text-gray-400 font-medium">
+                    {propertiesByArea[area].length} {propertiesByArea[area].length === 1 ? 'property' : 'properties'}
+                  </span>
+                  <div className="flex-1 h-px bg-gray-100" />
                 </div>
-                <div className="p-6 flex-1 flex flex-col">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{prop.name}</h3>
-                  <p className="text-gray-500 text-sm line-clamp-2 mb-6 leading-relaxed">{prop.description}</p>
-                  
-                  <div className="mt-auto flex justify-between items-end pt-4 border-t border-gray-100">
-                    <div className="text-sm font-medium text-gray-500 flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-gray-400" /> Destination
-                    </div>
-                    <div className="text-sm font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100/50">
-                      {prop.type === 'villa' ? 'Bookable' : `${prop.available_rooms} Rooms Available`}
-                    </div>
-                  </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {propertiesByArea[area].map(prop => PropertyCard(prop))}
                 </div>
-              </Link>
+              </div>
             ))}
+          </div>
+        ) : (
+          /* Flat grid when no bucket selected */
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableProperties.map(prop => PropertyCard(prop))}
           </div>
         )}
       </div>

@@ -179,8 +179,53 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cityArea">Rough Area / City (e.g. Alibag, Varsoli)</Label>
-        <Input name="cityArea" required placeholder="This will be shown to all guests" />
+        <Label htmlFor="cityArea">Area</Label>
+        <select
+          name="cityArea"
+          required
+          defaultValue=""
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+        >
+          <option value="" disabled>Select area...</option>
+          <optgroup label="── Alibag Raigad ──">
+            <option value="Rewas">Rewas</option>
+            <option value="Bodni">Bodni</option>
+            <option value="Karmale / Hashivare">Karmale / Hashivare</option>
+            <option value="Saral">Saral</option>
+            <option value="Chondhi">Chondhi</option>
+            <option value="Awas">Awas</option>
+            <option value="Sasawane">Sasawane</option>
+            <option value="Mandwa">Mandwa</option>
+            <option value="Kihim">Kihim</option>
+            <option value="Zirad">Zirad</option>
+            <option value="Thal">Thal</option>
+            <option value="Alibag">Alibag</option>
+            <option value="Varsoli">Varsoli</option>
+            <option value="Akshi">Akshi</option>
+            <option value="Nagaon">Nagaon</option>
+            <option value="Chaul">Chaul</option>
+            <option value="Revdanda">Revdanda</option>
+            <option value="Salav">Salav</option>
+            <option value="Korlai">Korlai</option>
+            <option value="Kashid">Kashid</option>
+            <option value="Nandgaon">Nandgaon</option>
+            <option value="Murud">Murud</option>
+            <option value="Rajpuri">Rajpuri</option>
+          </optgroup>
+          <optgroup label="── Shrivardhan Raigad ──">
+            <option value="Agardanda">Agardanda</option>
+            <option value="Dighi">Dighi</option>
+            <option value="Diveagar">Diveagar</option>
+            <option value="Borli Panchatan">Borli Panchatan</option>
+            <option value="Bagmandala">Bagmandala</option>
+            <option value="Shrivardhan">Shrivardhan</option>
+            <option value="Harihareshwar">Harihareshwar</option>
+            <option value="Velas">Velas</option>
+            <option value="Bharadkhol">Bharadkhol</option>
+            <option value="Shekhadi">Shekhadi</option>
+            <option value="Sarve">Sarve</option>
+          </optgroup>
+        </select>
       </div>
 
       <div className="space-y-2">
