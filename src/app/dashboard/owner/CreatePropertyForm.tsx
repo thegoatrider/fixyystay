@@ -147,6 +147,37 @@ export default function CreatePropertyForm() {
         </select>
       </div>
 
+      {/* Guest Pricing Fields */}
+      <div className="grid grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+        <div className="space-y-2">
+          <Label htmlFor="max_guests">Max Guests (included in base price)</Label>
+          <select
+            name="max_guests"
+            defaultValue="2"
+            className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm"
+            required
+          >
+            {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
+              <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gray-400">Number of guests the base price covers</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="extra_per_pax">Extra Cost Per Additional Guest (₹)</Label>
+          <Input
+            name="extra_per_pax"
+            type="number"
+            min="0"
+            step="1"
+            defaultValue="0"
+            placeholder="e.g. 499"
+          />
+          <p className="text-[11px] text-gray-400">₹0 = no extra charge beyond max guests</p>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="cityArea">Rough Area / City (e.g. Alibag, Varsoli)</Label>
         <Input name="cityArea" required placeholder="This will be shown to all guests" />
