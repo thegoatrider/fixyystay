@@ -225,28 +225,61 @@ export default function PropertyDetailClient({
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+            <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
               <MapPin className="text-red-500 w-5 h-5" /> Location
             </h3>
-            {isConfirmed ? (
-              <div>
-                <p className="text-gray-700 font-medium mb-2">{property.city_area}</p>
-                <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${property.latitude},${property.longitude}`}
+            <p className="text-sm text-gray-500 mb-3">
+              <span className="font-semibold text-gray-800">{property.city_area}</span>
+              {property.pincode && <span className="ml-2 text-gray-400 font-mono text-xs">· {property.pincode}</span>}
+            </p>
+
+            {/* Map embed — always visible but with overlay before booking */}
+            <div className="relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: 260 }}>
+              {property.pincode ? (
+                <iframe
+                  title="Approximate area map"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(property.pincode + ', Maharashtra, India')}&z=13&output=embed&iwloc=&maptype=roadmap`}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+                  <MapPin className="w-8 h-8 opacity-30" />
+                </div>
+              )}
+
+              {/* Overlay: before booking — blur + lock message */}
+              {!isConfirmed && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none"
+                  style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(6px)' }}>
+                  <div className="bg-white/95 rounded-2xl px-5 py-4 shadow-xl text-center border border-gray-100 max-w-xs mx-4">
+                    <div className="text-2xl mb-1">📍</div>
+                    <p className="font-bold text-gray-900 text-sm">Approximate location</p>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Exact address & precise location will be shared automatically after booking confirmation.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmed: show a "View area" link at bottom */}
+              {isConfirmed && property.pincode && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.pincode + ', Maharashtra, India')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:underline bg-blue-50 px-4 py-2 rounded-lg border border-blue-100"
+                  className="absolute bottom-3 right-3 bg-white/95 hover:bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full shadow-md border border-blue-100 flex items-center gap-1 transition-all"
                 >
-                  <MapPin className="w-4 h-4" /> Open Precise Location on Google Maps
+                  <MapPin className="w-3 h-3" /> Open in Maps
                 </a>
-              </div>
-            ) : (
-              <div className="bg-gray-50 border border-dashed rounded-xl p-4">
-                <p className="text-gray-900 font-bold mb-1 uppercase text-xs tracking-wider opacity-50">Rough Area</p>
-                <p className="text-gray-700 text-lg mb-3">{property.city_area || 'Location details restricted'}</p>
-                <div className="flex items-center gap-2 text-sm text-gray-500 bg-white/50 p-2 rounded-lg italic">
-                  <CheckCircle className="w-4 h-4 text-green-500" /> Precise location will be shared automatically after booking confirmation.
-                </div>
+              )}
+            </div>
+
+            {!isConfirmed && (
+              <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                Precise address shared automatically after booking confirmation.
               </div>
             )}
           </div>

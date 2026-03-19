@@ -34,8 +34,7 @@ export async function createProperty(formData: FormData) {
   const description = formData.get('description') as string
   const amenities = formData.getAll('amenities') as string[]
   const priceBucket = formData.get('priceBucket') as string
-  const latitude = parseFloat(formData.get('latitude') as string) || 0
-  const longitude = parseFloat(formData.get('longitude') as string) || 0
+  const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
   const helpdeskNumber = formData.get('helpdeskNumber') as string
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
@@ -77,8 +76,7 @@ export async function createProperty(formData: FormData) {
       image_url: image_urls[0] || null, // Keep for backward compatibility
       helpdesk_number: helpdeskNumber,
       city_area: cityArea,
-      latitude,
-      longitude,
+      pincode,
       approved: false,
       max_guests,
       max_capacity,
