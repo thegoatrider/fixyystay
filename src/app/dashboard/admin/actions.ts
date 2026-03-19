@@ -115,3 +115,25 @@ export async function assignInfluencer(propertyId: string, influencerId: string)
 
   revalidatePath('/dashboard/admin')
 }
+
+export async function toggleFeatured(propertyId: string, currentValue: boolean) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin') {
+    throw new Error('Unauthorized')
+  }
+
+  const { error } = await supabase
+    .from('properties')
+    .update({ featured: !currentValue })
+    .eq('id', propertyId)
+
+  if (error) {
+    console.error('Failed to toggle featured', error)
+    throw new Error('Failed to update featured status')
+  }
+
+  revalidatePath('/dashboard/admin')
+  revalidatePath('/guest')
+}

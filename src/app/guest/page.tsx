@@ -92,9 +92,12 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
 
   // Apply Price Bucket Filter
   if (selectedBucket) {
-    availableProperties = availableProperties.filter(prop => 
+    availableProperties = availableProperties.filter(prop =>
       prop.rooms.some((r: any) => r.price_bucket === selectedBucket)
     )
+  } else {
+    // No bucket selected — show only featured properties on homepage
+    availableProperties = availableProperties.filter(p => p.featured)
   }
 
   const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999']
