@@ -2,22 +2,28 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, addDays, isAfter, isBefore, isSameDay } from 'date-fns'
+import { format } from 'date-fns'
 import { DateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
-import { Calendar as CalendarIcon, Users } from 'lucide-react'
+import { Calendar as CalendarIcon, Users, X } from 'lucide-react'
 
 export function HomeSearch() {
   const router = useRouter()
-  const [range, setRange] = useState<DateRange | undefined>({
-    from: undefined,
-    to: undefined
-  })
+  const [range, setRange] = useState<DateRange | undefined>({ from: undefined, to: undefined })
   const [guests, setGuests] = useState('2')
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect screen size for responsive calendar
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Handle click outside to close calendar
   useEffect(() => {
@@ -35,60 +41,52 @@ export function HomeSearch() {
     if (range?.from) params.set('checkin', format(range.from, 'yyyy-MM-dd'))
     if (range?.to) params.set('checkout', format(range.to, 'yyyy-MM-dd'))
     if (guests) params.set('guests', guests)
-    
     router.push(`/guest?${params.toString()}`)
   }
 
   const handleSelectRange = (newRange: DateRange | undefined) => {
     setRange(newRange)
-    // If both dates are selected, close the calendar after a short delay
     if (newRange?.from && newRange?.to) {
       setTimeout(() => setIsCalendarOpen(false), 300)
     }
   }
 
   return (
-    <div className="bg-white border shadow-2xl rounded-3xl p-6 w-full max-w-4xl flex flex-col gap-5 relative group" ref={containerRef}>
+    <div className="bg-white border shadow-2xl rounded-3xl p-6 w-full max-w-4xl flex flex-col gap-5 relative" ref={containerRef}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-0 border-2 border-gray-100 rounded-2xl overflow-hidden divide-y md:divide-y-0 md:divide-x relative">
         
         {/* Date Selection Trigger */}
-        <div 
-          className="md:col-span-2 grid grid-cols-2 divide-x cursor-pointer hover:bg-blue-50/30 transition-all group/dates"
+        <div
+          className="md:col-span-2 grid grid-cols-2 divide-x cursor-pointer hover:bg-blue-50/30 transition-all"
           onClick={() => setIsCalendarOpen(!isCalendarOpen)}
         >
-          {/* Check-in Display */}
+          {/* Check-in */}
           <div className="px-6 py-4 flex flex-col items-start gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5">
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5 pointer-events-none">
               <CalendarIcon className="w-3 h-3 text-blue-500" /> Check-in
             </label>
-            <div className={cn(
-              "text-base font-bold transition-colors",
-              range?.from ? "text-gray-900" : "text-gray-400"
-            )}>
+            <div className={cn("text-base font-bold transition-colors", range?.from ? "text-gray-900" : "text-gray-400")}>
               {range?.from ? format(range.from, 'MMM dd, yyyy') : 'Add date'}
             </div>
           </div>
 
-          {/* Check-out Display */}
+          {/* Check-out */}
           <div className="px-6 py-4 flex flex-col items-start gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5">
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5 pointer-events-none">
               <CalendarIcon className="w-3 h-3 text-blue-500" /> Check-out
             </label>
-            <div className={cn(
-              "text-base font-bold transition-colors",
-              range?.to ? "text-gray-900" : "text-gray-400"
-            )}>
+            <div className={cn("text-base font-bold transition-colors", range?.to ? "text-gray-900" : "text-gray-400")}>
               {range?.to ? format(range.to, 'MMM dd, yyyy') : 'Add date'}
             </div>
           </div>
         </div>
 
         {/* Guest Select */}
-        <div className="px-6 py-4 bg-white flex flex-col items-start gap-1 relative md:col-span-1 group/guests hover:bg-blue-50/30 transition-all">
+        <div className="px-6 py-4 bg-white flex flex-col items-start gap-1 relative md:col-span-1 hover:bg-blue-50/30 transition-all">
           <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1.5">
             <Users className="w-3 h-3 text-blue-500" /> Guests
           </label>
-          <select 
+          <select
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
             className="text-base font-bold text-gray-900 bg-transparent border-none appearance-none outline-none w-full cursor-pointer focus:ring-0 p-0"
@@ -100,9 +98,9 @@ export function HomeSearch() {
           </select>
         </div>
 
-        {/* Compact Search Button on Desktop */}
+        {/* Search Button (Desktop) */}
         <div className="hidden md:flex items-center justify-center p-2 bg-white">
-          <Button 
+          <Button
             onClick={handleSearch}
             className="w-full h-full bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-200 transition-all border-none py-3"
           >
@@ -111,39 +109,67 @@ export function HomeSearch() {
         </div>
       </div>
 
-      {/* Premium Calendar Popover */}
+      {/* Calendar Popover — fixed positioning for mobile */}
       {isCalendarOpen && (
-        <div className="absolute top-[calc(100%+12px)] left-0 md:left-auto right-0 md:right-auto z-50 bg-white border-2 border-blue-50 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-3xl p-4 animate-in fade-in zoom-in-95 duration-200 origin-top">
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center px-4 pt-2">
-              <h4 className="text-sm font-black uppercase tracking-widest text-blue-900">Select dates</h4>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  setRange({ from: undefined, to: undefined })
-                }}
-                className="text-[10px] font-bold text-gray-400 hover:text-blue-600 uppercase"
+        <div className={cn(
+          "absolute left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-100",
+          "shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-3xl",
+          "animate-in fade-in zoom-in-95 duration-200 origin-top",
+          // Position below the search bar, with margin
+          "top-[calc(100%+12px)]",
+          // Mobile: almost full width, capped; Desktop: auto width
+          "w-[calc(100vw-32px)] max-w-[700px]",
+        )}>
+          {/* Header */}
+          <div className="flex justify-between items-center px-5 pt-4 pb-2 border-b border-gray-50">
+            <h4 className="text-xs font-black uppercase tracking-widest text-blue-900">Select Dates</h4>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setRange({ from: undefined, to: undefined })}
+                className="text-[11px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors"
               >
                 Clear
-              </Button>
+              </button>
+              <button
+                onClick={() => setIsCalendarOpen(false)}
+                className="text-gray-400 hover:text-gray-700 transition-colors ml-2"
+                aria-label="Close calendar"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
+          </div>
+
+          {/* Calendar — 1 month on mobile, 2 on desktop */}
+          <div className="overflow-x-auto">
             <Calendar
               mode="range"
               selected={range}
               onSelect={handleSelectRange}
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               disabled={{ before: new Date() }}
-              className="rounded-2xl border-none"
+              className="rounded-2xl border-none p-4"
             />
           </div>
+
+          {/* Mobile Done button */}
+          {isMobile && (
+            <div className="px-4 pb-4">
+              <Button
+                onClick={() => setIsCalendarOpen(false)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl"
+              >
+                Done
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Mobile Search Button */}
-      <Button 
+      <Button
         onClick={handleSearch}
-        size="lg" 
+        size="lg"
         className="md:hidden w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-[17px] font-black rounded-2xl shadow-xl shadow-blue-200 transition-all border-none"
       >
         Search Properties
