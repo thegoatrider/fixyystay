@@ -111,18 +111,24 @@ function CheckinForm() {
     formData.append('checkinDate', checkinDate)
     formData.append('checkoutDate', checkoutDate)
 
-    const result = await submitCheckin(formData)
+    try {
+      const result = await submitCheckin(formData)
 
-    if (result.success) {
-      setSuccessData({
-        propertyName: result.propertyName!,
-        helpdesk: result.helpdeskNumber! || 'Contact Support'
-      })
-      setStep(2)
-    } else {
-      alert(result.error)
+      if (result.success) {
+        setSuccessData({
+          propertyName: result.propertyName!,
+          helpdesk: result.helpdeskNumber! || 'Contact Support'
+        })
+        setStep(2)
+      } else {
+        alert(result.error)
+      }
+    } catch (err: any) {
+      console.error('Checkin Error:', err)
+      alert('An unexpected server error occurred while submitting your check-in. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   if (step === 2) {
