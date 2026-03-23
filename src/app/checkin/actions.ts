@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function submitCheckin(formData: FormData) {
   const supabase = await createClient()
@@ -12,12 +13,7 @@ export async function submitCheckin(formData: FormData) {
   const checkinDate = formData.get('checkinDate') as string
   const checkoutDate = formData.get('checkoutDate') as string
 
-  // Find property and owner info using Service Role to bypass RLS during check-in
-  const { createClient: createAdminClient } = await import('@supabase/supabase-js')
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const supabaseAdmin = createAdminClient()
 
   const { data: property, error: propError } = await supabaseAdmin
     .from('properties')
