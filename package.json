@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/splash-screen": "^8.0.1",
     "@radix-ui/react-slot": "^1.2.4",
     "@stripe/stripe-js": "^8.9.0",
     "@supabase/ssr": "^0.9.0",

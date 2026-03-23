@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import PropertyDetailClient from './ClientWrapper'
+import { format, eachDayOfInterval, subDays } from 'date-fns'
 
 export default async function PropertyDetailPage(
   props: {
@@ -41,30 +42,48 @@ export default async function PropertyDetailPage(
     redirect('/guest')
   }
 
-  // Calculate specifically available rooms for today
-  const todayStr = new Date().toISOString().split('T')[0]
+  // Calculate stay dates
+  const stayDates = checkin && checkout 
+    ? eachDayOfInterval({ 
+        start: new Date(checkin), 
+        end: subDays(new Date(checkout), 1) 
+      }).map(d => format(d, 'yyyy-MM-dd'))
+    : [format(new Date(), 'yyyy-MM-dd')]
   
   const availableRooms = []
   
   for (const room of property.rooms) {
-    // Check if specifically blocked
-    const availabilityToday = room.room_availability?.find((a: any) => a.date === todayStr)
-    if (availabilityToday && !availabilityToday.available) continue
-    
-    // Check if already booked
-    const bookingsToday = room.bookings?.filter((b: any) => {
-      return new Date(b.created_at).toISOString().split('T')[0] === todayStr
-    })
-    if (bookingsToday && bookingsToday.length > 0) continue
+    let totalStayPrice = 0
+    let isRoomAvailable = true
 
-    // Calculate current price
-    const rateToday = room.room_rates?.find((r: any) => r.date === todayStr)
-    const currentPrice = rateToday ? rateToday.price : room.base_price
+    for (const dateStr of stayDates) {
+      // 1. Check if specifically blocked
+      const availabilityRecord = room.room_availability?.find((a: any) => a.date === dateStr)
+      if (availabilityRecord && !availabilityRecord.available) {
+        isRoomAvailable = false
+        break
+      }
+      
+      // 2. Check if already booked
+      const bookingsOnDate = room.bookings?.filter((b: any) => {
+        return format(new Date(b.created_at), 'yyyy-MM-dd') === dateStr
+      })
+      if (bookingsOnDate && bookingsOnDate.length > 0) {
+        isRoomAvailable = false
+        break
+      }
 
-    availableRooms.push({
-      ...room,
-      currentPrice
-    })
+      // 3. Accumulate Price
+      const rateRecord = room.room_rates?.find((r: any) => r.date === dateStr)
+      totalStayPrice += rateRecord ? rateRecord.price : room.base_price
+    }
+
+    if (isRoomAvailable) {
+      availableRooms.push({
+        ...room,
+        currentPrice: totalStayPrice // Total for the stay
+      })
+    }
   }
 
   return (

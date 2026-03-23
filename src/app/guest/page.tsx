@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { MapPin, Star } from 'lucide-react'
+import { format, eachDayOfInterval, subDays, isSameDay } from 'date-fns'
 
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
@@ -61,27 +62,35 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   };
 
   // Filter properties logic: available_rooms > 0
-  const todayStr = new Date().toISOString().split('T')[0]
+  const stayDates = checkin && checkout 
+    ? eachDayOfInterval({ 
+        start: new Date(checkin), 
+        end: subDays(new Date(checkout), 1) // stay ends morning of checkout
+      }).map(d => format(d, 'yyyy-MM-dd'))
+    : [format(new Date(), 'yyyy-MM-dd')] // default to today only
 
   let availableProperties = properties?.map(prop => {
     let available_rooms = 0
 
     prop.rooms.forEach((room: any) => {
-      // Check if room is specifically blocked today
-      const availabilityToday = room.room_availability?.find((a: any) => a.date === todayStr)
-      if (availabilityToday && !availabilityToday.available) {
-        return // Room blocked
-      }
+      // For each room, it must be available for ALL stayDates
+      const isRoomAvailable = stayDates.every(dateStr => {
+        // 1. Check if specifically blocked
+        const availabilityRecord = room.room_availability?.find((a: any) => a.date === dateStr)
+        if (availabilityRecord && !availabilityRecord.available) return false
+        
+        // 2. Check if already booked
+        // (Note: This is a simplification; in a real app bookings might have start/end dates)
+        // Here we assume bookings track specific check-in dates.
+        const bookingsOnDate = room.bookings?.filter((b: any) => {
+          return format(new Date(b.created_at), 'yyyy-MM-dd') === dateStr
+        })
+        if (bookingsOnDate && bookingsOnDate.length > 0) return false
 
-      // Check if room is booked today
-      const bookingsToday = room.bookings?.filter((b: any) => {
-        return new Date(b.created_at).toISOString().split('T')[0] === todayStr
+        return true
       })
-      if (bookingsToday && bookingsToday.length > 0) {
-        return // Room booked
-      }
 
-      available_rooms++
+      if (isRoomAvailable) available_rooms++
     })
 
     return {

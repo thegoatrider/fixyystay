@@ -288,26 +288,50 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
                   {selectedGuest.id_documents && selectedGuest.id_documents.length > 0 ? (
                     <div className="flex flex-col gap-2">
                       {selectedGuest.id_documents.map((doc: any, i: number) => (
-                        <a
-                          key={i}
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between gap-2 p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl transition-all group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                              <FileText className="w-4 h-4 text-indigo-500" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-gray-800 group-hover:text-indigo-700">
-                                ID Document — Person {doc.personIndex || i + 1}
-                              </p>
-                              <p className="text-[11px] text-gray-400">Tap to open</p>
-                            </div>
-                          </div>
-                          <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
-                        </a>
+                        <div key={i} className="flex flex-col gap-2">
+                          {doc.frontUrl && (
+                            <a
+                              href={doc.frontUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between gap-2 p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl transition-all group"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <FileText className="w-4 h-4 text-indigo-500" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-gray-800 group-hover:text-indigo-700">
+                                    ID Document (Front) — Person {doc.personIndex || i + 1}
+                                  </p>
+                                  <p className="text-[11px] text-gray-400">Tap to view image</p>
+                                </div>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
+                            </a>
+                          )}
+                          {doc.backUrl && (
+                            <a
+                              href={doc.backUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between gap-2 p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl transition-all group"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <FileText className="w-4 h-4 text-indigo-500" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-gray-800 group-hover:text-indigo-700">
+                                    ID Document (Back) — Person {doc.personIndex || i + 1}
+                                  </p>
+                                  <p className="text-[11px] text-gray-400">Tap to view image</p>
+                                </div>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
+                            </a>
+                          )}
+                        </div>
                       ))}
                     </div>
                   ) : (

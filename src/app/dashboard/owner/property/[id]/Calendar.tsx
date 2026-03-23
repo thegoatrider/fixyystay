@@ -15,10 +15,9 @@ import {
   subMonths
 } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, Hash } from 'lucide-react'
-import { setRoomAvailability, setRoomRate } from './actions'
+import { ChevronLeft, ChevronRight, Hash, Layers, CheckCircle, XCircle, Info } from 'lucide-react'
+import { setRoomAvailability, setRoomRate, setMultipleRoomAvailability, setMultipleRoomRates } from './actions'
 
 type CalendarProps = {
   propertyId: string
@@ -28,9 +27,15 @@ type CalendarProps = {
   rates: any[]
 }
 
+const PRICE_BUCKETS = [
+  '₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999',
+  '₹4999', '₹7999', '₹9999', '₹14999', '₹19999', '₹24999', '₹29999', '₹39999', '₹49999'
+]
+
 export default function BookingCalendar({ propertyId, rooms, bookings, availability, rates }: CalendarProps) {
   const [selectedRoom, setSelectedRoom] = useState<string>(rooms[0]?.id || '')
-  const [selectedDateDetails, setSelectedDateDetails] = useState<Date | null>(null)
+  const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  const [isUpdating, setIsUpdating] = useState(false)
   
   // Create a 24-month range starting from current month
   const today = new Date()
@@ -56,23 +61,49 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
     }
   }
 
-  const handleToggleAvailability = async (date: Date, isCurrentlyAvailable: boolean) => {
-    if (!selectedRoom) return;
-    const dateStr = format(date, 'yyyy-MM-dd')
-    await setRoomAvailability(propertyId, selectedRoom, dateStr, !isCurrentlyAvailable)
+  const toggleDateSelection = (date: Date) => {
+    setSelectedDates(prev => {
+      const exists = prev.find(d => isSameDay(d, date))
+      if (exists) {
+        return prev.filter(d => !isSameDay(d, date))
+      }
+      return [...prev, date]
+    })
   }
 
-  const selectedDateStr = selectedDateDetails ? format(selectedDateDetails, 'yyyy-MM-dd') : null
-  const detailsBookings = bookings.filter(b => b.room_id === selectedRoom && format(new Date(b.created_at), 'yyyy-MM-dd') === selectedDateStr)
-
-  let selectedDateCurrentPrice = rooms.find(r => r.id === selectedRoom)?.base_price
-  if (selectedDateStr) {
-    const srRecord = rates.find(r => r.room_id === selectedRoom && r.date === selectedDateStr)
-    if (srRecord) selectedDateCurrentPrice = srRecord.price
+  const handleBulkAvailability = async (available: boolean) => {
+    if (!selectedRoom || selectedDates.length === 0) return
+    setIsUpdating(true)
+    try {
+      const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
+      await setMultipleRoomAvailability(propertyId, selectedRoom, dateStrings, available)
+      setSelectedDates([])
+    } finally {
+      setIsUpdating(false)
+    }
   }
+
+  const handleBulkRate = async (priceStr: string) => {
+    if (!selectedRoom || selectedDates.length === 0 || !priceStr) return
+    setIsUpdating(true)
+    try {
+      const price = parseInt(priceStr.replace(/[^\d]/g, ''))
+      const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
+      await setMultipleRoomRates(propertyId, selectedRoom, dateStrings, price)
+      setSelectedDates([])
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const clearSelection = () => setSelectedDates([])
+
+  // Selection state helpers
+  const singleSelectedDateStr = selectedDates.length === 1 ? format(selectedDates[0], 'yyyy-MM-dd') : null
+  const dayBookings = singleSelectedDateStr ? bookings.filter(b => b.room_id === selectedRoom && format(new Date(b.created_at), 'yyyy-MM-dd') === singleSelectedDateStr) : []
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 relative">
       {/* Header Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-4 rounded-xl border">
         <div className="flex flex-col gap-1">
@@ -82,7 +113,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
             value={selectedRoom}
             onChange={e => {
               setSelectedRoom(e.target.value)
-              setSelectedDateDetails(null)
+              setSelectedDates([])
             }}
             disabled={!rooms.length}
           >
@@ -123,6 +154,54 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
         </div>
       </div>
 
+      {/* Multi-Select Bulk Action Bar (Floating at bottom if selection exists) */}
+      {selectedDates.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl animate-in slide-in-from-bottom-8 duration-300">
+          <div className="bg-white border-2 border-blue-600 shadow-2xl rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-black animate-pulse">
+                {selectedDates.length}
+              </div>
+              <div>
+                <p className="text-sm font-black text-gray-900 leading-none">Dates Selected</p>
+                <button onClick={clearSelection} className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-widest mt-1">Clear All</button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+              <Button 
+                onClick={() => handleBulkAvailability(false)} 
+                disabled={isUpdating}
+                className="bg-red-600 hover:bg-red-700 h-10 px-4 text-xs font-bold gap-2 flex-shrink-0"
+              >
+                <XCircle className="w-4 h-4" /> Block
+              </Button>
+              <Button 
+                onClick={() => handleBulkAvailability(true)} 
+                disabled={isUpdating}
+                className="bg-green-600 hover:bg-green-700 h-10 px-4 text-xs font-bold gap-2 flex-shrink-0"
+              >
+                <CheckCircle className="w-4 h-4" /> Open
+              </Button>
+              
+              <div className="flex-shrink-0">
+                <select
+                  disabled={isUpdating}
+                  onChange={(e) => handleBulkRate(e.target.value)}
+                  className="bg-blue-50 border-2 border-blue-100 text-blue-700 h-10 px-3 rounded-lg text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none w-[140px]"
+                  defaultValue=""
+                >
+                  <option value="" disabled>Set Price...</option>
+                  {PRICE_BUCKETS.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Slidable Calendar Area */}
       <div 
         ref={scrollContainerRef}
@@ -160,15 +239,17 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                   const basePrice = rooms.find(r => r.id === selectedRoom)?.base_price
                   const calendarDayPrice = rateRecord ? rateRecord.price : basePrice
 
+                  const isSelected = selectedDates.some(d => isSameDay(d, date))
+
                   return (
                     <div 
                       key={dateStr}
-                      onClick={() => setSelectedDateDetails(date)}
+                      onClick={() => toggleDateSelection(date)}
                       className={`
-                        min-h-[64px] border rounded-md p-1.5 flex flex-col transition cursor-pointer relative
-                        ${!isCurrentMonth ? 'bg-gray-50/30 border-transparent opacity-20 pointer-events-none' : 'bg-white border-gray-100 hover:border-blue-300 hover:shadow-md'}
+                        min-h-[68px] border rounded-md p-1.5 flex flex-col transition cursor-pointer relative
+                        ${!isCurrentMonth ? 'bg-gray-50/30 border-transparent opacity-10 pointer-events-none' : 'bg-white border-gray-100 hover:border-blue-300 hover:shadow-md'}
                         ${!isAvailable && isCurrentMonth ? 'bg-red-50/30' : ''}
-                        ${selectedDateStr === dateStr ? 'ring-2 ring-blue-500 border-transparent z-10' : ''}
+                        ${isSelected ? 'ring-2 ring-blue-600 border-transparent z-10 bg-blue-50/50' : ''}
                       `}
                     >
                       <div className="flex justify-between items-start">
@@ -178,32 +259,29 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                         `}>
                           {format(date, 'd')}
                         </span>
-                        {bookingHasDate && isCurrentMonth && (
-                          <div className="h-2 w-2 rounded-full bg-purple-600 animate-pulse shadow-[0_0_8px_rgba(147,51,234,0.5)]" title="Booked" />
-                        )}
+                        <div className="flex gap-1">
+                          {!isAvailable && isCurrentMonth && <div className="h-1.5 w-1.5 rounded-full bg-red-500" title="Blocked" />}
+                          {bookingHasDate && isCurrentMonth && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse shadow-[0_0_8px_rgba(147,51,234,0.5)]" title="Booked" />
+                          )}
+                        </div>
                       </div>
 
                       {isCurrentMonth && (
-                        <div className="mt-auto flex flex-col gap-1.5">
-                          <div className="text-[11px] font-extrabold text-green-600 flex items-center justify-between">
-                            <span>₹{calendarDayPrice}</span>
-                            {rateRecord && <div className="h-1 w-1 rounded-full bg-orange-400" title="Custom Rate" />}
+                        <div className="mt-auto">
+                          <div className={`text-[10px] font-black flex items-baseline gap-0.5 ${rateRecord ? 'text-orange-600' : 'text-green-600'}`}>
+                            <span className="text-[8px]">₹</span>
+                            <span>{calendarDayPrice}</span>
                           </div>
-                          
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleAvailability(date, isAvailable);
-                            }}
-                            className={`
-                              text-[8px] py-0.5 rounded font-bold uppercase tracking-tighter transition-colors
-                              ${isAvailable 
-                                ? 'bg-blue-50 text-blue-600 hover:bg-red-50 hover:text-red-600' 
-                                : 'bg-red-100 text-red-700 hover:bg-blue-100 hover:text-blue-600'}
-                            `}
-                          >
-                            {isAvailable ? 'Block' : 'Open'}
-                          </button>
+                          <div className={`mt-1 h-1 w-full rounded-full ${isAvailable ? 'bg-green-100' : 'bg-red-100'}`} />
+                        </div>
+                      )}
+                      
+                      {isSelected && (
+                        <div className="absolute top-1 right-1">
+                          <div className="h-3 w-3 bg-blue-600 rounded-full flex items-center justify-center">
+                            <CheckCircle className="w-2 h-2 text-white" />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -215,86 +293,41 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
         })}
       </div>
 
-      {/* Selected Date Details Panel */}
-      {selectedDateDetails && (
-        <div className="border-2 border-blue-500 bg-blue-50/30 rounded-2xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex justify-between items-start mb-6 border-b border-blue-100 pb-4">
-            <div>
-              <Label className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1 block">Selected Date</Label>
-              <h3 className="text-xl font-black text-blue-900">
-                {format(selectedDateDetails, 'EEEE, MMMM do, yyyy')}
-              </h3>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedDateDetails(null)} className="rounded-full hover:bg-blue-100">✕ Close</Button>
-          </div>
-          
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Bookings Section */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <Hash className="w-4 h-4 text-purple-500" /> Active Bookings
-              </h4>
-              <div className="flex flex-col gap-3">
-                {detailsBookings.length > 0 ? (
-                  detailsBookings.map(b => (
-                    <div key={b.id} className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex justify-between items-center group hover:shadow-md transition-all">
-                      <div>
-                        <h5 className="font-bold text-gray-900">{b.guest_name}</h5>
-                        <p className="text-xs text-blue-500 font-medium">{b.guest_phone}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black text-green-600">₹{b.amount}</div>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Paid</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="bg-white/50 border-2 border-dashed rounded-xl py-8 text-center text-gray-400 italic text-sm">
-                    No bookings for this date
+      {/* Single Date Details (Booking View Only) */}
+      {selectedDates.length === 1 && dayBookings.length > 0 && (
+        <div className="bg-gray-50 rounded-2xl p-6 border-2 border-purple-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+           <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-4">
+            <Layers className="w-4 h-4 text-purple-500" /> Active Bookings on {format(selectedDates[0], 'MMM do')}
+          </h4>
+          <div className="flex flex-col gap-3">
+             {dayBookings.map(b => (
+                <div key={b.id} className="bg-white p-4 rounded-xl shadow-sm border border-purple-50 flex justify-between items-center group hover:shadow-md transition-all">
+                  <div>
+                    <h5 className="font-bold text-gray-900">{b.guest_name}</h5>
+                    <p className="text-xs text-blue-500 font-medium">{b.guest_phone}</p>
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Price Override Section */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full border-2 border-green-500 flex items-center justify-center text-[10px]">₹</div> Daily Pricing
-              </h4>
-              <div className="bg-white p-6 rounded-2xl border-2 border-blue-100 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                  <div className="text-xs text-gray-500 font-bold uppercase">Current active rate</div>
-                  <div className="text-2xl font-black text-green-600">₹{selectedDateCurrentPrice}</div>
+                  <div className="text-right">
+                    <div className="text-lg font-black text-green-600">₹{b.amount}</div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">Confirmed</span>
+                  </div>
                 </div>
-                
-                <form action={async (formData) => {
-                  const newPrice = Number(formData.get('price'))
-                  if (selectedDateStr) {
-                    await setRoomRate(propertyId, selectedRoom, selectedDateStr, newPrice)
-                  }
-                }} className="flex flex-col gap-3">
-                  <Label className="text-[10px] font-bold text-gray-400 ml-1">Override Price for this day</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
-                      <Input 
-                        type="number" 
-                        name="price" 
-                        placeholder="Enter amount" 
-                        required 
-                        className="pl-7 h-11 border-2 focus:border-blue-500 rounded-xl font-bold"
-                      />
-                    </div>
-                    <Button type="submit" size="lg" className="h-11 px-6 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
-                      Update
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
+              ))}
           </div>
         </div>
       )}
+
+      <div className="bg-gray-50 p-4 rounded-xl border border-dashed flex flex-col md:flex-row gap-4 items-center justify-between text-gray-500">
+        <div className="flex items-center gap-2 text-xs">
+          <Info className="w-4 h-4 text-blue-500" />
+          <span>Click multiple dates to bulk edit availability or pricing.</span>
+        </div>
+        <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500" /> Open</div>
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Blocked</div>
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-600" /> Booked</div>
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-600" /> Custom Rate</div>
+        </div>
+      </div>
     </div>
   )
 }

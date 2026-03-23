@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FixyStays</string>
+    <string name="title_activity_main">FixyStays</string>
+    <string name="package_name">com.fixystays.app</string>
+    <string name="custom_url_scheme">com.fixystays.app</string>
+</resources>

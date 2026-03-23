@@ -95,3 +95,44 @@ export async function setRoomRate(propertyId: string, roomId: string, dateStr: s
 
   revalidatePath(`/dashboard/owner/property/${propertyId}`)
 }
+
+export async function setMultipleRoomAvailability(propertyId: string, roomId: string, dateStrings: string[], available: boolean) {
+  const supabase = await createClient()
+
+  // Use a chunked upsert or just a regular one if the array isn't too huge
+  const { error } = await supabase.from('room_availability').upsert(
+    dateStrings.map(date => ({
+      room_id: roomId,
+      date,
+      available
+    })), 
+    { onConflict: 'room_id, date' }
+  )
+
+  if (error) {
+    console.error('Failed to update bulk availability', error)
+    throw new Error('Failed to update bulk availability: ' + error.message)
+  }
+
+  revalidatePath(`/dashboard/owner/property/${propertyId}`)
+}
+
+export async function setMultipleRoomRates(propertyId: string, roomId: string, dateStrings: string[], price: number) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.from('room_rates').upsert(
+    dateStrings.map(date => ({
+      room_id: roomId,
+      date,
+      price
+    })), 
+    { onConflict: 'room_id, date' }
+  )
+
+  if (error) {
+    console.error('Failed to update bulk rates', error)
+    throw new Error('Failed to update bulk rates: ' + error.message)
+  }
+
+  revalidatePath(`/dashboard/owner/property/${propertyId}`)
+}
