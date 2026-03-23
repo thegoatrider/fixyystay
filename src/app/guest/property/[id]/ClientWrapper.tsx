@@ -7,7 +7,7 @@ import { logClick, bookRoom } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MapPin, User, Phone, CheckCircle } from 'lucide-react'
+import { MapPin, User, Phone, CheckCircle, Share, Copy, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +48,45 @@ export default function PropertyDetailClient({
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isConfirmed, setIsConfirmed] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+
+  const propImages = property.image_urls || []
+  const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
+  const allImages = Array.from(new Set([...propImages, ...roomImages])) as string[]
+
+  useEffect(() => {
+    if (isLightboxOpen) {
+      const container = document.getElementById('lightbox-scroll-container')
+      if (container) {
+        container.scrollTo({
+          left: lightboxIndex * container.clientWidth,
+          behavior: 'instant'
+        })
+      }
+    }
+  }, [isLightboxOpen])
+
+  const handleNextLightbox = () => {
+    if (lightboxIndex < allImages.length - 1) {
+      const newIndex = lightboxIndex + 1
+      setLightboxIndex(newIndex)
+      setActiveImage(allImages[newIndex])
+      const container = document.getElementById('lightbox-scroll-container')
+      if (container) container.scrollTo({ left: newIndex * container.clientWidth, behavior: 'smooth' })
+    }
+  }
+
+  const handlePrevLightbox = () => {
+    if (lightboxIndex > 0) {
+      const newIndex = lightboxIndex - 1
+      setLightboxIndex(newIndex)
+      setActiveImage(allImages[newIndex])
+      const container = document.getElementById('lightbox-scroll-container')
+      if (container) container.scrollTo({ left: newIndex * container.clientWidth, behavior: 'smooth' })
+    }
+  }
   
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const calendarRef = useRef<HTMLDivElement>(null)
@@ -84,41 +123,46 @@ export default function PropertyDetailClient({
   const extraCharge = extraGuests * extraPerPax
   const totalPrice = roomPrice + extraCharge
 
+  const handleShare = async () => {
+    const shareData = {
+      title: property.name,
+      text: `Checkout this amazing property in ${property.city_area}!`,
+      url: window.location.href,
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`)
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 3000)
+      }
+    } catch (err) {
+      console.error('Error sharing:', err)
+    }
+  }
+
   async function handleBook(formData: FormData) {
     if (!selectedRoomId) return
     setIsLoading(true)
     setError(null)
     
-    const guestName = formData.get('guestName') as string
-    const guestPhone = formData.get('guestPhone') as string
-
     try {
-      const response = await fetch('/api/checkout_sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          propertyId: property.id,
-          propertyName: property.name,
-          roomId: selectedRoomId,
-          roomName: selectedRoom?.name,
-          guestName,
-          guestPhone,
-          influencerId: influencerId || null,
-          amount: roomPrice
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize payment')
+      // Direct booking per user instructions, bypassing Stripe for now
+      await bookRoom(property.id, selectedRoomId, totalPrice, formData)
+      
+      const confirmed = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]')
+      if (!confirmed.includes(property.id)) {
+        confirmed.push(property.id)
+        localStorage.setItem('confirmed_bookings', JSON.stringify(confirmed))
       }
-
-      if (data.url) {
-        window.location.href = data.url
-      }
+      
+      setSuccess(true)
+      setIsConfirmed(true)
     } catch (err: any) {
-      setError(err.message || 'Payment initiation failed')
+      setError(err.message || 'Booking failed. Please try again.')
+    } finally {
       setIsLoading(false)
     }
   }
@@ -147,42 +191,63 @@ export default function PropertyDetailClient({
           <div className="h-[400px] bg-gray-100 rounded-3xl overflow-hidden shadow-sm relative group border-2 border-white ring-1 ring-gray-100">
             {/* Logic to determine main image and gallery images */}
             {(() => {
-              const propImages = property.image_urls || []
-              const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
-              const allImages = [...propImages, ...roomImages]
               const mainImg = activeImage || allImages[0] || property.image_url
               
               if (mainImg) {
                 return (
-                  <img 
-                    src={mainImg} 
-                    alt={property.name} 
-                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105" 
-                  />
+                  <button 
+                    onClick={() => {
+                      const idx = allImages.indexOf(mainImg)
+                      setLightboxIndex(idx >= 0 ? idx : 0)
+                      setIsLightboxOpen(true)
+                    }}
+                    className="w-full h-full text-left"
+                  >
+                    <img 
+                      src={mainImg} 
+                      alt={property.name} 
+                      className="w-full h-full object-contain transition-all duration-700" 
+                    />
+                  </button>
                 )
               }
               return <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">🏨</div>
             })()}
             
             {/* Overlay Tag */}
-            <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 shadow-xl border border-white">
-              {property.type}
+            <div className="absolute top-6 left-6 flex items-center gap-2">
+              <div className="bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 shadow-xl border border-white">
+                {property.type}
+              </div>
             </div>
+
+            {/* Float Share Button on Image */}
+            <button 
+              onClick={handleShare}
+              className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full text-blue-900 shadow-xl border border-white hover:bg-blue-600 hover:text-white transition-all duration-300 group"
+            >
+              {isCopied ? <Copy className="w-5 h-5 animate-in zoom-in-50" /> : <Share className="w-5 h-5" />}
+              {isCopied && (
+                <span className="absolute right-12 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-md animate-in slide-in-from-right-2">
+                  Link Copied!
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Thumbnails */}
           {(() => {
-            const propImages = property.image_urls || []
-            const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
-            const allImages = [...new Set([...propImages, ...roomImages])] // Unique images
-            
             if (allImages.length > 1) {
               return (
                 <div className="flex gap-3 overflow-x-auto pb-2 px-1 scrollbar-hide">
                   {allImages.map((url: string, i: number) => (
                     <button
                       key={i}
-                      onClick={() => setActiveImage(url)}
+                      onClick={() => {
+                        setActiveImage(url)
+                        setLightboxIndex(i)
+                        setIsLightboxOpen(true)
+                      }}
                       className={cn(
                         "relative w-24 h-20 rounded-2xl overflow-hidden flex-shrink-0 transition-all duration-300 border-2",
                         (activeImage === url || (!activeImage && i === 0)) 
@@ -190,7 +255,7 @@ export default function PropertyDetailClient({
                           : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
                       )}
                     >
-                      <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-contain bg-gray-50" />
                       <div className={cn(
                         "absolute inset-0 transition-colors",
                         (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
@@ -204,7 +269,7 @@ export default function PropertyDetailClient({
           })()}
         </div>
         
-        <div className="bg-white p-6 rounded-xl border shadow-sm">
+        <div className="bg-white p-6 rounded-xl border shadow-sm relative">
           <div className="flex justify-between items-start mb-4">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">{property.type}</div>
@@ -472,6 +537,70 @@ export default function PropertyDetailClient({
           </form>
         )}
       </div>
+
+      {/* Fullscreen Image Lightbox Slider */}
+      {isLightboxOpen && allImages.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute top-0 right-0 p-4 z-10 flex w-full justify-between items-center text-white">
+            <div className="px-4 text-sm font-bold opacity-70">
+              {lightboxIndex + 1} / {allImages.length}
+            </div>
+            <button 
+              onClick={() => setIsLightboxOpen(false)} 
+              className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div 
+            id="lightbox-scroll-container"
+            className="flex-1 flex overflow-x-auto snap-x snap-mandatory hide-scrollbar items-center"
+            onScroll={(e) => {
+              const target = e.currentTarget
+              const index = Math.round(target.scrollLeft / target.clientWidth)
+              if (index >= 0 && index < allImages.length && index !== lightboxIndex) {
+                setLightboxIndex(index)
+                setActiveImage(allImages[index])
+              }
+            }}
+          >
+            {allImages.map((src, i) => (
+              <div 
+                key={i} 
+                className="flex-shrink-0 w-full h-full flex items-center justify-center snap-center p-4 relative"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={src} 
+                  className="max-w-full max-h-full object-contain drop-shadow-2xl" 
+                  alt={`Gallery view ${i + 1}`} 
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Navigation Arrows */}
+          {allImages.length > 1 && (
+            <>
+              <button 
+                onClick={handlePrevLightbox}
+                disabled={lightboxIndex === 0}
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+              <button 
+                onClick={handleNextLightbox}
+                disabled={lightboxIndex === allImages.length - 1}
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

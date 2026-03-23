@@ -113,10 +113,10 @@ export function HomeSearch() {
       {isCalendarOpen && (
         <div className={cn(
           "absolute left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-100",
-          "shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-3xl",
-          "animate-in fade-in zoom-in-95 duration-200 origin-top",
-          // Position below the search bar, with margin
-          "top-[calc(100%+12px)]",
+          "shadow-[0_-5px_40px_rgba(0,0,0,0.15)] rounded-3xl", // Adjusted shadow for upward visual
+          "animate-in fade-in zoom-in-95 duration-200 origin-bottom md:origin-top",
+          // Mobile: anchor above the panel (opens up) | Desktop: anchor below the panel (opens down)
+          "bottom-[calc(100%+12px)] md:bottom-auto md:top-[calc(100%+12px)]",
           // Mobile: almost full width, capped; Desktop: auto width
           "w-[calc(100vw-32px)] max-w-[700px]",
         )}>

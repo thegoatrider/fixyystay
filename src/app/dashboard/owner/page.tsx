@@ -79,7 +79,7 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
       </div>
 
       {activeTab === 'properties' ? (
-        <div className="grid md:grid-cols-[1fr_300px] gap-8">
+        <div className="flex flex-col-reverse md:grid md:grid-cols-[1fr_300px] gap-8">
           
           {/* Properties List */}
           <div className="flex flex-col gap-4">
