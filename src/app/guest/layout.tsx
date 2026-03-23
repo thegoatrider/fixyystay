@@ -11,7 +11,7 @@ export default async function GuestLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b sticky top-0 z-10 w-full px-6 py-4 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b sticky top-0 z-10 w-full px-6 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] flex items-center justify-between shadow-sm">
         <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
           Fixy Stays
         </Link>
