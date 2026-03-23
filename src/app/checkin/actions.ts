@@ -42,26 +42,30 @@ export async function submitCheckin(formData: FormData) {
     if (frontFile && frontFile.size > 0) {
       const fileExt = frontFile.name.split('.').pop()
       const fileName = `${propertyId}-${Date.now()}-${i}-front.${fileExt}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
         .from('property_images')
         .upload(`guest_ids/${fileName}`, frontFile)
 
       if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
+        const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
         personDocs.frontUrl = publicUrlData.publicUrl
+      } else {
+        console.error('Front ID upload error:', uploadError)
       }
     }
 
     if (backFile && backFile.size > 0) {
       const fileExt = backFile.name.split('.').pop()
       const fileName = `${propertyId}-${Date.now()}-${i}-back.${fileExt}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
         .from('property_images')
         .upload(`guest_ids/${fileName}`, backFile)
 
       if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
+        const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
         personDocs.backUrl = publicUrlData.publicUrl
+      } else {
+        console.error('Back ID upload error:', uploadError)
       }
     }
 
