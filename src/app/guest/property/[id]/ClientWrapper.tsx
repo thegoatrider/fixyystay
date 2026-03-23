@@ -181,7 +181,7 @@ export default function PropertyDetailClient({
   }
 
   return (
-    <div className="grid md:grid-cols-[1fr_400px] gap-8">
+    <div className="flex flex-col lg:grid lg:grid-cols-[1fr_400px] gap-8 lg:gap-12">
       {influencerId && <ClickTracker propertyId={property.id} refId={influencerId} />}
       
       {/* Property Details */}
@@ -352,7 +352,7 @@ export default function PropertyDetailClient({
       </div>
 
       {/* Booking Form Sidebar */}
-      <div className="bg-white p-6 rounded-xl border shadow-lg sticky top-24 h-fit">
+      <div className="bg-white p-6 rounded-xl border shadow-lg w-full max-w-lg mx-auto lg:max-w-none lg:sticky lg:top-24 h-fit">
         <h2 className="text-2xl font-bold mb-6">Book your Stay</h2>
 
         {availableRooms.length === 0 ? (
