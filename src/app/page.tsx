@@ -10,8 +10,8 @@ export default async function Index() {
 
   return (
     <div className="flex-1 w-full flex flex-col items-center">
-      <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-        <div className="w-full max-w-4xl flex justify-between items-center p-3 text-sm">
+      <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16">
+        <div className="w-full max-w-4xl flex justify-between items-center px-4 py-3 text-sm">
           <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
             Fixy Stays
           </Link>
@@ -39,10 +39,10 @@ export default async function Index() {
         </div>
       </nav>
 
-      <div className="flex-1 flex flex-col max-w-4xl px-3 p-20 w-full mt-10">
+      <div className="flex-1 flex flex-col max-w-4xl px-4 py-12 md:p-20 w-full mt-4 md:mt-10">
         <main className="flex flex-col gap-10 items-center text-center w-full">
           
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl text-gray-900 mb-4">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 mb-4 px-2">
             Find your perfect stay, <br className="hidden sm:block" />
             <span className="text-blue-600">in Alibag or host your own.</span>
           </h1>
