@@ -8,7 +8,6 @@ import { addRoom } from './actions'
 import BookingCalendar from './Calendar'
 import { ArrowLeft, CheckCircle, Clock } from 'lucide-react'
 import AddRoomForm from './AddRoomForm'
-import EditPropertyForm from '@/components/EditPropertyForm'
 
 export default async function PropertyDetailPage(
   props: {
@@ -70,10 +69,8 @@ export default async function PropertyDetailPage(
 
       <div className="grid md:grid-cols-[280px_1fr] gap-6 items-start">
         
-        {/* Left: Rooms List & Add Form */}
+        {/* Top: Rooms List & Add Form */}
         <div className="flex flex-col gap-6">
-          <EditPropertyForm property={property} />
-          
           <div className="bg-white border rounded-lg p-5 shadow-sm">
             <h2 className="text-xl font-bold mb-4">
               {property.type === 'villa' ? 'Villa Configuration' : 'Rooms Configuration'}

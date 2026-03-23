@@ -89,36 +89,42 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
           {/* Properties List (C) - Mobile Middle, Desktop Left (spans all rows) */}
           <div className="flex flex-col gap-4 order-2 md:order-none md:col-start-1 md:row-span-2">
             {properties?.map(prop => (
-              <Link 
+              <div 
                 key={prop.id} 
-                href={`/dashboard/owner/property/${prop.id}`}
-                className="bg-white border rounded-lg p-6 hover:shadow-md transition flex justify-between items-center group"
+                className="bg-white border rounded-lg p-4 md:p-6 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group"
               >
-                <div className="flex items-start gap-4">
-                  <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-16 h-16 flex-shrink-0 relative">
+                <div className="flex items-start gap-4 w-full md:w-auto overflow-hidden">
+                  <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden flex-shrink-0 relative w-16 h-16 md:w-20 md:h-20">
                     {prop.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={prop.image_url} alt={prop.name} className="object-cover w-full h-full" />
                     ) : (
                       <div className="flex w-full h-full items-center justify-center">
-                        <Home className="w-6 h-6" />
+                        <Home className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                     )}
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold group-hover:text-blue-600 transition">{prop.name}</h2>
-                    <p className="text-sm text-gray-500 capitalize">{prop.type} • {prop.rooms[0]?.count || 0} Rooms</p>
-                    <div className="flex items-center gap-1 mt-2 text-xs font-medium">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg md:text-xl font-bold group-hover:text-blue-600 transition truncate">{prop.name}</h2>
+                    <p className="text-xs md:text-sm text-gray-500 capitalize truncate">{prop.type} • {prop.rooms[0]?.count || 0} Rooms</p>
+                    <div className="flex items-center gap-1 mt-2 text-[10px] md:text-xs font-medium">
                       {prop.approved ? (
                         <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Approved</span>
                       ) : (
-                        <span className="text-orange-500 flex items-center gap-1"><Clock className="w-3 h-3"/> Pending Approval</span>
+                        <span className="text-orange-500 flex items-center gap-1"><Clock className="w-3 h-3"/> Pending</span>
                       )}
                     </div>
                   </div>
                 </div>
-                <Button variant="ghost">Manage</Button>
-              </Link>
+                <div className="flex w-full md:w-auto items-center gap-2 mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+                  <Link href={`/dashboard/owner/property/${prop.id}/edit`} className="flex-1 md:flex-none">
+                    <Button variant="outline" className="w-full">Edit</Button>
+                  </Link>
+                  <Link href={`/dashboard/owner/property/${prop.id}`} className="flex-1 md:flex-none">
+                    <Button variant="default" className="w-full">Manage</Button>
+                  </Link>
+                </div>
+              </div>
             ))}
             {(!properties || properties.length === 0) && (
               <div className="text-center p-12 border-2 border-dashed rounded-lg text-gray-500">

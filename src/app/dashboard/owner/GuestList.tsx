@@ -77,12 +77,12 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Guest Check-in Calendar</h2>
           <p className="text-sm text-gray-400 mt-0.5">{checkins.length} registered guests · click a date to view</p>
         </div>
-        <div className="relative w-64">
+        <div className="relative w-full md:w-64">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search guests..."
