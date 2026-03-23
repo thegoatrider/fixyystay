@@ -79,10 +79,15 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
       </div>
 
       {activeTab === 'properties' ? (
-        <div className="flex flex-col-reverse md:grid md:grid-cols-[1fr_300px] gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6 md:gap-8 items-start">
           
-          {/* Properties List */}
-          <div className="flex flex-col gap-4">
+          {/* Quick Checkin (A) - Mobile Top, Desktop Right Top */}
+          <div className="order-1 md:order-none md:col-start-2 sticky top-24 z-10">
+            <QuickCheckin properties={properties || []} />
+          </div>
+
+          {/* Properties List (C) - Mobile Middle, Desktop Left (spans all rows) */}
+          <div className="flex flex-col gap-4 order-2 md:order-none md:col-start-1 md:row-span-2">
             {properties?.map(prop => (
               <Link 
                 key={prop.id} 
@@ -123,14 +128,10 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
             )}
           </div>
 
-          {/* Quick Actions & Create Property */}
-          <div className="flex flex-col gap-6 sticky top-24 h-fit">
-            <QuickCheckin properties={properties || []} />
-            
-            <div className="bg-white border rounded-lg p-6 shadow-sm">
-              <h3 className="font-bold text-lg mb-4 flex gap-2 items-center"><Plus className="w-5 h-5"/> Add New Property</h3>
-              <CreatePropertyForm />
-            </div>
+          {/* Create Property Form (B) - Mobile Bottom, Desktop Right Bottom */}
+          <div className="bg-white border rounded-lg p-6 shadow-sm order-3 md:order-none md:col-start-2">
+            <h3 className="font-bold text-lg mb-4 flex gap-2 items-center"><Plus className="w-5 h-5"/> Add New Property</h3>
+            <CreatePropertyForm />
           </div>
 
         </div>
