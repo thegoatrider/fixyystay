@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
-import { DollarSign, MousePointerClick, CalendarCheck, Megaphone } from 'lucide-react'
+import { DollarSign, MousePointerClick, CalendarCheck, Megaphone, Wallet } from 'lucide-react'
 import { CopyLinkButton } from './CopyLinkButton'
+import WalletSection from '@/components/WalletSection'
+import { requestPayout } from '@/app/actions/wallet'
 
 export default async function InfluencerDashboard() {
   const supabase = await createClient()
@@ -23,7 +25,15 @@ export default async function InfluencerDashboard() {
   if (!isSuperAdmin) bookingQuery = bookingQuery.eq('influencer_id', influencerId)
   const { data: bookings } = await bookingQuery
 
-  const properties = assignments?.map(a => a.properties) || []
+  let walletQuery = supabase.from('wallet_transactions').select('*')
+  if (!isSuperAdmin) walletQuery = walletQuery.eq('user_id', influencerId)
+  const { data: transactions } = await walletQuery.order('created_at', { ascending: false })
+
+  let payoutQuery = supabase.from('payout_requests').select('*')
+  if (!isSuperAdmin) payoutQuery = payoutQuery.eq('user_id', influencerId)
+  const { data: payouts } = await payoutQuery.order('created_at', { ascending: false })
+
+  const properties = assignments?.map((a: any) => a.properties) || []
 
   // Aggregate global stats
   const totalClicks = clicks?.length || 0
@@ -69,10 +79,21 @@ export default async function InfluencerDashboard() {
           <Megaphone className="w-8 h-8 mx-auto text-yellow-400 mb-2" />
           <p className="text-sm font-semibold text-gray-300 uppercase tracking-widest">Your Commission</p>
           <p className="text-4xl font-black text-yellow-400 text-shadow-sm">₹{totalCommission.toLocaleString()}</p>
-        </div>
+      </div>
       </div>
 
-      <section>
+      <section className="mt-4">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+          <Wallet className="w-6 h-6 text-blue-600" /> Virtual Wallet
+        </h2>
+        <WalletSection 
+          transactions={transactions || []} 
+          payouts={payouts || []} 
+          onRequestPayout={requestPayout.bind(null, influencerId || '')} 
+        />
+      </section>
+
+      <section className="mt-6">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           Your Promotional Links
         </h2>

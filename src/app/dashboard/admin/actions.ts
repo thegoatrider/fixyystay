@@ -137,3 +137,82 @@ export async function toggleFeatured(propertyId: string, currentValue: boolean) 
   revalidatePath('/dashboard/admin')
   revalidatePath('/guest')
 }
+
+export async function approveInfluencer(formData: FormData) {
+  const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    throw new Error('Unauthorized')
+  }
+
+  const influencerId = formData.get('influencerId') as string
+  const commissionRate = parseFloat(formData.get('commissionRate') as string) || 0
+
+  const { error } = await supabaseAdmin
+    .from('influencers')
+    .update({ approved: true, commission_rate: commissionRate })
+    .eq('id', influencerId)
+
+  if (error) {
+    console.error('Failed to approve influencer', error)
+    throw new Error('Failed to approve influencer')
+  }
+
+  revalidatePath('/dashboard/admin')
+}
+
+export async function rejectInfluencer(influencerId: string) {
+  const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    throw new Error('Unauthorized')
+  }
+
+  const { error } = await supabaseAdmin
+    .from('influencers')
+    .delete()
+    .eq('id', influencerId)
+
+  if (error) {
+    console.error('Failed to reject influencer', error)
+    throw new Error('Failed to reject influencer')
+  }
+
+  revalidatePath('/dashboard/admin')
+}
+
+export async function processPayout(requestId: string, action: 'approve' | 'reject') {
+  const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    throw new Error('Unauthorized')
+  }
+
+  // 1. Fetch the request
+  const { data: request } = await supabaseAdmin.from('payout_requests').select('*').eq('id', requestId).single()
+  if (!request || request.status !== 'pending') {
+    throw new Error('Invalid or already processed request')
+  }
+
+  // 2. Update status
+  const newStatus = action === 'approve' ? 'completed' : 'rejected'
+  await supabaseAdmin.from('payout_requests').update({ status: newStatus }).eq('id', requestId)
+
+  // 3. If approved, lock the money by deducting from wallet ledger
+  if (action === 'approve') {
+    await supabaseAdmin.from('wallet_transactions').insert({
+      user_id: request.user_id,
+      amount: -Math.abs(request.amount),
+      transaction_type: 'payout',
+      description: `Manual Payout Processed to ${request.bank_details}`
+    })
+  }
+
+  revalidatePath('/dashboard/admin')
+}

@@ -5,7 +5,9 @@ import CreatePropertyForm from './CreatePropertyForm'
 import LeadsSection from './LeadsSection'
 import GuestList from './GuestList'
 import QuickCheckin from './QuickCheckin'
-import { Home, Plus, Clock, CheckCircle, List, MessageSquare, Zap, Users } from 'lucide-react'
+import { Home, Plus, Clock, CheckCircle, List, MessageSquare, Zap, Users, Wallet } from 'lucide-react'
+import WalletSection from '@/components/WalletSection'
+import { requestPayout } from '@/app/actions/wallet'
 
 export default async function OwnerDashboard(props: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await props.searchParams
@@ -31,6 +33,16 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
   let checkinQuery = supabase.from('guest_checkins').select('*, properties(name)')
   if (!isSuperAdmin) checkinQuery = checkinQuery.eq('owner_id', owner?.id)
   const { data: checkins } = await checkinQuery.order('created_at', { ascending: false })
+
+  // Fetch Wallet Transactions
+  let walletQuery = supabase.from('wallet_transactions').select('*')
+  if (!isSuperAdmin) walletQuery = walletQuery.eq('user_id', owner?.id)
+  const { data: transactions } = await walletQuery.order('created_at', { ascending: false })
+
+  // Fetch Payout Requests
+  let payoutQuery = supabase.from('payout_requests').select('*')
+  if (!isSuperAdmin) payoutQuery = payoutQuery.eq('user_id', owner?.id)
+  const { data: payouts } = await payoutQuery.order('created_at', { ascending: false })
 
   return (
     <div className="flex flex-col gap-8">
@@ -76,9 +88,25 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
           <Users className="w-4 h-4" /> Guests
           {checkins && checkins.length > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{checkins.length}</span>}
         </Link>
+        <Link 
+          href="/dashboard/owner?tab=wallet"
+          className={`px-8 py-3 font-semibold text-sm transition-all border-b-2 flex items-center gap-2 ${
+            activeTab === 'wallet' 
+              ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Wallet className="w-4 h-4" /> Wallet
+        </Link>
       </div>
 
-      {activeTab === 'properties' ? (
+      {activeTab === 'wallet' ? (
+        <WalletSection 
+          transactions={transactions || []} 
+          payouts={payouts || []} 
+          onRequestPayout={requestPayout.bind(null, owner?.id || '')} 
+        />
+      ) : activeTab === 'properties' ? (
         <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6 md:gap-8 items-start">
           
           {/* Quick Checkin (A) - Mobile Top, Desktop Right Top */}
