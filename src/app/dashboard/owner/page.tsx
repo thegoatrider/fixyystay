@@ -82,7 +82,7 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
         <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6 md:gap-8 items-start">
           
           {/* Quick Checkin (A) - Mobile Top, Desktop Right Top */}
-          <div className="order-1 md:order-none md:col-start-2 sticky top-24 z-10">
+          <div className="order-1 md:order-none md:col-start-2 md:sticky md:top-24 z-10 w-full max-w-full">
             <QuickCheckin properties={properties || []} />
           </div>
 
