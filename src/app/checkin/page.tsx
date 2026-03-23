@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle } from 'lucide-react'
 import { submitCheckin } from './actions'
+import { cn } from '@/lib/utils'
 import { Suspense } from 'react'
 
 export default function CheckinPage() {
@@ -259,67 +260,77 @@ function CheckinForm() {
                   
                   <div className="grid grid-cols-2 gap-4">
                     {/* Front ID */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative group">
                       <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Front Side</Label>
-                      {previews[`guestID_front_${i}`] ? (
-                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border-2 border-blue-400 group">
-                          <img src={previews[`guestID_front_${i}`]} alt="Front ID Preview" className="w-full h-full object-cover" />
-                          <button 
-                            type="button"
-                            onClick={() => removeFile(`guestID_front_${i}`)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative group">
-                          <input 
-                            type="file" 
-                            name={`guestID_front_${i}`}
-                            accept="image/*" 
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                            required
-                            onChange={(e) => handleFileChange(e, `guestID_front_${i}`)}
-                          />
-                          <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                      
+                      <div className="relative w-full aspect-[4/3]">
+                        <input 
+                          type="file" 
+                          name={`guestID_front_${i}`}
+                          accept="image/*" 
+                          className={cn(
+                            "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10", 
+                            previews[`guestID_front_${i}`] ? "hidden" : "block"
+                          )}
+                          required={!previews[`guestID_front_${i}`]}
+                          onChange={(e) => handleFileChange(e, `guestID_front_${i}`)}
+                        />
+                        
+                        {previews[`guestID_front_${i}`] ? (
+                          <div className="absolute inset-0 rounded-xl overflow-hidden border-2 border-blue-400">
+                            <img src={previews[`guestID_front_${i}`]} alt="Front ID Preview" className="w-full h-full object-cover" />
+                            <button 
+                              type="button"
+                              onClick={() => removeFile(`guestID_front_${i}`)}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl transition-all flex flex-col items-center justify-center gap-1 text-center px-2 pointer-events-none">
                             <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
                             <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Front</span>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
 
                     {/* Back ID */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative group">
                       <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Back Side</Label>
-                      {previews[`guestID_back_${i}`] ? (
-                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border-2 border-blue-400 group">
-                          <img src={previews[`guestID_back_${i}`]} alt="Back ID Preview" className="w-full h-full object-cover" />
-                          <button 
-                            type="button"
-                            onClick={() => removeFile(`guestID_back_${i}`)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative group">
-                          <input 
-                            type="file" 
-                            name={`guestID_back_${i}`}
-                            accept="image/*" 
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                            required
-                            onChange={(e) => handleFileChange(e, `guestID_back_${i}`)}
-                          />
-                          <div className="bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl py-6 transition-all flex flex-col items-center justify-center gap-1 text-center px-2">
+                      
+                      <div className="relative w-full aspect-[4/3]">
+                        <input 
+                          type="file" 
+                          name={`guestID_back_${i}`}
+                          accept="image/*" 
+                          className={cn(
+                            "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10", 
+                            previews[`guestID_back_${i}`] ? "hidden" : "block"
+                          )}
+                          required={!previews[`guestID_back_${i}`]}
+                          onChange={(e) => handleFileChange(e, `guestID_back_${i}`)}
+                        />
+                        
+                        {previews[`guestID_back_${i}`] ? (
+                          <div className="absolute inset-0 rounded-xl overflow-hidden border-2 border-blue-400">
+                            <img src={previews[`guestID_back_${i}`]} alt="Back ID Preview" className="w-full h-full object-cover" />
+                            <button 
+                              type="button"
+                              onClick={() => removeFile(`guestID_back_${i}`)}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl transition-all flex flex-col items-center justify-center gap-1 text-center px-2 pointer-events-none">
                             <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
                             <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Back</span>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
