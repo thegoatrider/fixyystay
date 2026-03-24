@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-
 import { HomeSearch } from '@/components/HomeSearch'
+import { blogPosts } from './blog/data'
+import { Clock, ArrowRight } from 'lucide-react'
 
 export default async function Index() {
   const supabase = await createClient()
@@ -84,6 +85,64 @@ export default async function Index() {
 
         </main>
       </div>
+
+      {/* ── Blog Section ── */}
+      <section className="w-full bg-gray-50 border-t py-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Blog</span>
+              <h2 className="text-3xl font-extrabold text-gray-900 mt-3">Alibag Travel Guides</h2>
+              <p className="text-gray-500 mt-1">Tips, guides, and inspiration for your next Alibag escape.</p>
+            </div>
+            <Link href="/blog" className="hidden md:flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold text-sm">
+              All posts <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {blogPosts.map(post => (
+              <Link
+                key={post.slug}
+                href={`/blog/${post.slug}`}
+                className="group bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col"
+              >
+                {/* Card Hero */}
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 flex items-center justify-center">
+                  <span className="text-5xl group-hover:scale-110 transition-transform duration-300">{post.coverEmoji}</span>
+                </div>
+                <div className="p-6 flex flex-col flex-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-600">{post.category}</span>
+                  <h3 className="font-bold text-gray-900 text-lg mt-2 mb-2 group-hover:text-blue-600 transition-colors leading-snug">
+                    {post.title}
+                  </h3>
+                  <p className="text-gray-500 text-sm leading-relaxed line-clamp-3 flex-1">{post.excerpt}</p>
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <Clock className="w-3 h-3" /> {post.readTime}
+                    </span>
+                    <span className="text-sm font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                      Read more <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="text-center mt-8 md:hidden">
+            <Link href="/blog" className="inline-flex items-center gap-2 text-blue-600 font-semibold">
+              View all posts <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="w-full bg-white border-t py-8 text-center text-sm text-gray-400">
+        © 2025 Fixy Stays · Alibag's trusted property booking platform
+      </footer>
     </div>
   )
 }
+
