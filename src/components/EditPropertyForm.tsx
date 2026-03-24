@@ -135,7 +135,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
               <button 
                 type="button" 
                 onClick={() => removeExistingPhoto(i)}
-                className="absolute top-2 right-2 bg-red-500/90 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -152,7 +152,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
               <button 
                 type="button" 
                 onClick={() => removeNewPhoto(i)}
-                className="absolute top-2 right-2 bg-red-500/90 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform"
               >
                 <X className="w-3 h-3" />
               </button>
