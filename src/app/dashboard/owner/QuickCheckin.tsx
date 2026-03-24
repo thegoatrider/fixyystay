@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MessageSquare, Phone } from 'lucide-react'
+import { CollapsibleTile } from '@/components/CollapsibleTile'
 
 type Property = {
   id: string
@@ -32,10 +33,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
   }
 
   return (
-    <div className="bg-white border border-blue-100 rounded-xl p-6 shadow-sm">
-      <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-900">
-        <MessageSquare className="w-5 h-5" /> Send Guest ID Form
-      </h3>
+    <CollapsibleTile title="Send Guest ID Form" icon={MessageSquare}>
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
           <Label htmlFor="guestPhone">Guest Phone Number</Label>
@@ -72,6 +70,6 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
           Send ID Form on WhatsApp
         </Button>
       </div>
-    </div>
+    </CollapsibleTile>
   )
 }

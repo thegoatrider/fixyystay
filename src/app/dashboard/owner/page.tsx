@@ -5,6 +5,8 @@ import CreatePropertyForm from './CreatePropertyForm'
 import LeadsSection from './LeadsSection'
 import GuestList from './GuestList'
 import QuickCheckin from './QuickCheckin'
+import AddLeadTile from './AddLeadTile'
+import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { Home, Plus, Clock, CheckCircle, List, MessageSquare, Zap, Users, Wallet } from 'lucide-react'
 import WalletSection from '@/components/WalletSection'
 import { requestPayout } from '@/app/actions/wallet'
@@ -115,19 +117,25 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
           onRequestPayout={requestPayout.bind(null, owner?.id || '')} 
         />
       ) : activeTab === 'properties' ? (
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6 md:gap-8 items-start">
+        <div className="flex flex-col gap-6 items-start w-full">
           
-          {/* Quick Checkin (A) - Mobile Top, Desktop Right Top */}
-          <div className="order-1 md:order-none md:col-start-2 md:sticky md:top-24 z-10 w-full max-w-full">
+          {/* Action Tiles (Top) */}
+          <div className="flex flex-col w-full gap-2 lg:bg-white lg:border lg:p-4 lg:shadow-sm lg:rounded-xl">
+            <AddLeadTile ownerId={owner?.id} properties={properties || []} />
             <QuickCheckin properties={properties || []} />
+            <CollapsibleTile title="Add New Property" icon={Home}>
+              <CreatePropertyForm />
+            </CollapsibleTile>
           </div>
 
-          {/* Properties List (C) - Mobile Middle, Desktop Left (spans all rows) */}
-          <div className="flex flex-col gap-4 order-2 md:order-none md:col-start-1 md:row-span-2">
-            {properties?.map(prop => (
+          {/* Properties List (Bottom) */}
+          <div className="flex flex-col gap-4 w-full">
+            <h2 className="text-xl font-bold mt-4 lg:mt-2 px-1">Your Properties Database</h2>
+            
+            {properties && properties.length > 0 ? properties.map(prop => (
               <div 
                 key={prop.id} 
-                className="bg-white border rounded-lg p-4 md:p-6 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group"
+                className="bg-white border rounded-lg p-4 md:p-6 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group w-full"
               >
                 <div className="flex items-start gap-4 w-full md:w-auto overflow-hidden">
                   <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden flex-shrink-0 relative w-16 h-16 md:w-20 md:h-20">
@@ -161,21 +169,13 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
                   </Link>
                 </div>
               </div>
-            ))}
-            {(!properties || properties.length === 0) && (
-              <div className="text-center p-12 border-2 border-dashed rounded-lg text-gray-500">
+            )) : (
+              <div className="text-center p-12 border-2 border-dashed bg-white rounded-lg text-gray-500 w-full">
                 <Home className="w-12 h-12 mx-auto text-gray-300 mb-4" />
                 <p>You haven't added any properties yet.</p>
               </div>
             )}
           </div>
-
-          {/* Create Property Form (B) - Mobile Bottom, Desktop Right Bottom */}
-          <div className="bg-white border rounded-lg p-6 shadow-sm order-3 md:order-none md:col-start-2">
-            <h3 className="font-bold text-lg mb-4 flex gap-2 items-center"><Plus className="w-5 h-5"/> Add New Property</h3>
-            <CreatePropertyForm />
-          </div>
-
         </div>
       ) : activeTab === 'leads' ? (
         <LeadsSection 
