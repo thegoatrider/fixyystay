@@ -68,6 +68,12 @@ export async function submitCheckin(formData: FormData) {
     idDocuments.push(personDocs)
   }
 
+  // Generate a unique GST-XXXXXXXX identifier for this check-in
+  const uid = 'GST-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()
+
   // Insert check-in record
   const { error } = await supabase
     .from('guest_checkins')
@@ -79,7 +85,8 @@ export async function submitCheckin(formData: FormData) {
       num_people: numPeople,
       checkin_date: checkinDate || null,
       checkout_date: checkoutDate || null,
-      id_documents: idDocuments
+      id_documents: idDocuments,
+      uid
     }])
 
   if (error) {

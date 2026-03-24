@@ -5,6 +5,7 @@ import { CheckCircle, Users, Wallet, CreditCard, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
+import AdminPropertiesSearch from './AdminPropertiesSearch'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -267,61 +268,12 @@ export default async function AdminDashboard() {
       <section>
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
           <CheckCircle className="text-green-500" /> Approved Properties
+          <span className="text-sm font-normal text-gray-400 ml-2">{approvedProperties?.length || 0} total</span>
         </h2>
-        <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3">Property Name</th>
-                <th className="px-6 py-3">Owner</th>
-                <th className="px-6 py-3">Type</th>
-                <th className="px-6 py-3 text-center">Featured</th>
-                <th className="px-6 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {approvedProperties?.map((prop) => (
-                <tr key={prop.id}>
-                  <td className="px-6 py-4 font-medium">{prop.name}</td>
-                  <td className="px-6 py-4">{prop.owners?.name}</td>
-                  <td className="px-6 py-4 capitalize">{prop.type}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      <FeaturedToggle propertyId={prop.id} featured={!!prop.featured} />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <form action={async (formData) => {
-                        'use server'
-                        const infId = formData.get('influencerId') as string
-                        if (infId) await assignInfluencer(prop.id, infId)
-                      }} className="flex-shrink-0 flex items-center gap-2">
-                        <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50" required defaultValue="">
-                          <option value="" disabled>Select Influencer...</option>
-                          {influencers?.map(inf => (
-                            <option key={inf.id} value={inf.id}>{inf.name}</option>
-                          ))}
-                        </select>
-                        <Button type="submit" size="sm" variant="secondary" className="flex-shrink-0">Assign</Button>
-                      </form>
-                      <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-                      <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
-                      <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
-                        <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {(!approvedProperties || approvedProperties.length === 0) && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No approved properties yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <AdminPropertiesSearch 
+          properties={(approvedProperties || []) as any} 
+          influencers={(influencers || []) as any} 
+        />
       </section>
 
       {/* SECTION 3: Influencer Promotion Properties */}
