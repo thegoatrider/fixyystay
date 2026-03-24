@@ -141,7 +141,7 @@ export default async function Index() {
       {/* Footer */}
       <footer className="w-full bg-white border-t">
         {/* Social + Support bar */}
-        <div className="max-w-4xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Social Links */}
           <div className="flex items-center gap-4">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">Follow us</span>
