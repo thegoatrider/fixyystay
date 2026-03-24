@@ -68,8 +68,22 @@ export default async function AdminDashboard() {
     }
   }) || []
 
-  // 5. Global Wallet Stats
-  const { data: walletTransactions } = await supabase.from('wallet_transactions').select('*')
+  // 5. Global Wallet Stats — guarded in case wallet_migrations.sql hasn't been run yet
+  let walletTransactions: any[] = []
+  let pendingPayoutsRaw: any[] = []
+  try {
+    const { data: wt } = await supabase.from('wallet_transactions').select('*')
+    walletTransactions = wt || []
+    const { data: pr } = await supabase
+      .from('payout_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    pendingPayoutsRaw = pr || []
+  } catch (e) {
+    console.warn('Wallet tables not found. Run supabase/wallet_migrations.sql to enable wallet features.')
+  }
+
   const { data: allBookings } = await supabase.from('bookings').select('amount')
   
   const totalRevenueGenerated = allBookings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0
@@ -78,23 +92,15 @@ export default async function AdminDashboard() {
   let paidToOwners = 0
   let paidToInfluencers = 0
   
-  walletTransactions?.filter(t => t.transaction_type === 'earning').forEach(t => {
+  walletTransactions.filter(t => t.transaction_type === 'earning').forEach(t => {
     if (influencerIds.includes(t.user_id)) {
       paidToInfluencers += Number(t.amount)
     } else {
-      // If it's not an influencer, it's an owner
       paidToOwners += Number(t.amount)
     }
   })
   
   const platformCommission = totalRevenueGenerated - paidToOwners - paidToInfluencers
-
-  // 6. Pending Payout Requests
-  const { data: pendingPayoutsRaw } = await supabase
-    .from('payout_requests')
-    .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true })
 
   const { data: allOwners } = await supabase.from('owners').select('id, name')
   
