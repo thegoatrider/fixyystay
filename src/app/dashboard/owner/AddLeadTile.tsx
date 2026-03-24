@@ -10,7 +10,7 @@ import { CollapsibleTile } from '@/components/CollapsibleTile'
 
 type Property = { id: string; name: string }
 
-export default function AddLeadTile({ ownerId, properties }: { ownerId: string, properties: Property[] }) {
+export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: string, properties: Property[] }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
   const [phone, setPhone] = useState('')

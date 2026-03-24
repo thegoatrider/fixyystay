@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { approveProperty, assignInfluencer, approveInfluencer, rejectInfluencer, processPayout } from './actions'
+import { approveProperty, assignInfluencer, assignInfluencerFromForm, approveInfluencer, rejectInfluencer, processPayout } from './actions'
 import { CheckCircle, Users, Wallet, CreditCard, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
@@ -273,6 +273,7 @@ export default async function AdminDashboard() {
         <AdminPropertiesSearch 
           properties={(approvedProperties || []) as any} 
           influencers={(influencers || []) as any} 
+          assignInfluencerAction={assignInfluencerFromForm}
         />
       </section>
 

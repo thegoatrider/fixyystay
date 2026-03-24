@@ -13,11 +13,24 @@ export async function approveProperty(propertyId: string) {
     throw new Error('Unauthorized')
   }
 
-  // Generate a unique PRP-XXXXXXXX identifier
-  const uid = 'PRP-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase()
+  // Generate a collision-safe unique PRP-XXXXXXXX identifier
+  let uid = ''
+  let attempts = 0
+  while (attempts < 10) {
+    const candidate = 'PRP-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+    // Check if this UID already exists in the database
+    const { data: existing } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('uid', candidate)
+      .maybeSingle()
+    if (!existing) { uid = candidate; break }
+    attempts++
+  }
+  if (!uid) throw new Error('Failed to generate a unique property UID after 10 attempts')
 
   const { error } = await supabase
     .from('properties')
@@ -31,7 +44,6 @@ export async function approveProperty(propertyId: string) {
 
   revalidatePath('/dashboard/admin')
 }
-
 
 export async function deleteProperty(propertyId: string) {
   const supabase = await createClient()
@@ -122,6 +134,15 @@ export async function assignInfluencer(propertyId: string, influencerId: string)
 
   revalidatePath('/dashboard/admin')
 }
+
+// FormData version - safe to pass as prop to client components
+export async function assignInfluencerFromForm(formData: FormData) {
+  const propertyId = formData.get('propertyId') as string
+  const influencerId = formData.get('influencerId') as string
+  if (!propertyId || !influencerId) return
+  await assignInfluencer(propertyId, influencerId)
+}
+
 
 export async function toggleFeatured(propertyId: string, currentValue: boolean) {
   const supabase = await createClient()

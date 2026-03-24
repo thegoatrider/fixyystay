@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import FeaturedToggle from './FeaturedToggle'
 import DeletePropertyButton from './DeletePropertyButton'
-import { assignInfluencer } from './actions'
 
 type Property = {
   id: string
@@ -25,10 +24,12 @@ type Influencer = {
 
 export default function AdminPropertiesSearch({ 
   properties, 
-  influencers 
+  influencers,
+  assignInfluencerAction
 }: { 
   properties: Property[],
-  influencers: Influencer[]
+  influencers: Influencer[],
+  assignInfluencerAction: (formData: FormData) => Promise<void>
 }) {
   const [query, setQuery] = useState('')
 
@@ -91,11 +92,8 @@ export default function AdminPropertiesSearch({
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-3">
-                    <form action={async (formData) => {
-                      'use server'
-                      const infId = formData.get('influencerId') as string
-                      if (infId) await assignInfluencer(prop.id, infId)
-                    }} className="flex-shrink-0 flex items-center gap-2">
+                    <form action={assignInfluencerAction} className="flex-shrink-0 flex items-center gap-2">
+                      <input type="hidden" name="propertyId" value={prop.id} />
                       <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50 text-sm" required defaultValue="">
                         <option value="" disabled>Select Influencer...</option>
                         {influencers?.map(inf => (
