@@ -10,7 +10,7 @@ export function CollapsibleTile({
   badgeCount = 0
 }: { 
   title: string, 
-  icon: any, 
+  icon?: any, 
   children: React.ReactNode, 
   defaultOpen?: boolean,
   badgeCount?: number
@@ -25,7 +25,7 @@ export function CollapsibleTile({
       >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${open ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
-            <Icon className="w-5 h-5" />
+            {Icon ? <Icon className="w-5 h-5" /> : <span className="text-sm font-bold">+</span>}
           </div>
           <span className="font-bold text-gray-900 text-sm md:text-base">{title}</span>
           {badgeCount > 0 && !open && (
