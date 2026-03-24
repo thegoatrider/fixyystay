@@ -131,7 +131,7 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
           <div className="flex flex-col w-full gap-2 lg:bg-white lg:border lg:p-4 lg:shadow-sm lg:rounded-xl">
             <AddLeadTile ownerId={owner?.id} properties={properties || []} />
             <QuickCheckin properties={properties || []} />
-            <CollapsibleTile title="Add New Property" icon={Home}>
+            <CollapsibleTile title="Add New Property">
               <CreatePropertyForm />
             </CollapsibleTile>
           </div>
