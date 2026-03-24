@@ -149,9 +149,13 @@ export default function PropertyDetailClient({
     setError(null)
     
     try {
-      // Direct booking per user instructions, bypassing Stripe for now
-      await bookRoom(property.id, selectedRoomId, totalPrice, formData)
+      const result = await bookRoom(property.id, selectedRoomId, totalPrice, formData)
       
+      if (result?.error) {
+        setError(result.error)
+        return
+      }
+
       const confirmed = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]')
       if (!confirmed.includes(property.id)) {
         confirmed.push(property.id)
