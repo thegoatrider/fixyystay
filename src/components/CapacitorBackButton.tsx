@@ -2,39 +2,44 @@
 
 import { useEffect } from 'react'
 import { App as CapacitorApp } from '@capacitor/app'
-import { useRouter } from 'next/navigation'
 
 export function CapacitorBackButton() {
-  const router = useRouter()
-
   useEffect(() => {
     let backListener: any
 
     const setupListener = async () => {
       try {
-        backListener = await CapacitorApp.addListener('backButton', () => {
-          // If the user is on the root landing page or login page, we let them exit the app.
-          // Otherwise, we pop the Next.js router stack.
-          if (window.location.pathname === '/' || window.location.pathname === '/login') {
+        backListener = await CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+          // canGoBack comes from the Capacitor WebView's own history tracking
+          // window.history.length > 1 means there's history to go back through
+          const hasHistory = canGoBack || (typeof window !== 'undefined' && window.history.length > 1)
+
+          // Allow exit only when truly at the start (home or login) AND no history
+          const isExitScreen =
+            window.location.pathname === '/' ||
+            window.location.pathname === '/login' ||
+            window.location.pathname === '/signup'
+
+          if (isExitScreen && !canGoBack) {
+            // At the very start of the app with nothing to go back to — exit
             CapacitorApp.exitApp()
           } else {
-            router.back()
+            // Go back in native WebView history (works reliably on Android)
+            window.history.go(-1)
           }
         })
       } catch (err) {
-        // Safe fail on non-capacitor environments (like web browser)
-        console.warn('Capacitor App plugin listener failed to load (likely in browser environment)', err)
+        // Safe fail on web browser (no Capacitor runtime)
+        console.warn('Capacitor back button not available in browser', err)
       }
     }
 
     setupListener()
 
     return () => {
-      if (backListener && typeof backListener.remove === 'function') {
-        backListener.remove()
-      }
+      if (backListener?.remove) backListener.remove()
     }
-  }, [router])
+  }, [])
 
   return null
 }
