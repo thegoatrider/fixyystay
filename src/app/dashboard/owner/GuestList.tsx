@@ -14,6 +14,7 @@ type GuestCheckin = {
   checkout_date: string | null
   id_documents: any[]
   created_at: string
+  uid: string | null
   properties: { name: string }
 }
 
@@ -50,14 +51,23 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
     return map
   }, [checkins])
 
-  // Guests for the selected date
+  // When searching, show ALL matching guests regardless of date
+  const allSearchResults = useMemo(() => {
+    if (!searchTerm) return []
+    const q = searchTerm.toLowerCase()
+    return checkins.filter(c =>
+      c.guest_name.toLowerCase().includes(q) ||
+      c.guest_phone.includes(q) ||
+      c.properties.name.toLowerCase().includes(q) ||
+      (c.uid && c.uid.toLowerCase().includes(q))
+    )
+  }, [checkins, searchTerm])
+
+  const isGlobalSearch = searchTerm.length > 0
+
+  // Guests for the selected date (used when NOT in global search mode)
   const selectedGuests = selectedDate
-    ? (checkinsByDate[format(selectedDate, 'yyyy-MM-dd')] || []).filter(c =>
-        !searchTerm ||
-        c.guest_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.guest_phone.includes(searchTerm) ||
-        c.properties.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    ? (checkinsByDate[format(selectedDate, 'yyyy-MM-dd')] || [])
     : []
 
   function prevMonth() {
@@ -162,9 +172,50 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
           </div>
         </div>
 
-        {/* ── Guest List for selected date ── */}
-        <div className={`transition-all duration-300 ${selectedDate ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          {selectedDate ? (
+        {/* ── Guest List ── */}
+        <div className="transition-all duration-300">
+          {isGlobalSearch ? (
+            // Global search result mode
+            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Search Results</p>
+                  <h3 className="font-bold text-gray-900 text-sm">{allSearchResults.length} matches</h3>
+                </div>
+              </div>
+              <div className="flex flex-col divide-y max-h-[500px] overflow-y-auto">
+                {allSearchResults.length === 0 && (
+                  <div className="p-6 text-center text-gray-400 text-sm italic">No guests match your search.</div>
+                )}
+                {allSearchResults.map(guest => (
+                  <button
+                    key={guest.id}
+                    onClick={() => setSelectedGuest(selectedGuest?.id === guest.id ? null : guest)}
+                    className={[
+                      'w-full text-left px-4 py-3.5 transition-colors hover:bg-indigo-50/60',
+                      selectedGuest?.id === guest.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : '',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
+                          <p className="text-xs text-gray-400 truncate">{guest.properties.name}</p>
+                          {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                        </div>
+                      </div>
+                      <span className="flex-shrink-0 flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                        <Users className="w-3 h-3" />{guest.num_people}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : selectedDate ? (
             <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
                 <div>
@@ -181,10 +232,9 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
                   </button>
                 </div>
               </div>
-
               <div className="flex flex-col divide-y max-h-[500px] overflow-y-auto">
                 {selectedGuests.length === 0 && (
-                  <div className="p-6 text-center text-gray-400 text-sm italic">No results for current search.</div>
+                  <div className="p-6 text-center text-gray-400 text-sm italic">No check-ins on this date.</div>
                 )}
                 {selectedGuests.map(guest => (
                   <button
@@ -203,6 +253,7 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
                           <p className="text-xs text-gray-400 truncate">{guest.properties.name}</p>
+                          {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
                         </div>
                       </div>
                       <span className="flex-shrink-0 flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -216,7 +267,7 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
           ) : (
             <div className="bg-gray-50 border border-dashed rounded-2xl p-8 text-center text-gray-400 flex flex-col items-center gap-3">
               <CalIcon className="w-8 h-8 opacity-30" />
-              <p className="text-xs font-medium">Select a date<br/>to see guests</p>
+              <p className="text-xs font-medium">Select a date<br/>or search by name above</p>
             </div>
           )}
         </div>
@@ -234,6 +285,9 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
                   <div>
                     <h3 className="font-bold text-gray-900">{selectedGuest.guest_name}</h3>
                     <p className="text-xs text-gray-400">{selectedGuest.properties.name}</p>
+                    {selectedGuest.uid && (
+                      <p className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">{selectedGuest.uid}</p>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => setSelectedGuest(null)}

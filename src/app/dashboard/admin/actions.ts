@@ -13,9 +13,15 @@ export async function approveProperty(propertyId: string) {
     throw new Error('Unauthorized')
   }
 
+  // Generate a unique PRP-XXXXXXXX identifier
+  const uid = 'PRP-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()
+
   const { error } = await supabase
     .from('properties')
-    .update({ approved: true })
+    .update({ approved: true, uid })
     .eq('id', propertyId)
 
   if (error) {
@@ -25,6 +31,7 @@ export async function approveProperty(propertyId: string) {
 
   revalidatePath('/dashboard/admin')
 }
+
 
 export async function deleteProperty(propertyId: string) {
   const supabase = await createClient()
