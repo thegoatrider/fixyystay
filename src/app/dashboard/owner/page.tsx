@@ -36,15 +36,23 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
   if (!isSuperAdmin) checkinQuery = checkinQuery.eq('owner_id', owner?.id)
   const { data: checkins } = await checkinQuery.order('created_at', { ascending: false })
 
-  // Fetch Wallet Transactions
-  let walletQuery = supabase.from('wallet_transactions').select('*')
-  if (!isSuperAdmin) walletQuery = walletQuery.eq('user_id', owner?.id)
-  const { data: transactions } = await walletQuery.order('created_at', { ascending: false })
+  // Fetch Wallet Transactions — guarded in case wallet_migrations.sql hasn't been run yet
+  let transactions: any[] = []
+  let payouts: any[] = []
+  try {
+    let walletQuery = supabase.from('wallet_transactions').select('*')
+    if (!isSuperAdmin && owner?.id) walletQuery = walletQuery.eq('user_id', owner.id)
+    const { data: walletData, error: walletError } = await walletQuery.order('created_at', { ascending: false })
+    if (!walletError) transactions = walletData || []
 
-  // Fetch Payout Requests
-  let payoutQuery = supabase.from('payout_requests').select('*')
-  if (!isSuperAdmin) payoutQuery = payoutQuery.eq('user_id', owner?.id)
-  const { data: payouts } = await payoutQuery.order('created_at', { ascending: false })
+    let payoutQuery = supabase.from('payout_requests').select('*')
+    if (!isSuperAdmin && owner?.id) payoutQuery = payoutQuery.eq('user_id', owner.id)
+    const { data: payoutData, error: payoutError } = await payoutQuery.order('created_at', { ascending: false })
+    if (!payoutError) payouts = payoutData || []
+  } catch (e) {
+    // wallet_migrations.sql not yet run — tables don't exist, show empty wallet
+    console.warn('Wallet tables not found. Run supabase/wallet_migrations.sql to enable wallet features.')
+  }
 
   return (
     <div className="flex flex-col gap-8">
