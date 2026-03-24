@@ -55,48 +55,56 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
       </div>
 
       {/* Tabs Design */}
-      <div className="flex border-b border-gray-200 w-full mb-2">
+      <div className="flex justify-between border-b border-gray-200 w-full mb-2 overflow-x-hidden">
         <Link 
           href="/dashboard/owner?tab=properties"
-          className={`px-8 py-3 font-semibold text-sm transition-all border-b-2 flex items-center gap-2 ${
+          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
             activeTab === 'properties' 
               ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <List className="w-4 h-4" /> Properties
+          <List className="w-4 h-4 md:w-5 md:h-5" /> 
+          <span>Properties</span>
         </Link>
         <Link 
           href="/dashboard/owner?tab=leads"
-          className={`px-8 py-3 font-semibold text-sm transition-all border-b-2 flex items-center gap-2 ${
+          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
             activeTab === 'leads' 
               ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <MessageSquare className="w-4 h-4" /> Leads
-          {leads && leads.length > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{leads.length}</span>}
+          <MessageSquare className="w-4 h-4 md:w-5 md:h-5" /> 
+          <span className="flex items-center">
+            Leads
+            {leads && leads.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1 py-0.5 rounded-full ml-1 hidden sm:inline-block">{leads.length}</span>}
+          </span>
         </Link>
         <Link 
           href="/dashboard/owner?tab=guests"
-          className={`px-8 py-3 font-semibold text-sm transition-all border-b-2 flex items-center gap-2 ${
+          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
             activeTab === 'guests' 
               ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <Users className="w-4 h-4" /> Guests
-          {checkins && checkins.length > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{checkins.length}</span>}
+          <Users className="w-4 h-4 md:w-5 md:h-5" /> 
+          <span className="flex items-center">
+            Guests
+            {checkins && checkins.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1 py-0.5 rounded-full ml-1 hidden sm:inline-block">{checkins.length}</span>}
+          </span>
         </Link>
         <Link 
           href="/dashboard/owner?tab=wallet"
-          className={`px-8 py-3 font-semibold text-sm transition-all border-b-2 flex items-center gap-2 ${
+          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
             activeTab === 'wallet' 
               ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <Wallet className="w-4 h-4" /> Wallet
+          <Wallet className="w-4 h-4 md:w-5 md:h-5" /> 
+          <span>Wallet</span>
         </Link>
       </div>
 
