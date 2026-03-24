@@ -69,41 +69,48 @@ export async function submitCheckin(formData: FormData) {
   }
 
   // Generate a collision-safe unique GST-XXXXXXXX identifier
-  let uid = ''
-  let attempts = 0
-  while (attempts < 10) {
-    const candidate = 'GST-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase()
-    // Check if this UID already exists in the database
-    const { data: existing } = await supabaseAdmin
-      .from('guest_checkins')
-      .select('id')
-      .eq('uid', candidate)
-      .maybeSingle()
-    if (!existing) { uid = candidate; break }
-    attempts++
-  }
-  if (!uid) {
-    console.error('Failed to generate a unique guest UID after 10 attempts')
-    uid = 'GST-' + Date.now().toString(16).toUpperCase() // last-resort fallback
+  // (Only used if uid_migrations.sql has been run — gracefully falls back if not)
+  let uid: string | null = null
+  try {
+    let candidate = ''
+    for (let attempts = 0; attempts < 10; attempts++) {
+      candidate = 'GST-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase()
+      const { data: existing } = await supabaseAdmin
+        .from('guest_checkins')
+        .select('id')
+        .eq('uid', candidate)
+        .maybeSingle()
+      if (!existing) { uid = candidate; break }
+    }
+    if (!uid) uid = 'GST-' + Date.now().toString(16).toUpperCase()
+  } catch {
+    // uid column doesn't exist yet — proceed without it
   }
 
-  // Insert check-in record
-  const { error } = await supabase
-    .from('guest_checkins')
-    .insert([{
-      property_id: propertyId,
-      owner_id: property.owner_id,
-      guest_phone: guestPhone,
-      guest_name: guestName,
-      num_people: numPeople,
-      checkin_date: checkinDate || null,
-      checkout_date: checkoutDate || null,
-      id_documents: idDocuments,
-      uid
-    }])
+  const checkinRecord: any = {
+    property_id: propertyId,
+    owner_id: property.owner_id,
+    guest_phone: guestPhone,
+    guest_name: guestName,
+    num_people: numPeople,
+    checkin_date: checkinDate || null,
+    checkout_date: checkoutDate || null,
+    id_documents: idDocuments,
+  }
+  if (uid) checkinRecord.uid = uid
+
+  // Try insert — if uid column missing, retry without it
+  let { error } = await supabase.from('guest_checkins').insert([checkinRecord])
+
+  if (error && (error.code === '42703' || error.message?.includes('uid'))) {
+    // uid column doesn't exist yet — insert without it
+    const { uid: _removed, ...recordWithoutUid } = checkinRecord
+    const { error: fallbackError } = await supabase.from('guest_checkins').insert([recordWithoutUid])
+    error = fallbackError ?? null
+  }
 
   if (error) {
     console.error('Check-in failed:', error)
@@ -116,3 +123,4 @@ export async function submitCheckin(formData: FormData) {
     helpdeskNumber: property.helpdesk_number 
   }
 }
+
