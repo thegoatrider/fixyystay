@@ -68,11 +68,27 @@ export async function submitCheckin(formData: FormData) {
     idDocuments.push(personDocs)
   }
 
-  // Generate a unique GST-XXXXXXXX identifier for this check-in
-  const uid = 'GST-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase()
+  // Generate a collision-safe unique GST-XXXXXXXX identifier
+  let uid = ''
+  let attempts = 0
+  while (attempts < 10) {
+    const candidate = 'GST-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+    // Check if this UID already exists in the database
+    const { data: existing } = await supabaseAdmin
+      .from('guest_checkins')
+      .select('id')
+      .eq('uid', candidate)
+      .maybeSingle()
+    if (!existing) { uid = candidate; break }
+    attempts++
+  }
+  if (!uid) {
+    console.error('Failed to generate a unique guest UID after 10 attempts')
+    uid = 'GST-' + Date.now().toString(16).toUpperCase() // last-resort fallback
+  }
 
   // Insert check-in record
   const { error } = await supabase
