@@ -99,8 +99,12 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     }
   }).filter(p => p.available_rooms > 0) || []
 
-  // Apply Price Bucket Filter
-  if (selectedBucket) {
+  // Apply Price Bucket Filter or See All Types
+  if (selectedBucket === 'See All Rooms') {
+    availableProperties = availableProperties.filter(prop => prop.type === 'multi-room property')
+  } else if (selectedBucket === 'See All Villas') {
+    availableProperties = availableProperties.filter(prop => prop.type === 'villa')
+  } else if (selectedBucket) {
     availableProperties = availableProperties.filter(prop =>
       prop.rooms.some((r: any) => r.price_bucket === selectedBucket)
     )
@@ -109,12 +113,12 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     availableProperties = availableProperties.filter(p => p.featured)
   }
 
-  const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999']
-  const villaBuckets = ['₹4999', '₹7999', '₹9999', '₹14999', '₹19999', '₹24999', '₹29999', '₹39999', '₹49999']
+  const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999', 'See All Rooms']
+  const villaBuckets = ['₹4999', '₹7999', '₹9999', '₹14999', '₹19999', '₹24999', '₹29999', '₹39999', '₹49999', 'See All Villas']
 
-  // Group by area — only when a bucket filter is active
+  // Group by area — only when a specific price bucket is active (not See All)
   const propertiesByArea: Record<string, typeof availableProperties> = {}
-  if (selectedBucket) {
+  if (selectedBucket && selectedBucket !== 'See All Rooms' && selectedBucket !== 'See All Villas') {
     availableProperties.forEach(prop => {
       const area = prop.city_area || 'Other'
       if (!propertiesByArea[area]) propertiesByArea[area] = []
@@ -197,12 +201,15 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
           <div className="text-center p-12 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
             <p className="text-gray-500 text-lg">No properties found matching your selection.</p>
             {selectedBucket && (
-              <Link href="/guest" className="inline-block mt-4 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">
-                Show all properties
+              <Link 
+                href={buildUrl({ bucket: roomBuckets.includes(selectedBucket) ? 'See All Rooms' : 'See All Villas' })} 
+                className="inline-block mt-4 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+              >
+                Show all {roomBuckets.includes(selectedBucket) ? 'rooms' : 'villas'}
               </Link>
             )}
           </div>
-        ) : selectedBucket ? (
+        ) : selectedBucket && selectedBucket !== 'See All Rooms' && selectedBucket !== 'See All Villas' ? (
           /* Grouped by area when bucket is active */
           <div className="flex flex-col gap-10">
             {sortedAreas.map(area => (
