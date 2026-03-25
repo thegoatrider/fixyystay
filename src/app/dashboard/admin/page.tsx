@@ -1,11 +1,14 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { approveProperty, assignInfluencer, assignInfluencerFromForm, approveInfluencer, rejectInfluencer, processPayout } from './actions'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
 import AdminPropertiesSearch from './AdminPropertiesSearch'
+import PayoutActions from './PayoutActions'
+import PropertyApprovalActions from './PropertyApprovalActions'
+import InfluencerApprovalActions from './InfluencerApprovalActions'
+import { assignInfluencerFromForm } from './actions'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -38,8 +41,6 @@ export default async function AdminDashboard() {
     .order('created_at', { ascending: false })
 
   // 4. Influencer Promotion Stats
-  // We will need a complex query to get clicks, bookings, revenue, commission.
-  // For now, let's fetch basic mappings and calculate.
   const { data: promotionData } = await supabase
     .from('influencer_properties')
     .select(`
@@ -68,7 +69,7 @@ export default async function AdminDashboard() {
     }
   }) || []
 
-  // 5. Global Wallet Stats — guarded in case wallet_migrations.sql hasn't been run yet
+  // 5. Global Wallet Stats
   let walletTransactions: any[] = []
   let pendingPayoutsRaw: any[] = []
   try {
@@ -81,11 +82,10 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: true })
     pendingPayoutsRaw = pr || []
   } catch (e) {
-    console.warn('Wallet tables not found. Run supabase/wallet_migrations.sql to enable wallet features.')
+    console.warn('Wallet tables not found.')
   }
 
   const { data: allBookings } = await supabase.from('bookings').select('amount')
-  
   const totalRevenueGenerated = allBookings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0
   
   const influencerIds = influencers?.map(i => i.id) || []
@@ -101,7 +101,6 @@ export default async function AdminDashboard() {
   })
   
   const platformCommission = totalRevenueGenerated - paidToOwners - paidToInfluencers
-
   const { data: allOwners } = await supabase.from('owners').select('id, name')
   
   const pendingPayouts = pendingPayoutsRaw?.map(req => {
@@ -171,14 +170,7 @@ export default async function AdminDashboard() {
                   <td className="px-6 py-4 font-bold text-orange-600">₹{Number(req.amount).toLocaleString()}</td>
                   <td className="px-6 py-4 font-mono text-gray-600">{req.bank_details}</td>
                   <td className="px-6 py-4">
-                    <div className="flex justify-end gap-2">
-                      <form action={processPayout.bind(null, req.id, 'reject')}>
-                        <Button type="submit" variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">Reject</Button>
-                      </form>
-                      <form action={processPayout.bind(null, req.id, 'approve')}>
-                        <Button type="submit" size="sm" className="bg-green-600 hover:bg-green-700 text-white">Mark Paid</Button>
-                      </form>
-                    </div>
+                    <PayoutActions requestId={req.id} />
                   </td>
                 </tr>
               ))}
@@ -213,11 +205,9 @@ export default async function AdminDashboard() {
                 
                 <div className="mt-auto flex gap-2">
                   <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/3" />
-                  <form action={approveProperty.bind(null, prop.id)} className="w-2/3">
-                    <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                      Approve
-                    </Button>
-                  </form>
+                  <div className="w-2/3">
+                    <PropertyApprovalActions propertyId={prop.id} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -243,23 +233,7 @@ export default async function AdminDashboard() {
                   <p className="text-sm text-gray-500">{inf.email}</p>
                 </div>
                 
-                <div className="mt-auto flex flex-col gap-2">
-                  <form action={approveInfluencer} className="flex gap-2">
-                    <input type="hidden" name="influencerId" value={inf.id} />
-                    <div className="flex flex-col gap-1 w-1/3">
-                      <label className="text-[10px] uppercase text-gray-500 font-bold">Comm. %</label>
-                      <input type="number" name="commissionRate" required min="0" max="100" step="0.5" defaultValue="5" className="border rounded px-2 py-1.5 focus:ring-blue-500 outline-none text-sm w-full font-bold" />
-                    </div>
-                    <Button type="submit" size="sm" className="w-2/3 bg-green-600 hover:bg-green-700 text-white mt-auto h-8">
-                      Approve
-                    </Button>
-                  </form>
-                  <form action={rejectInfluencer.bind(null, inf.id)}>
-                    <Button type="submit" variant="destructive" size="sm" className="w-full h-8">
-                      Reject
-                    </Button>
-                  </form>
-                </div>
+                <InfluencerApprovalActions influencerId={inf.id} />
               </div>
             ))}
           </div>
@@ -302,7 +276,6 @@ export default async function AdminDashboard() {
             </thead>
             <tbody className="divide-y">
               {promotions.map((promo) => {
-                // Supabase joins with to-one relationships return an object or array. We need to safely extract name.
                 const propVal = promo.properties as any;
                 const infVal = promo.influencers as any;
 
