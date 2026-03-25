@@ -107,10 +107,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <Link href="/" className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm">
-            <ArrowLeft className="w-4 h-4" /> Back to Fixy Stays
+      <div className="bg-white border-b sticky top-0 z-50">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/blog" className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to Blog
+          </Link>
+          <Link href="/" className="text-gray-400 hover:text-gray-600 text-xs font-bold uppercase tracking-widest transition-colors">
+            Home
           </Link>
         </div>
       </div>
