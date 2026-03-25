@@ -24,6 +24,7 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
     const supabase = await createClient()
 
     const guestName = formData.get('guestName') as string
+    const guestEmail = formData.get('guestEmail') as string
     const guestPhone = formData.get('guestPhone') as string
     const influencerId = formData.get('influencerId') as string || null
 
@@ -59,6 +60,7 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
       room_id: roomId,
       influencer_id: influencerId,
       guest_name: guestName,
+      guest_email: guestEmail,
       guest_phone: guestPhone,
       amount
     }]).select().single()
@@ -105,6 +107,26 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
 
     revalidatePath('/guest')
     revalidatePath(`/guest/property/${propertyId}`)
+
+    // 4. Send Notifications (Email & SMS) - Non-fatal, async
+    try {
+      // Find property and room details for the message
+      const { data: prop } = await supabaseAdmin.from('properties').select('name').eq('id', propertyId).single()
+      const { data: room } = await supabaseAdmin.from('rooms').select('category').eq('id', roomId).single()
+      
+      const { sendBookingNotifications } = await import('@/utils/notifications')
+      await sendBookingNotifications({
+        guestName,
+        guestEmail,
+        guestPhone,
+        propertyName: prop?.name || 'FixStay Property',
+        roomCategory: room?.category || 'Standard',
+        amount,
+        bookingId: insertedBooking.id
+      })
+    } catch (notifyErr) {
+      console.error('Notification dispatch failed:', notifyErr)
+    }
 
     return { success: true }
   } catch (err: any) {

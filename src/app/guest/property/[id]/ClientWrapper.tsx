@@ -521,6 +521,11 @@ export default function PropertyDetailClient({
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="guestEmail" className="flex items-center gap-1">✉️ Email Address</Label>
+              <Input type="email" name="guestEmail" placeholder="your@email.com" required />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="guestPhone" className="flex items-center gap-1"><Phone className="w-4 h-4" /> Phone Number</Label>
               <Input name="guestPhone" placeholder="+91 9876543210" required />
             </div>

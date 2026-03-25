@@ -29,7 +29,7 @@ export default function AdminPropertiesSearch({
 }: { 
   properties: Property[],
   influencers: Influencer[],
-  assignInfluencerAction: (formData: FormData) => Promise<void>
+  assignInfluencerAction: (formData: FormData) => Promise<any>
 }) {
   const [query, setQuery] = useState('')
 
