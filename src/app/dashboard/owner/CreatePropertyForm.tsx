@@ -193,7 +193,25 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cityArea">Area</Label>
+        <Label htmlFor="city">City</Label>
+        <select
+          name="city"
+          required
+          defaultValue="Alibag"
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+        >
+          <option value="Alibag">Alibag</option>
+          <option value="Lonavala" disabled>Lonavala (Coming Soon)</option>
+          <option value="Khandala" disabled>Khandala (Coming Soon)</option>
+          <option value="Matheran" disabled>Matheran (Coming Soon)</option>
+          <option value="Mahableshwar" disabled>Mahableshwar (Coming Soon)</option>
+          <option value="Mumbai" disabled>Mumbai (Coming Soon)</option>
+          <option value="Goa" disabled>Goa (Coming Soon)</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cityArea">Area / Sub-locality</Label>
         <select
           name="cityArea"
           required

@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 import { Calendar as CalendarIcon, Users, X } from 'lucide-react'
 
-export function HomeSearch() {
+export function HomeSearch({ selectedCity = 'Alibag' }: { selectedCity?: string }) {
   const router = useRouter()
   const [range, setRange] = useState<DateRange | undefined>({ from: undefined, to: undefined })
   const [guests, setGuests] = useState('2')
@@ -41,6 +41,7 @@ export function HomeSearch() {
     if (range?.from) params.set('checkin', format(range.from, 'yyyy-MM-dd'))
     if (range?.to) params.set('checkout', format(range.to, 'yyyy-MM-dd'))
     if (guests) params.set('guests', guests)
+    if (selectedCity) params.set('city', selectedCity)
     router.push(`/guest?${params.toString()}`)
   }
 

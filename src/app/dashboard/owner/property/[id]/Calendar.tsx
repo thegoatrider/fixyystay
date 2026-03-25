@@ -16,8 +16,8 @@ import {
 } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, Hash, Layers, CheckCircle, XCircle, Info } from 'lucide-react'
-import { setRoomAvailability, setRoomRate, setMultipleRoomAvailability, setMultipleRoomRates } from './actions'
+import { ChevronLeft, ChevronRight, Hash, Layers, CheckCircle, XCircle, Info, Save } from 'lucide-react'
+import { setRoomAvailability, setRoomRate, setMultipleRoomAvailability, setMultipleRoomRates, saveMultipleChanges } from './actions'
 
 type CalendarProps = {
   propertyId: string
@@ -36,6 +36,10 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
   const [selectedRoom, setSelectedRoom] = useState<string>(rooms[0]?.id || '')
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Staging area for changes
+  const [stagedAvailability, setStagedAvailability] = useState<boolean | null>(null)
+  const [stagedPrice, setStagedPrice] = useState<number | null>(null)
   
   // Create a 24-month range starting from current month
   const today = new Date()
@@ -71,16 +75,30 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
     })
   }
 
-  const handleBulkAvailability = async (available: boolean) => {
+  const handleUnifiedSave = async () => {
     if (!selectedRoom || selectedDates.length === 0) return
+    if (stagedAvailability === null && stagedPrice === null) {
+      alert("Please choose an availability status or a price first.")
+      return
+    }
+
     setIsUpdating(true)
     try {
       const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
-      const result = await setMultipleRoomAvailability(propertyId, selectedRoom, dateStrings, available)
+      const result = await saveMultipleChanges(
+        propertyId, 
+        selectedRoom, 
+        dateStrings, 
+        stagedAvailability, 
+        stagedPrice
+      )
+      
       if (result?.error) {
         alert(result.error)
       } else {
         setSelectedDates([])
+        setStagedAvailability(null)
+        setStagedPrice(null)
       }
     } catch (err) {
       console.error(err)
@@ -90,27 +108,11 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
     }
   }
 
-  const handleBulkRate = async (priceStr: string) => {
-    if (!selectedRoom || selectedDates.length === 0 || !priceStr) return
-    setIsUpdating(true)
-    try {
-      const price = parseInt(priceStr.replace(/[^\d]/g, ''))
-      const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
-      const result = await setMultipleRoomRates(propertyId, selectedRoom, dateStrings, price)
-      if (result?.error) {
-        alert(result.error)
-      } else {
-        setSelectedDates([])
-      }
-    } catch (err) {
-      console.error(err)
-      alert('An unexpected error occurred.')
-    } finally {
-      setIsUpdating(false)
-    }
+  const clearSelection = () => {
+    setSelectedDates([])
+    setStagedAvailability(null)
+    setStagedPrice(null)
   }
-
-  const clearSelection = () => setSelectedDates([])
 
   // Selection state helpers
   const singleSelectedDateStr = selectedDates.length === 1 ? format(selectedDates[0], 'yyyy-MM-dd') : null
@@ -119,7 +121,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
   return (
     <div className="flex flex-col gap-6 relative">
       {/* Header Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-4 rounded-xl border">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-3 sm:p-4 rounded-xl border">
         <div className="flex flex-col gap-1">
           <Label className="text-[10px] font-bold uppercase text-gray-400">Selected Room</Label>
           <select 
@@ -127,7 +129,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
             value={selectedRoom}
             onChange={e => {
               setSelectedRoom(e.target.value)
-              setSelectedDates([])
+              clearSelection()
             }}
             disabled={!rooms.length}
           >
@@ -171,46 +173,71 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
       {/* Multi-Select Bulk Action Bar (Floating at bottom if selection exists) */}
       {selectedDates.length > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl animate-in slide-in-from-bottom-8 duration-300">
-          <div className="bg-white border-2 border-blue-600 shadow-2xl rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-black animate-pulse">
-                {selectedDates.length}
+          <div className="bg-white border-2 border-blue-600 shadow-2xl rounded-2xl p-4 flex flex-col items-stretch gap-4">
+            
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-black animate-pulse">
+                  {selectedDates.length}
+                </div>
+                <div>
+                  <p className="text-sm font-black text-gray-900 leading-none">Dates Selected</p>
+                  <button onClick={clearSelection} className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-widest mt-1">Clear Selection</button>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-black text-gray-900 leading-none">Dates Selected</p>
-                <button onClick={clearSelection} className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-widest mt-1">Clear All</button>
-              </div>
+              
+              <Button 
+                onClick={handleUnifiedSave}
+                disabled={isUpdating || (stagedAvailability === null && stagedPrice === null)}
+                className="bg-blue-600 hover:bg-blue-700 h-10 px-6 font-bold gap-2 shadow-lg shadow-blue-200"
+              >
+                {isUpdating ? 'Saving...' : (
+                  <>
+                    <Save className="w-4 h-4" /> Save All Changes
+                  </>
+                )}
+              </Button>
             </div>
 
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-              <Button 
-                onClick={() => handleBulkAvailability(false)} 
-                disabled={isUpdating}
-                className="bg-red-600 hover:bg-red-700 h-10 px-4 text-xs font-bold gap-2 flex-shrink-0"
-              >
-                <XCircle className="w-4 h-4" /> Block
-              </Button>
-              <Button 
-                onClick={() => handleBulkAvailability(true)} 
-                disabled={isUpdating}
-                className="bg-green-600 hover:bg-green-700 h-10 px-4 text-xs font-bold gap-2 flex-shrink-0"
-              >
-                <CheckCircle className="w-4 h-4" /> Open
-              </Button>
-              
-              <div className="flex-shrink-0">
-                <select
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+                <Button 
+                  onClick={() => setStagedAvailability(false)} 
+                  variant={stagedAvailability === false ? 'default' : 'outline'}
                   disabled={isUpdating}
-                  onChange={(e) => handleBulkRate(e.target.value)}
-                  className="bg-blue-50 border-2 border-blue-100 text-blue-700 h-10 px-3 rounded-lg text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none w-[140px]"
-                  defaultValue=""
+                  className={`h-10 px-4 text-xs font-bold gap-2 flex-shrink-0 transition-all ${stagedAvailability === false ? 'bg-red-600 hover:bg-red-700' : 'text-red-600 border-red-200 hover:bg-red-50'}`}
                 >
-                  <option value="" disabled>Set Price...</option>
-                  {PRICE_BUCKETS.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                  <XCircle className="w-4 h-4" /> Block
+                </Button>
+                <Button 
+                  onClick={() => setStagedAvailability(true)} 
+                  variant={stagedAvailability === true ? 'default' : 'outline'}
+                  disabled={isUpdating}
+                  className={`h-10 px-4 text-xs font-bold gap-2 flex-shrink-0 transition-all ${stagedAvailability === true ? 'bg-green-600 hover:bg-green-700' : 'text-green-600 border-green-200 hover:bg-green-50'}`}
+                >
+                  <CheckCircle className="w-4 h-4" /> Open
+                </Button>
+                
+                <div className="flex-shrink-0">
+                  <select
+                    disabled={isUpdating}
+                    onChange={(e) => setStagedPrice(parseInt(e.target.value.replace(/[^\d]/g, '')))}
+                    className="bg-blue-50 border-2 border-blue-100 text-blue-700 h-10 px-3 rounded-lg text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none w-[140px]"
+                    value={stagedPrice ? `₹${stagedPrice}` : ""}
+                  >
+                    <option value="" disabled>Set Price...</option>
+                    {PRICE_BUCKETS.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {(stagedAvailability !== null || stagedPrice !== null) && (
+                <p className="text-[10px] font-bold text-orange-500 animate-pulse italic">
+                  Changes staged. Don't forget to click Save!
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -233,12 +260,14 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
           
           return (
             <div key={mIndex} className="min-w-full snap-start p-2">
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1">{day}</div>
+              <div className="grid grid-cols-7 gap-px sm:gap-0.5 mb-1">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                  <div key={day} className={`text-center text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1 ${idx === 0 || idx === 6 ? 'text-red-300' : ''}`}>
+                    {day.substring(0, 3)}
+                  </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-0.5">
+              <div className="grid grid-cols-7 gap-px sm:gap-0.5">
                 {monthDays.map((date) => {
                   const dateStr = format(date, 'yyyy-MM-dd')
                   const isCurrentMonth = isSameMonth(date, monthDate)
@@ -254,16 +283,19 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                   const calendarDayPrice = rateRecord ? rateRecord.price : basePrice
 
                   const isSelected = selectedDates.some(d => isSameDay(d, date))
+                  
+                  const effectiveAvailability = (isSelected && stagedAvailability !== null) ? stagedAvailability : isAvailable
+                  const effectivePrice = (isSelected && stagedPrice !== null) ? stagedPrice : calendarDayPrice
 
                   return (
                     <div 
                       key={dateStr}
                       onClick={() => toggleDateSelection(date)}
                       className={`
-                        min-h-[68px] border rounded-md p-1.5 flex flex-col transition cursor-pointer relative
-                        ${!isCurrentMonth ? 'bg-gray-50/30 border-transparent opacity-10 pointer-events-none' : 'bg-white border-gray-100 hover:border-blue-300 hover:shadow-md'}
-                        ${!isAvailable && isCurrentMonth ? 'bg-red-50/30' : ''}
-                        ${isSelected ? 'ring-2 ring-blue-600 border-transparent z-10 bg-blue-50/50' : ''}
+                        min-h-[50px] sm:min-h-[68px] border rounded-sm sm:rounded-md p-1 sm:p-1.5 flex flex-col transition cursor-pointer relative
+                        ${!isCurrentMonth ? 'bg-gray-50/10 border-transparent opacity-0 pointer-events-none' : 'bg-white border-gray-100 hover:border-blue-300 hover:shadow-md'}
+                        ${!effectiveAvailability && isCurrentMonth ? 'bg-red-50/20' : ''}
+                        ${isSelected ? 'ring-1 sm:ring-2 ring-blue-600 border-transparent z-10 bg-blue-50/50' : ''}
                       `}
                     >
                       <div className="flex justify-between items-start">
@@ -274,7 +306,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                           {format(date, 'd')}
                         </span>
                         <div className="flex gap-1">
-                          {!isAvailable && isCurrentMonth && <div className="h-1.5 w-1.5 rounded-full bg-red-500" title="Blocked" />}
+                          {!effectiveAvailability && isCurrentMonth && <div className="h-1.5 w-1.5 rounded-full bg-red-500" title="Blocked" />}
                           {bookingHasDate && isCurrentMonth && (
                             <div className="h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse shadow-[0_0_8px_rgba(147,51,234,0.5)]" title="Booked" />
                           )}
@@ -283,11 +315,11 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
 
                       {isCurrentMonth && (
                         <div className="mt-auto">
-                          <div className={`text-[10px] font-black flex items-baseline gap-0.5 ${rateRecord ? 'text-orange-600' : 'text-green-600'}`}>
-                            <span className="text-[8px]">₹</span>
-                            <span>{calendarDayPrice}</span>
+                          <div className={`text-[8px] sm:text-[10px] font-black flex items-baseline gap-0.5 leading-none mb-1 overflow-hidden ${rateRecord || (isSelected && stagedPrice) ? 'text-orange-600' : 'text-green-600'}`}>
+                            <span className="text-[6px] sm:text-[8px]">₹</span>
+                            <span className="truncate tracking-tighter">{effectivePrice}</span>
                           </div>
-                          <div className={`mt-1 h-1 w-full rounded-full ${isAvailable ? 'bg-green-100' : 'bg-red-100'}`} />
+                          <div className={`h-0.5 sm:h-1 w-full rounded-full ${effectiveAvailability ? 'bg-green-100' : 'bg-red-100'}`} />
                         </div>
                       )}
                       

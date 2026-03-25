@@ -82,7 +82,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
       
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-semibold">{error}</div>}
       {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Updates saved successfully!</div>}
