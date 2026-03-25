@@ -1,8 +1,4 @@
-/**
- * Notification Utility for FixStay
- * Handles automated Email (via Resend) and SMS (via Twilio)
- * Uses standard fetch to keep dependencies light.
- */
+import { Resend } from 'resend';
 
 interface BookingNotificationParams {
   guestName: string;
@@ -33,41 +29,35 @@ async function sendEmail(email: string, name: string, property: string, room: st
     return;
   }
 
+  const resend = new Resend(apiKey);
+
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: 'FixStay <bookings@fixstay.com>',
-        to: email,
-        subject: `Booking Confirmed: ${property}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-            <h2 style="color: #2563eb;">Your stay is confirmed!</h2>
-            <p>Hi <strong>${name}</strong>,</p>
-            <p>Thank you for booking with FixStay. Your reservation at <strong>${property}</strong> is confirmed.</p>
-            <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 0; font-size: 14px; color: #6b7280;">Booking Details:</p>
-              <p style="margin: 5px 0; font-weight: bold;">Room: ${room}</p>
-              <p style="margin: 5px 0; font-weight: bold;">Amount Paid: ₹${amount.toLocaleString()}</p>
-              <p style="margin: 5px 0; font-size: 12px; color: #9ca3af;">Ref: ${id}</p>
-            </div>
-            <p>We look forward to hosting you. If you have any questions, reply to this email or contact us via WhatsApp.</p>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #9ca3af; text-align: center;">FixStay - Premium Stays Simplified</p>
+    const { data, error } = await resend.emails.send({
+      from: 'FixStay <bookings@fixstay.com>',
+      to: [email],
+      subject: `Booking Confirmed: ${property}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb;">Your stay is confirmed!</h2>
+          <p>Hi <strong>${name}</strong>,</p>
+          <p>Thank you for booking with FixStay. Your reservation at <strong>${property}</strong> is confirmed.</p>
+          <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #6b7280;">Booking Details:</p>
+            <p style="margin: 5px 0; font-weight: bold;">Room: ${room}</p>
+            <p style="margin: 5px 0; font-weight: bold;">Amount Paid: ₹${amount.toLocaleString()}</p>
+            <p style="margin: 5px 0; font-size: 12px; color: #9ca3af;">Ref: ${id}</p>
           </div>
-        `,
-      }),
+          <p>We look forward to hosting you. If you have any questions, reply to this email or contact us via WhatsApp.</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #9ca3af; text-align: center;">FixStay - Premium Stays Simplified</p>
+        </div>
+      `,
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      console.error('[Notification] Resend API error:', err);
+    if (error) {
+      console.error('[Notification] Resend API error:', error);
     } else {
-      console.log(`[Notification] Email sent successfully to ${email}`);
+      console.log(`[Notification] Email sent successfully to ${email}. ID: ${data?.id}`);
     }
   } catch (err) {
     console.error('[Notification] Failed to dispatch email:', err);
