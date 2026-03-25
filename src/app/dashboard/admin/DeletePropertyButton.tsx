@@ -23,7 +23,10 @@ export default function DeletePropertyButton({
     if (confirm(`Are you absolutely sure you want to delete "${propertyName}"? This will remove it from everywhere on the website and delete all its images.`)) {
       setIsLoading(true)
       try {
-        await deleteProperty(propertyId)
+        const result = await deleteProperty(propertyId)
+        if (result?.error) {
+          alert(result.error)
+        }
       } catch (err) {
         console.error(err)
         alert('Failed to delete property. Please try again.')

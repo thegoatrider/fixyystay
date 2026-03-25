@@ -15,7 +15,14 @@ export default function FeaturedToggle({
 
   return (
     <button
-      onClick={() => startTransition(() => toggleFeatured(propertyId, featured))}
+      onClick={() => {
+        startTransition(async () => {
+          const result = await toggleFeatured(propertyId, featured)
+          if (result?.error) {
+            alert(result.error)
+          }
+        })
+      }}
       disabled={isPending}
       title={featured ? 'Remove from featured' : 'Mark as featured'}
       className={[

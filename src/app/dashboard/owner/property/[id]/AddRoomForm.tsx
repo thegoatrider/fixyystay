@@ -47,7 +47,13 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
     })
     
     try {
-      await addRoom(propertyId, formData)
+      const result = await addRoom(propertyId, formData)
+      
+      if (result?.error) {
+        alert(result.error)
+        return
+      }
+
       // Reset state on success
       previews.forEach(url => URL.revokeObjectURL(url))
       setPreviews([])

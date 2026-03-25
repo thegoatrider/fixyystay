@@ -76,8 +76,15 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
     setIsUpdating(true)
     try {
       const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
-      await setMultipleRoomAvailability(propertyId, selectedRoom, dateStrings, available)
-      setSelectedDates([])
+      const result = await setMultipleRoomAvailability(propertyId, selectedRoom, dateStrings, available)
+      if (result?.error) {
+        alert(result.error)
+      } else {
+        setSelectedDates([])
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An unexpected error occurred.')
     } finally {
       setIsUpdating(false)
     }
@@ -89,8 +96,15 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
     try {
       const price = parseInt(priceStr.replace(/[^\d]/g, ''))
       const dateStrings = selectedDates.map(d => format(d, 'yyyy-MM-dd'))
-      await setMultipleRoomRates(propertyId, selectedRoom, dateStrings, price)
-      setSelectedDates([])
+      const result = await setMultipleRoomRates(propertyId, selectedRoom, dateStrings, price)
+      if (result?.error) {
+        alert(result.error)
+      } else {
+        setSelectedDates([])
+      }
+    } catch (err) {
+      console.error(err)
+      alert('An unexpected error occurred.')
     } finally {
       setIsUpdating(false)
     }
