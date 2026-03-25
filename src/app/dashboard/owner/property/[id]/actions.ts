@@ -161,3 +161,57 @@ export async function setMultipleRoomRates(propertyId: string, roomId: string, d
   }
 }
 
+export async function saveMultipleChanges(
+  propertyId: string, 
+  roomId: string, 
+  dateStrings: string[], 
+  available: boolean | null, 
+  price: number | null
+) {
+  try {
+    const supabase = await createClient()
+
+    const promises = []
+
+    if (available !== null) {
+      promises.push(
+        supabase.from('room_availability').upsert(
+          dateStrings.map(date => ({
+            room_id: roomId,
+            date,
+            available
+          })), 
+          { onConflict: 'room_id, date' }
+        )
+      )
+    }
+
+    if (price !== null && !isNaN(price)) {
+      promises.push(
+        supabase.from('room_rates').upsert(
+          dateStrings.map(date => ({
+            room_id: roomId,
+            date,
+            price
+          })), 
+          { onConflict: 'room_id, date' }
+        )
+      )
+    }
+
+    if (promises.length === 0) return { success: true }
+
+    const results = await Promise.all(promises)
+    const error = results.find(r => r.error)?.error
+
+    if (error) {
+      console.error('Failed to save multiple changes', error)
+      return { error: 'Failed to save changes: ' + error.message }
+    }
+
+    revalidatePath(`/dashboard/owner/property/${propertyId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}

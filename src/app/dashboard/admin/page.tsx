@@ -148,39 +148,65 @@ export default async function AdminDashboard() {
           <Banknote className="text-green-600" /> Payout Requests
         </h2>
         <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3">User</th>
-                <th className="px-6 py-3">Role</th>
-                <th className="px-6 py-3">Amount Requested</th>
-                <th className="px-6 py-3">Bank Details / UPI</th>
-                <th className="px-6 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {pendingPayouts.map((req) => (
-                <tr key={req.id}>
-                  <td className="px-6 py-4 font-bold text-gray-900">{req.userName}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs rounded-md font-bold ${req.userType === 'Owner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3">User</th>
+                  <th className="px-6 py-3">Role</th>
+                  <th className="px-6 py-3">Amount Requested</th>
+                  <th className="px-6 py-3">Bank Details / UPI</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {pendingPayouts.map((req) => (
+                  <tr key={req.id}>
+                    <td className="px-6 py-4 font-bold text-gray-900">{req.userName}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-md font-bold ${req.userType === 'Owner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {req.userType}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-orange-600">₹{Number(req.amount).toLocaleString()}</td>
+                    <td className="px-6 py-4 font-mono text-gray-600">{req.bank_details}</td>
+                    <td className="px-6 py-4">
+                      <PayoutActions requestId={req.id} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden flex flex-col divide-y">
+            {pendingPayouts.map((req) => (
+              <div key={req.id} className="p-4 flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-gray-900">{req.userName}</div>
+                    <span className={`inline-block px-1.5 py-0.5 text-[10px] rounded font-bold uppercase tracking-wider mt-1 ${req.userType === 'Owner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                       {req.userType}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-orange-600">₹{Number(req.amount).toLocaleString()}</td>
-                  <td className="px-6 py-4 font-mono text-gray-600">{req.bank_details}</td>
-                  <td className="px-6 py-4">
-                    <PayoutActions requestId={req.id} />
-                  </td>
-                </tr>
-              ))}
-              {pendingPayouts.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No pending payout requests. All caught up!</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="text-lg font-black text-orange-600">₹{Number(req.amount).toLocaleString()}</div>
+                </div>
+                <div className="bg-gray-50 p-2.5 rounded border border-gray-100 font-mono text-xs text-gray-600 break-all">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bank / UPI</p>
+                  {req.bank_details}
+                </div>
+                <div className="pt-2 flex justify-end">
+                  <PayoutActions requestId={req.id} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {pendingPayouts.length === 0 && (
+            <div className="px-6 py-12 text-center text-gray-500">No pending payout requests. All caught up!</div>
+          )}
         </div>
       </section>
 
@@ -194,7 +220,12 @@ export default async function AdminDashboard() {
             {pendingProperties.map((prop) => (
               <div key={prop.id} className="border bg-white rounded-lg p-5 shadow-sm flex flex-col gap-3">
                 <div>
-                  <h3 className="font-semibold text-lg">{prop.name}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-lg leading-tight">{prop.name}</h3>
+                    <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">
+                      {prop.uid || 'NO-ID'}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-500">{prop.type} • Owner: {prop.owners?.name}</p>
                   
                   <div className="mt-2 text-sm text-gray-600">
@@ -262,47 +293,89 @@ export default async function AdminDashboard() {
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
           <Users className="text-blue-500" /> Influencer Promotion Properties
         </h2>
-        <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3">Property</th>
-                <th className="px-6 py-3">Influencer</th>
-                <th className="px-6 py-3 text-right">Clicks</th>
-                <th className="px-6 py-3 text-right">Bookings</th>
-                <th className="px-6 py-3 text-right">Revenue</th>
-                <th className="px-6 py-3 text-right">Commission (10%)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {promotions.map((promo) => {
-                const propVal = promo.properties as any;
-                const infVal = promo.influencers as any;
-
-                const propName = propVal && !Array.isArray(propVal) ? propVal.name : 'Unknown Property';
-                const infName = infVal && !Array.isArray(infVal) ? infVal.name : 'Unknown Influencer';
-                
-                return (
-                  <tr key={promo.id}>
-                    <td className="px-6 py-4 font-medium">{propName}</td>
-                    <td className="px-6 py-4">{infName}</td>
-                    <td className="px-6 py-4 text-right text-gray-600">{promo.clicks}</td>
-                    <td className="px-6 py-4 text-right font-medium">{promo.bookingsCount}</td>
-                    <td className="px-6 py-4 text-right text-gray-600">₹{promo.revenue.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right font-bold text-green-600">₹{promo.commission.toLocaleString()}</td>
-                  </tr>
-                )
-              })}
-              {promotions.length === 0 && (
+        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 border-b">
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">No influencers assigned to properties yet.</td>
+                  <th className="px-6 py-3">Property</th>
+                  <th className="px-6 py-3">Influencer</th>
+                  <th className="px-6 py-3 text-right">Clicks</th>
+                  <th className="px-6 py-3 text-right">Bookings</th>
+                  <th className="px-6 py-3 text-right">Revenue</th>
+                  <th className="px-6 py-3 text-right">Commission (10%)</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {promotions.map((promo) => {
+                  const propVal = promo.properties as any;
+                  const infVal = promo.influencers as any;
+
+                  const propName = propVal && !Array.isArray(propVal) ? propVal.name : 'Unknown Property';
+                  const infName = infVal && !Array.isArray(infVal) ? infVal.name : 'Unknown Influencer';
+                  
+                  return (
+                    <tr key={promo.id}>
+                      <td className="px-6 py-4 font-medium">{propName}</td>
+                      <td className="px-6 py-4">{infName}</td>
+                      <td className="px-6 py-4 text-right text-gray-600">{promo.clicks}</td>
+                      <td className="px-6 py-4 text-right font-medium">{promo.bookingsCount}</td>
+                      <td className="px-6 py-4 text-right text-gray-600">₹{promo.revenue.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right font-bold text-green-600">₹{promo.commission.toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden flex flex-col divide-y">
+            {promotions.map((promo) => {
+              const propVal = promo.properties as any;
+              const infVal = promo.influencers as any;
+
+              const propName = propVal && !Array.isArray(propVal) ? propVal.name : 'Unknown Property';
+              const infName = infVal && !Array.isArray(infVal) ? infVal.name : 'Unknown Influencer';
+              
+              return (
+                <div key={promo.id} className="p-4 flex flex-col gap-3">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0">
+                      <div className="font-bold text-gray-900 truncate">{propName}</div>
+                      <div className="text-xs text-gray-500 truncate">by {infName}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-bold text-green-600 uppercase tracking-tighter">Commission</div>
+                      <div className="text-base font-black text-green-700">₹{promo.commission.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-center">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Clicks</p>
+                      <p className="text-sm font-bold text-gray-700">{promo.clicks}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Bookings</p>
+                      <p className="text-sm font-bold text-gray-700">{promo.bookingsCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Revenue</p>
+                      <p className="text-sm font-bold text-gray-700">₹{promo.revenue.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {promotions.length === 0 && (
+            <div className="px-6 py-12 text-center text-gray-500">No influencers assigned to properties yet.</div>
+          )}
         </div>
       </section>
-      
+
     </div>
   )
 }

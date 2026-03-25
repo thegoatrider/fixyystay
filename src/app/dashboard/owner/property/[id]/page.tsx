@@ -45,22 +45,27 @@ export default async function PropertyDetailPage(
     <div className="flex flex-col gap-8">
       
       <div>
-        <Link href="/dashboard/owner" className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 mb-4 w-fit">
-          <ArrowLeft className="w-4 h-4" /> Back to Properties
+        <Link href="/dashboard/owner" className="text-xs sm:text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 mb-4 w-fit font-medium">
+          <ArrowLeft className="w-3.5 h-3.5 sm:w-4 h-4" /> Back to Properties
         </Link>
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{property.name}</h1>
-            <p className="text-gray-500 capitalize">{property.type} • {property.amenities?.join(', ')}</p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words text-gray-900">{property.name}</h1>
+              <span className="text-[10px] sm:text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 uppercase tracking-tighter">
+                {property.uid || 'NO-ID'}
+              </span>
+            </div>
+            <p className="text-sm sm:text-base text-gray-500 capitalize mt-1 font-medium">{property.type} • {property.amenities?.join(', ')}</p>
           </div>
-          <div>
+          <div className="flex-shrink-0">
             {property.approved ? (
-              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 border border-green-200">
-                <CheckCircle className="w-4 h-4" /> Approved
+              <span className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-green-100 shadow-sm">
+                <CheckCircle className="w-3.5 h-3.5 sm:w-4 h-4" /> Approved
               </span>
             ) : (
-              <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 border border-orange-200">
-                <Clock className="w-4 h-4" /> Pending Approval
+              <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-orange-100 shadow-sm">
+                <Clock className="w-3.5 h-3.5 sm:w-4 h-4" /> Pending
               </span>
             )}
           </div>
@@ -112,7 +117,7 @@ export default async function PropertyDetailPage(
         </div>
 
         {/* Right: Unified Calendar View */}
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
+        <div className="bg-white border rounded-lg p-3 sm:p-6 shadow-sm">
           <h2 className="text-xl font-bold mb-6">Booking & Availability Calendar</h2>
           <BookingCalendar 
             propertyId={propertyId}

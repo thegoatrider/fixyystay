@@ -65,13 +65,13 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
       </div>
 
       {/* Tabs Design */}
-      <div className="flex justify-between border-b border-gray-200 w-full mb-2 overflow-x-hidden">
+      <div className="flex border-b border-gray-100 w-full mb-2 overflow-x-auto no-scrollbar scroll-smooth">
         <Link 
           href="/dashboard/owner?tab=properties"
-          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
+          className={`flex-none md:flex-1 min-w-[100px] justify-center px-4 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center gap-1.5 sm:gap-2 ${
             activeTab === 'properties' 
-              ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+              : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
           }`}
         >
           <List className="w-4 h-4 md:w-5 md:h-5" /> 
@@ -79,38 +79,38 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
         </Link>
         <Link 
           href="/dashboard/owner?tab=leads"
-          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
+          className={`flex-none md:flex-1 min-w-[90px] justify-center px-4 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center gap-1.5 sm:gap-2 ${
             activeTab === 'leads' 
-              ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+              : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
           }`}
         >
           <MessageSquare className="w-4 h-4 md:w-5 md:h-5" /> 
           <span className="flex items-center">
             Leads
-            {leads && leads.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1 py-0.5 rounded-full ml-1 hidden sm:inline-block">{leads.length}</span>}
+            {leads && leads.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-black">{leads.length}</span>}
           </span>
         </Link>
         <Link 
           href="/dashboard/owner?tab=guests"
-          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
+          className={`flex-none md:flex-1 min-w-[95px] justify-center px-4 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center gap-1.5 sm:gap-2 ${
             activeTab === 'guests' 
-              ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+              : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Users className="w-4 h-4 md:w-5 md:h-5" /> 
           <span className="flex items-center">
             Guests
-            {checkins && checkins.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1 py-0.5 rounded-full ml-1 hidden sm:inline-block">{checkins.length}</span>}
+            {checkins && checkins.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-black">{checkins.length}</span>}
           </span>
         </Link>
         <Link 
           href="/dashboard/owner?tab=wallet"
-          className={`flex-1 justify-center px-1 md:px-8 py-3 font-semibold text-[11px] sm:text-sm transition-all border-b-2 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 ${
+          className={`flex-none md:flex-1 min-w-[90px] justify-center px-4 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center gap-1.5 sm:gap-2 ${
             activeTab === 'wallet' 
-              ? 'border-blue-600 text-blue-600 bg-blue-50/50' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+              : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Wallet className="w-4 h-4 md:w-5 md:h-5" /> 
@@ -143,37 +143,42 @@ export default async function OwnerDashboard(props: { searchParams: Promise<{ ta
             {properties && properties.length > 0 ? properties.map(prop => (
               <div 
                 key={prop.id} 
-                className="bg-white border rounded-lg p-4 md:p-6 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 group w-full"
+                className="bg-white border rounded-xl p-3 sm:p-5 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 group w-full"
               >
-                <div className="flex items-start gap-4 w-full md:w-auto overflow-hidden">
-                  <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden flex-shrink-0 relative w-16 h-16 md:w-20 md:h-20">
+                <div className="flex items-start gap-3 sm:gap-4 w-full md:w-auto overflow-hidden">
+                  <div className="bg-blue-100 text-blue-600 rounded-lg overflow-hidden flex-shrink-0 relative w-14 h-14 sm:w-20 sm:h-20">
                     {prop.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={prop.image_url} alt={prop.name} className="object-cover w-full h-full" />
                     ) : (
                       <div className="flex w-full h-full items-center justify-center">
-                        <Home className="w-6 h-6 md:w-8 md:h-8" />
+                        <Home className="w-5 h-5 sm:w-8 sm:h-8" />
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-lg md:text-xl font-bold group-hover:text-blue-600 transition truncate">{prop.name}</h2>
-                    <p className="text-xs md:text-sm text-gray-500 capitalize truncate">{prop.type} • {prop.rooms[0]?.count || 0} Rooms</p>
-                    <div className="flex items-center gap-1 mt-2 text-[10px] md:text-xs font-medium">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-xl font-bold group-hover:text-blue-600 transition truncate">{prop.name}</h2>
+                      <span className="text-[10px] sm:text-xs font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">
+                        {prop.uid || 'NO-ID'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] sm:text-sm text-gray-400 capitalize truncate font-medium">{prop.type} • {prop.rooms[0]?.count || 0} Rooms</p>
+                    <div className="flex items-center gap-1 mt-1 sm:mt-2 text-[9px] sm:text-xs font-bold uppercase tracking-wider">
                       {prop.approved ? (
-                        <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Approved</span>
+                        <span className="text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded"><CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Approved</span>
                       ) : (
-                        <span className="text-orange-500 flex items-center gap-1"><Clock className="w-3 h-3"/> Pending</span>
+                        <span className="text-orange-500 flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded"><Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Pending</span>
                       )}
                     </div>
                   </div>
                 </div>
-                <div className="flex w-full md:w-auto items-center gap-2 mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+                <div className="flex w-full md:w-auto items-center gap-2 pt-2 md:pt-0 border-t md:border-0 border-gray-50">
                   <Link href={`/dashboard/owner/property/${prop.id}/edit`} className="flex-1 md:flex-none">
-                    <Button variant="outline" className="w-full">Edit</Button>
+                    <Button variant="outline" size="sm" className="w-full h-9 sm:h-10 font-bold border-gray-200">Edit</Button>
                   </Link>
                   <Link href={`/dashboard/owner/property/${prop.id}`} className="flex-1 md:flex-none">
-                    <Button variant="default" className="w-full">Manage</Button>
+                    <Button variant="default" size="sm" className="w-full h-9 sm:h-10 font-bold shadow-md">Manage</Button>
                   </Link>
                 </div>
               </div>

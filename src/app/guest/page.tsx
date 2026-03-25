@@ -6,12 +6,12 @@ import { format, eachDayOfInterval, subDays, isSameDay } from 'date-fns'
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
 // checks if the property is approved and has rooms. For availability, we fetch properties and perform filtering.
-export default async function GuestBrowsePage(props: { searchParams: Promise<{ bucket?: string, checkin?: string, checkout?: string, guests?: string }> }) {
+export default async function GuestBrowsePage(props: { searchParams: Promise<{ bucket?: string, checkin?: string, checkout?: string, guests?: string, city?: string }> }) {
   const searchParams = await props.searchParams;
-  const { bucket: selectedBucket, checkin, checkout, guests } = searchParams;
+  const { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity } = searchParams;
   
   const buildUrl = (newParams: Record<string, string | undefined>) => {
-    const combined = { bucket: selectedBucket, checkin, checkout, guests, ...newParams }
+    const combined = { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity, ...newParams }
     const urlParams = new URLSearchParams()
     Object.entries(combined).forEach(([key, value]) => {
       if (value) urlParams.set(key, value)
@@ -24,6 +24,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     if (checkin) urlParams.set('checkin', checkin)
     if (checkout) urlParams.set('checkout', checkout)
     if (guests) urlParams.set('guests', guests)
+    if (selectedCity) urlParams.set('city', selectedCity)
     const qs = urlParams.toString()
     return `/guest/property/${id}${qs ? `?${qs}` : ''}`
   }
@@ -46,6 +47,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
       )
     `)
     .eq('approved', true)
+    .eq('city', selectedCity || 'Alibag')
 
   const { data: { user } } = await supabase.auth.getUser()
   const isInfluencer = user?.user_metadata?.role === 'influencer'
@@ -60,6 +62,8 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     }
     return null;
   };
+
+  const hasDates = !!(checkin && checkout)
 
   // Filter properties logic: available_rooms > 0
   const stayDates = checkin && checkout 
@@ -95,9 +99,15 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
 
     return {
       ...prop,
-      available_rooms
+      available_rooms,
+      total_rooms: prop.rooms.length
     }
-  }).filter(p => p.available_rooms > 0) || []
+  }) || []
+
+  // Only filter by availability if the user explicitly searched for dates
+  if (hasDates) {
+    availableProperties = availableProperties.filter((p: any) => p.available_rooms > 0)
+  }
 
   // Apply Price Bucket Filter or See All Types
   if (selectedBucket === 'See All Rooms') {
@@ -150,10 +160,10 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
         <p className="text-gray-500 text-sm line-clamp-2 mb-6 leading-relaxed">{prop.description}</p>
         <div className="mt-auto flex justify-between items-end pt-4 border-t border-gray-100">
           <div className="text-sm font-medium text-gray-500">
-            {prop.type === 'villa' ? 'Entire Villa' : `${prop.available_rooms} Rooms`}
+            {prop.type === 'villa' ? 'Entire Villa' : (hasDates ? `${prop.available_rooms} Rooms` : `${prop.total_rooms} Rooms`)}
           </div>
           <div className="text-sm font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100/50">
-            {prop.type === 'villa' ? 'Bookable' : `${prop.available_rooms} Available`}
+            {prop.type === 'villa' ? 'Bookable' : (hasDates ? `${prop.available_rooms} Available` : 'Bookable')}
           </div>
         </div>
       </div>

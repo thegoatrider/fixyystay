@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { HomeSearch } from '@/components/HomeSearch'
+import { Hero } from '@/components/Hero'
 import { blogPosts } from './blog/data'
-import { Clock, ArrowRight } from 'lucide-react'
+import { Clock, ArrowRight, LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react'
 
 export default async function Index() {
   const supabase = await createClient()
@@ -11,32 +11,45 @@ export default async function Index() {
 
   return (
     <div className="flex-1 w-full flex flex-col items-center">
-      <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16">
+      <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="w-full max-w-4xl flex justify-between items-center px-4 py-3 text-sm">
           <div className="flex items-center gap-6">
             <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
               Fixy Stays
             </Link>
-            <Link href="/blog" className="hidden sm:block font-bold text-gray-400 hover:text-blue-600 transition">
-              Blog
-            </Link>
           </div>
-          <div>
+          
+          <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
-              <div className="flex items-center gap-4">
-                Hey, {user.user_metadata?.name || user.email}!
+              <>
+                <div className="hidden lg:block text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                  Hey, {(user.user_metadata?.name || user.email || 'Admin').split('@')[0]}!
+                </div>
+                
+                <Link 
+                  href={`/dashboard/${user.email === 'superadmin@fixstay.com' ? 'admin' : (user.user_metadata?.role || 'guest')}`}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-blue-600 bg-blue-50 font-bold hover:bg-blue-100 transition-all text-xs sm:text-sm"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden xs:inline">Dashboard</span>
+                </Link>
+
                 <form action="/auth/signout" method="post">
-                  <Button variant="outline" type="submit">
-                    Logout
-                  </Button>
+                  <button 
+                    type="submit" 
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    title="Logout"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
                 </form>
-              </div>
+              </>
             ) : (
               <div className="flex gap-2">
-                <Link href="/login" className="px-4 py-2 border rounded-md hover:bg-gray-50">
+                <Link href="/login" className="px-3 py-2 text-gray-600 hover:text-blue-600 font-bold text-xs sm:text-sm">
                   Log in
                 </Link>
-                <Link href="/signup" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                <Link href="/signup" className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs sm:text-sm shadow-md">
                   Sign up
                 </Link>
               </div>
@@ -48,13 +61,7 @@ export default async function Index() {
       <div className="flex-1 flex flex-col max-w-4xl px-4 py-12 md:p-20 w-full mt-4 md:mt-10">
         <main className="flex flex-col gap-10 items-center text-center w-full">
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 mb-4 px-2">
-            Find your perfect stay, <br className="hidden sm:block" />
-            <span className="text-blue-600">in Alibag or host your own.</span>
-          </h1>
-
-          {/* Inline Search Card */}
-          <HomeSearch />
+          <Hero />
 
           <div className="flex flex-col gap-4 mt-8 w-full max-w-2xl items-center">
             <div className="flex items-center gap-4 w-full my-4">
@@ -143,8 +150,8 @@ export default async function Index() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="w-full bg-white border-t">
+      {/* Footer - Desktop Only */}
+      <footer className="hidden md:block w-full bg-white border-t">
         {/* Social + Support bar */}
         <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Social Links */}

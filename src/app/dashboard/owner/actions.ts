@@ -4,6 +4,29 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
+async function generatePropertyUid(supabaseAdmin: any, city: string) {
+  const prefixes: Record<string, string> = {
+    'Alibag': 'ALB',
+    'Lonavala': 'LON',
+    'Khandala': 'KHA',
+    'Matheran': 'MAT',
+    'Mahableshwar': 'MAH',
+    'Mumbai': 'MUM',
+    'Goa': 'GOA'
+  }
+  
+  const prefix = prefixes[city] || 'PRP'
+  
+  // Count existing properties for this city
+  const { count } = await supabaseAdmin
+    .from('properties')
+    .select('*', { count: 'exact', head: true })
+    .eq('city', city)
+    
+  const nextNum = (count || 0) + 1
+  return `${prefix}${nextNum.toString().padStart(3, '0')}`
+}
+
 export async function createProperty(formData: FormData) {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
@@ -36,6 +59,7 @@ export async function createProperty(formData: FormData) {
   const priceBucket = formData.get('priceBucket') as string
   const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
+  const city = (formData.get('city') as string) || 'Alibag'
   const helpdeskNumber = formData.get('helpdeskNumber') as string
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
@@ -63,6 +87,9 @@ export async function createProperty(formData: FormData) {
     }
   }
 
+  // 4.5 Generate custom UID
+  const propertyUid = await generatePropertyUid(supabaseAdmin, city)
+
   // 5. Insert property (admin bypasses RLS)
   const { data: property, error: insertError } = await supabaseAdmin
     .from('properties')
@@ -75,9 +102,11 @@ export async function createProperty(formData: FormData) {
       image_urls,
       image_url: image_urls[0] || null, // Keep for backward compatibility
       helpdesk_number: helpdeskNumber,
+      city,
       city_area: cityArea,
       pincode,
       approved: false,
+      uid: propertyUid,
       max_guests,
       max_capacity,
       extra_per_pax,
