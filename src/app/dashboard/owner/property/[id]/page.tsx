@@ -72,7 +72,7 @@ export default async function PropertyDetailPage(
         </div>
       </div>
 
-      <div className="grid md:grid-cols-[280px_1fr] gap-6 items-start">
+      <div className="flex flex-col gap-6 items-stretch w-full overflow-hidden">
         
         {/* Top: Rooms List & Add Form */}
         <div className="flex flex-col gap-6">

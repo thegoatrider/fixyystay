@@ -68,7 +68,7 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
   }
 
   return (
-    <div className="bg-white border rounded-lg p-5 shadow-sm sticky top-24">
+    <div className="bg-white border rounded-lg p-5 shadow-sm sm:sticky sm:top-24">
       <h3 className="font-bold mb-4">Add a New Room</h3>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="space-y-2">
