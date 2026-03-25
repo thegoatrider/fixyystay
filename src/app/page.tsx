@@ -13,9 +13,14 @@ export default async function Index() {
     <div className="flex-1 w-full flex flex-col items-center">
       <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16">
         <div className="w-full max-w-4xl flex justify-between items-center px-4 py-3 text-sm">
-          <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
-            Fixy Stays
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition">
+              Fixy Stays
+            </Link>
+            <Link href="/blog" className="hidden sm:block font-bold text-gray-400 hover:text-blue-600 transition">
+              Blog
+            </Link>
+          </div>
           <div>
             {user ? (
               <div className="flex items-center gap-4">
