@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
 import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import React from 'react'
 
 type GuestCheckin = {
   id: string
@@ -30,7 +31,7 @@ function getDaysInMonth(year: number, month: number) {
   return days
 }
 
-export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
+export default React.memo(function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
@@ -415,4 +416,4 @@ export default function GuestList({ checkins }: { checkins: GuestCheckin[] }) {
       )}
     </div>
   )
-}
+})

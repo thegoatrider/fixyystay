@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { format, isSameDay, parseISO, startOfMonth, endOfMonth } from 'date-fns'
+import { format, isSameDay } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle } from 'lucide-react'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import React from 'react'
 
 type Property = { id: string; name: string }
 
@@ -48,7 +50,7 @@ function getDaysInMonth(year: number, month: number) {
   return days
 }
 
-export default function LeadsSection({
+export default React.memo(function LeadsSection({
   ownerId,
   properties,
   initialLeads,
@@ -57,7 +59,14 @@ export default function LeadsSection({
   properties: Property[]
   initialLeads: Lead[]
 }) {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads)
+  const queryClient = useQueryClient()
+  const [localLeads, setLocalLeads] = useState<Lead[]>(initialLeads)
+  
+  // Update local leads when prop changes (e.g. after background refetch)
+  React.useEffect(() => {
+    setLocalLeads(initialLeads)
+  }, [initialLeads])
+
   const [isLoading, setIsLoading] = useState(false)
   const [isFormVisible, setIsFormVisible] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -79,7 +88,7 @@ export default function LeadsSection({
   // Map: 'YYYY-MM-DD' => Lead[]
   const leadsByDate = useMemo(() => {
     const map: Record<string, Lead[]> = {}
-    leads.forEach(lead => {
+    localLeads.forEach(lead => {
       if (lead.checkin_date) {
         const key = lead.checkin_date.slice(0, 10)
         if (!map[key]) map[key] = []
@@ -87,7 +96,7 @@ export default function LeadsSection({
       }
     })
     return map
-  }, [leads])
+  }, [localLeads])
 
   // Prioritized dot color for a date (hottest marking wins)
   function getDotColor(dateLeads: Lead[]) {
@@ -111,7 +120,10 @@ export default function LeadsSection({
       const propertyName = properties.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
       window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
-      setLeads([{ ...result.lead, properties: { name: propertyName } } as Lead, ...leads])
+      
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+      setLocalLeads([{ ...result.lead, properties: { name: propertyName } } as Lead, ...localLeads])
+      
       setPhone(''); setCheckin(''); setCheckout('')
       setIsFormVisible(false)
     } else {
@@ -120,29 +132,47 @@ export default function LeadsSection({
     setIsLoading(false)
   }
 
-  async function handleMarkingChange(leadId: string, newMarking: string) {
-    const result = await updateLeadMarking(leadId, newMarking)
-    if (result.success) setLeads(leads.map(l => l.id === leadId ? { ...l, marking: newMarking } : l))
-  }
+  const markLeadMutation = useMutation({
+    mutationFn: ({ leadId, marking }: { leadId: string, marking: string }) => updateLeadMarking(leadId, marking),
+    onSuccess: (_, { leadId, marking }) => {
+      setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, marking } : l))
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+    }
+  })
 
-  async function handleStatusChange(leadId: string, newStatus: string) {
-    const result = await updateLeadStatus(leadId, newStatus)
-    if (result.success) setLeads(leads.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
-  }
+  const statusLeadMutation = useMutation({
+    mutationFn: ({ leadId, status }: { leadId: string, status: string }) => updateLeadStatus(leadId, status),
+    onSuccess: (_, { leadId, status }) => {
+      setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l))
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+    }
+  })
 
-  async function handleDelete(leadId: string) {
-    if (!confirm('Remove this lead?')) return
-    const result = await deleteLead(leadId)
-    if (result.success) {
-      const updated = leads.filter(l => l.id !== leadId)
-      setLeads(updated)
-      // If the selected date now has no leads, close panel
+  const deleteLeadMutation = useMutation({
+    mutationFn: (leadId: string) => deleteLead(leadId),
+    onSuccess: (_, leadId) => {
+      const updated = localLeads.filter(l => l.id !== leadId)
+      setLocalLeads(updated)
       if (selectedDate) {
         const key = format(selectedDate, 'yyyy-MM-dd')
         const remaining = updated.filter(l => l.checkin_date?.slice(0, 10) === key)
         if (remaining.length === 0) setSelectedDate(null)
       }
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
     }
+  })
+
+  async function handleMarkingChange(leadId: string, newMarking: string) {
+    markLeadMutation.mutate({ leadId, marking: newMarking })
+  }
+
+  async function handleStatusChange(leadId: string, newStatus: string) {
+    statusLeadMutation.mutate({ leadId, status: newStatus })
+  }
+
+  async function handleDelete(leadId: string) {
+    if (!confirm('Remove this lead?')) return
+    deleteLeadMutation.mutate(leadId)
   }
 
   function prevMonth() {
@@ -165,7 +195,7 @@ export default function LeadsSection({
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Leads Calendar</h2>
-          <p className="text-sm text-gray-400 mt-0.5">{leads.length} total leads · click a date to view</p>
+          <p className="text-sm text-gray-400 mt-0.5">{localLeads.length} total leads · click a date to view</p>
         </div>
         <Button onClick={() => setIsFormVisible(!isFormVisible)} size="sm" className="gap-2">
           {isFormVisible ? <><X className="w-4 h-4" /> Close</> : <><Plus className="w-4 h-4" /> New Enquiry</>}
@@ -389,7 +419,7 @@ export default function LeadsSection({
       </div>
 
       {/* No leads at all */}
-      {leads.length === 0 && (
+      {localLeads.length === 0 && (
         <div className="text-center p-10 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
           <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-20" />
           <p className="font-medium">No leads yet. Add your first enquiry using the button above.</p>
@@ -397,4 +427,4 @@ export default function LeadsSection({
       )}
     </div>
   )
-}
+})

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { MapPin, User, Phone, CheckCircle, Share, Copy, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
+import { eachDayOfInterval, isSameDay as isSameDayDate, subDays } from 'date-fns'
 
 // Simple client wrapper for logging click
 function ClickTracker({ propertyId, refId }: { propertyId: string, refId: string }) {
@@ -107,22 +108,56 @@ export default function PropertyDetailClient({
     if (confirmed.includes(property.id)) {
       setIsConfirmed(true)
     }
-  }, [property.id])
+  }, [property.id])  
 
-  const selectedRoom = availableRooms.find(r => r.id === selectedRoomId)
+  // --- Dynamic Pricing & Availability Logic ---
+  const selectedRoom = property.rooms?.find((r: any) => r.id === selectedRoomId)
   
-  // Real pricing would consider dates. Here we just take today's price or base price.
-  const roomPrice = selectedRoom?.currentPrice || selectedRoom?.base_price || 0
+  // 1. Calculate Stay Interval
+  const stayDates = (checkin && checkout && new Date(checkin) < new Date(checkout))
+    ? eachDayOfInterval({ 
+        start: new Date(checkin), 
+        end: subDays(new Date(checkout), 1) 
+      }).map(d => format(d, 'yyyy-MM-dd'))
+    : []
 
-  // Guest count pricing
-  const maxGuests: number = property.max_guests || 0
-  const maxCapacity: number = property.max_capacity || 20
+  const numNights = stayDates.length
+
+  // 2. Multi-night Availability & Base Price Calculation
+  let baseStayPrice = 0
+  let isRangeAvailable = numNights > 0
+
+  if (selectedRoom && numNights > 0) {
+    for (const d of stayDates) {
+      // Check Blocked
+      const isBlocked = selectedRoom.room_availability?.some((a: any) => a.date === d && !a.available)
+      // Check Booked
+      const isBooked = selectedRoom.bookings?.some((b: any) => format(new Date(b.created_at), 'yyyy-MM-dd') === d)
+      
+      if (isBlocked || isBooked) {
+        isRangeAvailable = false
+        break
+      }
+      
+      // Accumulate Rate
+      const customRate = selectedRoom.room_rates?.find((r: any) => r.date === d)?.price
+      baseStayPrice += customRate !== undefined ? customRate : selectedRoom.base_price
+    }
+  }
+
+  // 3. Guest Pricing Logic
+  const maxGuestsBase: number = property.max_guests || 2 // Free guests
+  const maxCapacityGlobal: number = property.max_capacity || 20 // Total limit
   const extraPerPax: number = property.extra_per_pax || 0
-  const guestCount = parseInt(guests) || 2
-  const extraGuests = maxGuests > 0 && guestCount > maxGuests ? guestCount - maxGuests : 0
-  const extraCharge = extraGuests * extraPerPax
-  const totalPrice = roomPrice + extraCharge
+  const guestCount = parseInt(guests) || 1
 
+  const extraGuests = guestCount > maxGuestsBase ? guestCount - maxGuestsBase : 0
+  const extraChargePerNight = extraGuests * extraPerPax
+  const totalExtraCharge = extraChargePerNight * numNights
+
+  const totalPrice = baseStayPrice + totalExtraCharge
+  // --- End Logic ---
+  
   const handleShare = async () => {
     const shareData = {
       title: property.name,
@@ -381,6 +416,7 @@ export default function PropertyDetailClient({
           </div>
         ) : (
           <form action={handleBook} className="flex flex-col gap-5">
+            <input type="hidden" name="influencerId" value={influencerId || ''} />
             <div className="space-y-2">
               <Label>Available Room Types</Label>
               <div className="flex flex-col gap-3">
@@ -475,44 +511,49 @@ export default function PropertyDetailClient({
                 onChange={(e) => setGuests(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
               >
-                {Array.from({ length: maxCapacity }, (_, i) => i + 1).map(n => (
+                {Array.from({ length: maxCapacityGlobal }, (_, i) => i + 1).map(n => (
                   <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                 ))}
               </select>
-              {maxCapacity > 0 && (
-                <p className="text-[11px] text-gray-400">Max capacity: {maxCapacity} guests</p>
+              {maxCapacityGlobal > 0 && (
+                <p className="text-[11px] text-gray-400">Max capacity: {maxCapacityGlobal} guests</p>
               )}
             </div>
 
             {/* Price Breakdown */}
-            <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">
-                  Base price
-                  {maxGuests > 0 && (
-                    <span className="text-gray-400 ml-1">(up to {maxGuests} guests)</span>
+            <div className={`rounded-xl border p-4 space-y-2 transition-all duration-300 ${numNights > 0 ? 'bg-blue-50/30 border-blue-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+              {numNights > 0 ? (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">
+                      Room Base Price ({numNights} {numNights === 1 ? 'night' : 'nights'})
+                    </span>
+                    <span className="font-bold text-gray-900 font-mono">₹{baseStayPrice.toLocaleString()}</span>
+                  </div>
+
+                  {extraGuests > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-orange-600 font-medium">
+                        Extra Guests ({extraGuests} × ₹{extraPerPax} × {numNights}n)
+                      </span>
+                      <span className="font-bold text-orange-600 font-mono">+₹{totalExtraCharge.toLocaleString()}</span>
+                    </div>
                   )}
-                </span>
-                <span className="font-bold text-gray-900">₹{roomPrice.toLocaleString()}</span>
-              </div>
 
-              {extraGuests > 0 && extraPerPax > 0 && (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-orange-600">
-                    +{extraGuests} extra {extraGuests === 1 ? 'guest' : 'guests'} × ₹{extraPerPax}
-                  </span>
-                  <span className="font-bold text-orange-600">+₹{extraCharge.toLocaleString()}</span>
-                </div>
+                  {guestCount <= maxGuestsBase && (
+                    <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> Within base guest limit
+                    </p>
+                  )}
+
+                  <div className="border-t border-blue-100 pt-2 flex justify-between items-center">
+                    <span className="font-black text-gray-900">Total Amount</span>
+                    <span className="font-extrabold text-2xl text-blue-700 font-mono">₹{totalPrice.toLocaleString()}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-center text-gray-400 text-sm py-2">Select dates to see price breakdown</p>
               )}
-
-              {maxGuests > 0 && guestCount <= maxGuests && extraPerPax > 0 && (
-                <p className="text-xs text-green-600 font-medium">✓ Within base guest limit — no extra charge</p>
-              )}
-
-              <div className="border-t pt-2 flex justify-between items-center">
-                <span className="font-bold text-gray-900">Total per night</span>
-                <span className="font-extrabold text-xl text-green-600">₹{totalPrice.toLocaleString()}</span>
-              </div>
             </div>
 
             <div className="space-y-2 mt-2">
@@ -536,13 +577,9 @@ export default function PropertyDetailClient({
               </div>
             )}
 
-            <Button type="submit" size="lg" className="w-full mt-2 text-lg" disabled={isLoading}>
-              {isLoading ? 'Processing...' : `Pay ₹${totalPrice.toLocaleString()}`}
+            <Button type="submit" size="lg" className="w-full mt-2 text-lg" disabled={isLoading || !isRangeAvailable || numNights === 0}>
+              {isLoading ? 'Processing...' : !isRangeAvailable ? 'Sold Out for these dates' : numNights === 0 ? 'Select Dates' : `Pay ₹${totalPrice.toLocaleString()}`}
             </Button>
-            
-            <p className="text-xs text-center text-gray-500 mt-2">
-              You won't be charged yet. This is a demo booking flow.
-            </p>
           </form>
         )}
       </div>
