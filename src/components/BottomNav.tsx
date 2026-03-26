@@ -29,7 +29,7 @@ export function BottomNav() {
   const hideOn = ['/login', '/signup']
   if (hideOn.includes(pathname)) return null
 
-  const dashboardPath = role ? `/dashboard/${role}` : '/login'
+  const dashboardPath = role ? (role === 'guest' ? '/guest' : `/dashboard/${role}`) : '/login'
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
@@ -42,8 +42,8 @@ export function BottomNav() {
       </Link>
 
       <Link 
-        href="/search" 
-        className={`flex flex-col items-center gap-1 transition-colors ${pathname.includes('/search') ? 'text-blue-600' : 'text-gray-400'}`}
+        href="/guest" 
+        className={`flex flex-col items-center gap-1 transition-colors ${pathname === '/guest' ? 'text-blue-600' : 'text-gray-400'}`}
       >
         <Search className="w-6 h-6" />
         <span className="text-[10px] font-bold uppercase tracking-tighter">Explore</span>
