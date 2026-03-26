@@ -345,7 +345,8 @@ export default React.memo(function LeadsSection({
               <div className="flex flex-col divide-y max-h-[520px] overflow-y-auto">
                 {selectedLeads.map(lead => {
                   const cfg = MARKING_CONFIG[lead.marking] || MARKING_CONFIG['Warm']
-                  const waMessage = `Hello! I am the owner of ${lead.properties.name}. Following up on your enquiry for ${lead.checkin_date || 'TBD'} to ${lead.checkout_date || 'TBD'}. View property: https://www.fixystays.com/guest/property/${lead.property_id}`
+                  const propName = lead.properties?.name || 'our property'
+                  const waMessage = `Hello! I am the owner of ${propName}. Following up on your enquiry for ${lead.checkin_date || 'TBD'} to ${lead.checkout_date || 'TBD'}. View property: https://www.fixystays.com/guest/property/${lead.property_id}`
 
                   return (
                     <div key={lead.id} className="p-5 hover:bg-gray-50/60 transition-colors">
@@ -356,7 +357,7 @@ export default React.memo(function LeadsSection({
                             <Phone className="w-3.5 h-3.5 text-gray-400" />
                             {lead.phone_number}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{lead.properties.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{propName}</p>
                         </div>
                         {/* Marking selector as pill */}
                         <select
