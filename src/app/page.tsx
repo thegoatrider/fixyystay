@@ -10,7 +10,7 @@ export default async function Index() {
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <div className="flex-1 w-full flex flex-col items-center pb-24 md:pb-0">
+    <div className="flex-1 w-full flex flex-col items-center pb-32 md:pb-0">
       <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="w-full max-w-4xl flex justify-between items-center px-4 py-3 text-sm">
           <div className="flex items-center gap-6">
@@ -150,8 +150,8 @@ export default async function Index() {
         </div>
       </section>
 
-      {/* Footer - Desktop Only */}
-      <footer className="hidden md:block w-full bg-white border-t">
+      {/* Footer */}
+      <footer className="w-full bg-white border-t">
         {/* Social + Support bar */}
         <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Social Links */}
