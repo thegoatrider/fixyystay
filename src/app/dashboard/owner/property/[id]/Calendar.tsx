@@ -119,7 +119,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
   const dayBookings = singleSelectedDateStr ? bookings.filter(b => b.room_id === selectedRoom && format(new Date(b.created_at), 'yyyy-MM-dd') === singleSelectedDateStr) : []
 
   return (
-    <div className="flex flex-col gap-6 relative">
+    <div className={`flex flex-col gap-6 relative ${selectedDates.length > 0 ? 'pb-72 md:pb-24' : 'pb-24'}`}>
       {/* Header Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-3 sm:p-4 rounded-xl border">
         <div className="flex flex-col gap-1">
@@ -172,7 +172,7 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
 
       {/* Multi-Select Bulk Action Bar (Floating at bottom if selection exists) */}
       {selectedDates.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl animate-in slide-in-from-bottom-8 duration-300">
+        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl animate-in slide-in-from-bottom-8 duration-300">
           <div className="bg-white border-2 border-blue-600 shadow-2xl rounded-2xl p-4 flex flex-col items-stretch gap-4">
             
             <div className="flex items-center justify-between border-b pb-3">

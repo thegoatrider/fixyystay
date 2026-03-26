@@ -67,19 +67,28 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
 
     if (bookingError || !insertedBooking) {
       console.error('Booking insert failed:', bookingError)
-      return { error: 'Booking failed. Please try again.' }
+      // If error is about missing column guest_email, inform the user
+      if (bookingError?.message?.includes('column "guest_email" does not exist')) {
+        return { error: 'Database schema mismatch: guest_email column is missing. Please run notifications_migration.sql.' }
+      }
+      return { error: `Booking failed: ${bookingError?.message || 'Unknown error'}` }
     }
 
     // 3. Financial Splits & Wallet Ledger (non-fatal)
     try {
       const bookingId = insertedBooking.id
-      const { data: prop } = await supabaseAdmin.from('properties').select('owner_id').eq('id', propertyId).single()
-      const ownerId = prop?.owner_id
+      const { data: prop } = await supabaseAdmin
+        .from('properties')
+        .select('owners(user_id)')
+        .eq('id', propertyId)
+        .single()
+      
+      const ownerUserId = (prop as any)?.owners?.user_id
 
-      if (ownerId) {
+      if (ownerUserId) {
         const ownerEarning = amount * 0.80
         await supabaseAdmin.from('wallet_transactions').insert({
-          user_id: ownerId,
+          user_id: ownerUserId,
           amount: ownerEarning,
           transaction_type: 'earning',
           booking_id: bookingId,
@@ -87,13 +96,19 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
         })
       }
 
-      if (influencerId) {
-        const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate').eq('id', influencerId).single()
+      const infId = influencerId
+      if (infId) {
+        // Here influencers use auth.users(id) directly or we need to find their user_id
+        // Assuming influencers table 'id' matches auth.users(id) or we need to look it up.
+        // Let's check influencers table.
+        const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate, user_id').eq('id', infId).single()
         const rate = inf?.commission_rate || 0
-        if (rate > 0) {
+        const infUserId = inf?.user_id || infId // Fallback to infId if it's already a user_id
+        
+        if (rate > 0 && infUserId) {
           const influencerEarning = amount * (rate / 100)
           await supabaseAdmin.from('wallet_transactions').insert({
-            user_id: influencerId,
+            user_id: infUserId,
             amount: influencerEarning,
             transaction_type: 'earning',
             booking_id: bookingId,
