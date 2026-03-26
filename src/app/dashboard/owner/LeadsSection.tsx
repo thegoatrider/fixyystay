@@ -77,7 +77,7 @@ export default React.memo(function LeadsSection({
   const [viewMonth, setViewMonth] = useState(today.getMonth())
 
   // Form state
-  const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
+  const [selectedPropertyId, setSelectedPropertyId] = useState(properties?.[0]?.id || '')
   const [phone, setPhone] = useState('')
   const [checkin, setCheckin] = useState('')
   const [checkout, setCheckout] = useState('')
@@ -117,7 +117,7 @@ export default React.memo(function LeadsSection({
     setIsLoading(true)
     const result = await createLead({ ownerId, propertyId: selectedPropertyId, phoneNumber: phone, checkinDate: checkin, checkoutDate: checkout })
     if (result.success && result.lead) {
-      const propertyName = properties.find(p => p.id === selectedPropertyId)?.name || 'Property'
+      const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
       window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
       

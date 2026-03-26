@@ -22,7 +22,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
       return
     }
 
-    const propertyName = properties.find(p => p.id === selectedPropertyId)?.name || 'Property'
+    const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
     const baseUrl = window.location.origin
     const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}`
     const message = `Hello! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
@@ -57,7 +57,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
             onChange={(e) => setSelectedPropertyId(e.target.value)}
             className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm"
           >
-            {properties.map(p => (
+            {properties?.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>

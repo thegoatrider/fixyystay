@@ -23,7 +23,7 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
     const result = await createLead({ ownerId, propertyId: selectedPropertyId, phoneNumber: phone, checkinDate: checkin, checkoutDate: checkout })
     
     if (result.success && result.lead) {
-      const propertyName = properties.find(p => p.id === selectedPropertyId)?.name || 'Property'
+      const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
       window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
       
@@ -44,7 +44,7 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
           <Label>Select Property</Label>
           <select value={selectedPropertyId} onChange={e => setSelectedPropertyId(e.target.value)}
             className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm" required>
-            {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {properties?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div className="space-y-2">
