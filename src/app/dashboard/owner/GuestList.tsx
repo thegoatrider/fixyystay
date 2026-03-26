@@ -57,9 +57,9 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
     if (!searchTerm) return []
     const q = searchTerm.toLowerCase()
     return checkins.filter(c =>
-      c.guest_name.toLowerCase().includes(q) ||
-      c.guest_phone.includes(q) ||
-      c.properties.name.toLowerCase().includes(q) ||
+      c.guest_name?.toLowerCase().includes(q) ||
+      c.guest_phone?.includes(q) ||
+      c.properties?.name?.toLowerCase().includes(q) ||
       (c.uid && c.uid.toLowerCase().includes(q))
     )
   }, [checkins, searchTerm])
@@ -204,7 +204,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
-                          <p className="text-xs text-gray-400 truncate">{guest.properties.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
                           {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
                         </div>
                       </div>
@@ -253,7 +253,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
-                          <p className="text-xs text-gray-400 truncate">{guest.properties.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
                           {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
                         </div>
                       </div>
@@ -284,8 +284,8 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                     <User className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900">{selectedGuest.guest_name}</h3>
-                    <p className="text-xs text-gray-400">{selectedGuest.properties.name}</p>
+                    <h3 className="font-bold text-gray-900">{selectedGuest?.guest_name}</h3>
+                    <p className="text-xs text-gray-400">{selectedGuest?.properties?.name || 'Property'}</p>
                     {selectedGuest.uid && (
                       <p className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">{selectedGuest.uid}</p>
                     )}
