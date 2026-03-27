@@ -110,61 +110,71 @@ export function HomeSearch({ selectedCity = 'Alibag' }: { selectedCity?: string 
         </div>
       </div>
 
-      {/* Calendar Popover — fixed positioning for mobile */}
+      {/* Calendar Popover/Modal */}
       {isCalendarOpen && (
-        <div className={cn(
-          "absolute left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-100",
-          "shadow-[0_-5px_40px_rgba(0,0,0,0.15)] rounded-3xl", // Adjusted shadow for upward visual
-          "animate-in fade-in zoom-in-95 duration-200 origin-bottom md:origin-top",
-          // Mobile: anchor above the panel (opens up) | Desktop: anchor below the panel (opens down)
-          "bottom-[calc(100%+12px)] md:bottom-auto md:top-[calc(100%+12px)]",
-          // Mobile: almost full width, capped; Desktop: auto width
-          "w-[calc(100vw-32px)] max-w-[700px]",
-        )}>
-          {/* Header */}
-          <div className="flex justify-between items-center px-5 pt-4 pb-2 border-b border-gray-50">
-            <h4 className="text-xs font-black uppercase tracking-widest text-blue-900">Select Dates</h4>
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setRange({ from: undefined, to: undefined })}
-                className="text-[11px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors"
-              >
-                Clear
-              </button>
-              <button
-                onClick={() => setIsCalendarOpen(false)}
-                className="text-gray-400 hover:text-gray-700 transition-colors ml-2"
-                aria-label="Close calendar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Calendar — 1 month on mobile, 2 on desktop */}
-          <div className="overflow-x-auto">
-            <Calendar
-              mode="range"
-              selected={range}
-              onSelect={handleSelectRange}
-              numberOfMonths={isMobile ? 1 : 2}
-              disabled={{ before: new Date() }}
-              className="rounded-2xl border-none p-4"
-            />
-          </div>
-
-          {/* Mobile Done button */}
+        <>
+          {/* Backdrop for mobile */}
           {isMobile && (
-            <div className="px-4 pb-4">
+            <div 
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-in fade-in duration-200"
+              onClick={() => setIsCalendarOpen(false)}
+            />
+          )}
+
+          <div className={cn(
+            "z-[60] bg-white border border-gray-100 transition-all duration-300",
+            "shadow-[0_10px_50px_rgba(0,0,0,0.2)] rounded-[32px]",
+            
+            // Positioning Logic
+            isMobile 
+              ? "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-32px)] max-w-[400px]" 
+              : "absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+12px)] md:bottom-auto md:top-[calc(100%+12px)] w-auto min-w-[600px]",
+            
+            "animate-in fade-in zoom-in-95 duration-200 origin-center"
+          )}>
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 pt-5 pb-2 border-b border-gray-50">
+              <h4 className="text-xs font-black uppercase tracking-widest text-blue-900">Select Dates</h4>
+              <div className="flex gap-3 items-center">
+                <button
+                  onClick={() => setRange({ from: undefined, to: undefined })}
+                  className="text-[11px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => setIsCalendarOpen(false)}
+                  className="text-gray-400 hover:text-gray-700 transition-colors bg-gray-50 p-1.5 rounded-full"
+                  aria-label="Close calendar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+  
+            {/* Calendar */}
+            <div className="p-2 sm:p-4 overflow-x-auto flex justify-center">
+              <Calendar
+                mode="range"
+                selected={range}
+                onSelect={handleSelectRange}
+                numberOfMonths={isMobile ? 1 : 2}
+                disabled={{ before: new Date() }}
+                className="rounded-2xl border-none"
+              />
+            </div>
+  
+            {/* Action Footer */}
+            <div className="px-6 pb-6 pt-2">
               <Button
                 onClick={() => setIsCalendarOpen(false)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl"
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-100"
               >
-                Done
+                {range?.from && range?.to ? 'Apply Dates' : 'Done'}
               </Button>
             </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Mobile Search Button */}
