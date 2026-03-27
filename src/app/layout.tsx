@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CapacitorBackButton } from '@/components/CapacitorBackButton'
 import { BottomNav } from '@/components/BottomNav'
+import { PullToRefresh } from '@/components/PullToRefresh'
 import Providers from "@/components/Providers";
 
 const geistSans = Geist({
@@ -36,9 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
         <Providers>
+          <PullToRefresh />
           <CapacitorBackButton />
           {children}
           <BottomNav />
