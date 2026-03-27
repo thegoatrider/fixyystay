@@ -48,18 +48,19 @@ export default async function LoginPage(
         <Button formAction={login} className="mt-4 w-full">
           Sign In
         </Button>
+      </form>
 
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-200"></span>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">Or continue with</span>
-          </div>
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-gray-200"></span>
         </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-white px-2 text-gray-500">Or continue with</span>
+        </div>
+      </div>
 
+      <form action={signInWithGoogle}>
         <Button 
-          formAction={signInWithGoogle} 
           variant="outline" 
           type="submit" 
           className="w-full flex items-center justify-center gap-2"
@@ -84,12 +85,13 @@ export default async function LoginPage(
           </svg>
           Google
         </Button>
+      </form>
 
-        {searchParams?.message && (
-          <p className="mt-4 p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm text-center">
-            {searchParams.message}
-          </p>
-        )}
+      {searchParams?.message && (
+        <p className="mt-4 p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm text-center">
+          {searchParams.message}
+        </p>
+      )}
         
         <div className="text-center mt-4 text-sm text-gray-500">
           Don't have an account?{" "}
