@@ -46,7 +46,27 @@ export default function PropertyMap({ lat, lng, isConfirmed, pincode, areaName, 
   // We'll use a slightly zoomed out static map
   const staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/light-v10/static/${mapLng},${mapLat},13,0/600x300?access_token=${MAPBOX_TOKEN}`
 
-  if (!lat || !lng) return null
+  // Fallback if data is missing
+  if (!lat || !lng) {
+    return (
+      <div className="w-full h-[280px] bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white p-3 rounded-full shadow-sm mb-3">
+          <MapPin className="text-gray-300 w-6 h-6" />
+        </div>
+        <p className="text-gray-500 text-sm font-medium">Location data pending</p>
+        <p className="text-gray-400 text-xs mt-1">Latitude and Longitude are required to show the map.</p>
+      </div>
+    )
+  }
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="w-full h-[280px] bg-red-50 rounded-2xl border border-red-100 flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-red-600 text-sm font-bold">Mapbox Token Missing</p>
+        <p className="text-red-500 text-xs mt-1">Please add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to Vercel env vars.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-2">
