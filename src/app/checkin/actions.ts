@@ -43,7 +43,8 @@ export async function submitCheckin(formData: FormData) {
 
       if (frontFile && frontFile.size > 0) {
         const fileExt = frontFile.name.split('.').pop() || 'jpg'
-        const fileName = `checkin-${propertyId}-${Date.now()}-${i}-front.${fileExt}`
+        const randomStr = Math.random().toString(36).substring(2, 7)
+        const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-f${i}.${fileExt}`
         const { error: uploadError } = await supabaseAdmin.storage
           .from('property_images')
           .upload(`guest_ids/${fileName}`, frontFile, {
@@ -61,7 +62,8 @@ export async function submitCheckin(formData: FormData) {
 
       if (backFile && backFile.size > 0) {
         const fileExt = backFile.name.split('.').pop() || 'jpg'
-        const fileName = `checkin-${propertyId}-${Date.now()}-${i}-back.${fileExt}`
+        const randomStr = Math.random().toString(36).substring(2, 7)
+        const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-b${i}.${fileExt}`
         const { error: uploadError } = await supabaseAdmin.storage
           .from('property_images')
           .upload(`guest_ids/${fileName}`, backFile, {
