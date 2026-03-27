@@ -211,7 +211,7 @@ export default async function Index() {
 
         {/* Copyright */}
         <div className="border-t py-3 text-center text-xs text-gray-400">
-          © 2025 Fixy Stays · Alibag's trusted property booking platform
+          © 2026 Fixy Stays · Most trusted property booking platform
         </div>
       </footer>
     </div>
