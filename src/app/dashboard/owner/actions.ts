@@ -17,13 +17,23 @@ async function generatePropertyUid(supabaseAdmin: any, city: string) {
   
   const prefix = prefixes[city] || 'PRP'
   
-  // Count existing properties for this city
-  const { count } = await supabaseAdmin
+  // Find properties with this prefix and get the highest number
+  const { data: properties } = await supabaseAdmin
     .from('properties')
-    .select('*', { count: 'exact', head: true })
-    .eq('city', city)
+    .select('uid')
+    .like('uid', `${prefix}%`)
+    .order('uid', { ascending: false })
+    .limit(1)
     
-  const nextNum = (count || 0) + 1
+  let nextNum = 1
+  if (properties && properties.length > 0 && properties[0].uid) {
+    const lastUid = properties[0].uid
+    const match = lastUid.match(/\d+$/)
+    if (match) {
+      nextNum = parseInt(match[0], 10) + 1
+    }
+  }
+  
   return `${prefix}${nextNum.toString().padStart(3, '0')}`
 }
 
