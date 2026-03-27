@@ -4,16 +4,17 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { MapPin, ExternalLink, CheckCircle } from 'lucide-react'
 import { getApproxLocation } from '@/utils/getApproxLocation'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
 // Mapbox GL JS is heavy, load it dynamically
-const Map = dynamic(() => import('react-map-gl').then(mod => mod.Map), { 
+const Map = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Map), { 
   ssr: false,
   loading: () => <div className="w-full h-full bg-gray-100 animate-pulse flex items-center justify-center"><MapPin className="text-gray-300 w-8 h-8" /></div>
-})
+}) as any
 
-const Source = dynamic(() => import('react-map-gl').then(mod => mod.Source), { ssr: false })
-const Layer = dynamic(() => import('react-map-gl').then(mod => mod.Layer), { ssr: false })
-const Marker = dynamic(() => import('react-map-gl').then(mod => mod.Marker), { ssr: false })
+const Source = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Source), { ssr: false }) as any
+const Layer = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Layer), { ssr: false }) as any
+const Marker = dynamic(() => import('react-map-gl/mapbox').then(mod => mod.Marker), { ssr: false }) as any
 
 interface PropertyMapProps {
   lat: number
