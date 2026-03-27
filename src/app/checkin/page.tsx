@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle } from 'lucide-react'
+import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook } from 'lucide-react'
 import { submitCheckin } from './actions'
 import { cn } from '@/lib/utils'
 import { Suspense } from 'react'
@@ -134,32 +134,65 @@ function CheckinForm() {
   }
 
   if (step === 2) {
+    const whatsappLink = successData?.helpdesk 
+      ? `https://wa.me/${successData.helpdesk.replace(/\D/g, '')}`
+      : 'https://wa.me/'
+
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center flex flex-col items-center animate-in fade-in zoom-in duration-500">
-          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-8">
-            <CheckCircle className="w-12 h-12 text-green-600" />
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+            <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-4">Check-in Complete!</h1>
-          <p className="text-xl text-gray-600 mb-8">
+          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Check-in Complete!</h1>
+          <p className="text-lg text-gray-600 mb-8">
             Welcome to <span className="font-bold text-blue-600">{successData?.propertyName}</span>!
           </p>
           
-          <div className="w-full bg-blue-50 border border-blue-100 p-6 rounded-2xl text-left mb-8">
+          <div className="w-full bg-blue-50 border border-blue-100 p-6 rounded-2xl text-left mb-6">
             <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5" /> Important Info
             </h3>
             <p className="text-blue-800 text-sm leading-relaxed">
-              We've received your details. Please head to the property entrance. This is **Fixy Stays**. 
+              We&apos;ve received your details. Please head to the property entrance. This is **Fixy Stays**. 
             </p>
             <div className="mt-4 pt-4 border-t border-blue-200">
               <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Helpdesk Number</div>
               <div className="text-xl font-bold text-blue-900">{successData?.helpdesk}</div>
             </div>
           </div>
+
+          <div className="w-full flex flex-col gap-3 mb-8">
+            <Button 
+              asChild 
+              className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white border-0 shadow-md flex items-center justify-center gap-2"
+            >
+              <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                <HelpCircle className="w-5 h-5" /> Help & Support (WhatsApp)
+              </a>
+            </Button>
+            
+            <div className="grid grid-cols-3 gap-2">
+              <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-blue-600">
+                <a href="https://fixystays.com" target="_blank" rel="noopener noreferrer">
+                  <Globe className="w-5 h-5" />
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-pink-600">
+                <a href="https://instagram.com/fixystays" target="_blank" rel="noopener noreferrer">
+                  <Instagram className="w-5 h-5" />
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-blue-800">
+                <a href="https://facebook.com/fixystays" target="_blank" rel="noopener noreferrer">
+                  <Facebook className="w-5 h-5" />
+                </a>
+              </Button>
+            </div>
+          </div>
           
-          <p className="text-gray-400 text-sm">
-            Enjoy your stay with us!
+          <p className="text-gray-400 text-[10px] font-medium uppercase tracking-widest">
+            Enjoy your stay with Fixy Stays
           </p>
         </div>
       </div>
