@@ -116,12 +116,14 @@ function CheckinForm() {
 
       if (result.success) {
         setSuccessData({
-          propertyName: result.propertyName!,
-          helpdesk: result.helpdeskNumber! || 'Contact Support'
+          propertyName: result.propertyName || 'the property',
+          helpdesk: result.helpdeskNumber || 'Contact Support'
         })
         setStep(2)
       } else {
-        alert(result.error)
+        // Log the specific error for debugging
+        console.error('Check-in Submission Failed:', result.error)
+        alert(`Check-in failed: ${result.error}`)
       }
     } catch (err: any) {
       console.error('Checkin Error:', err)
