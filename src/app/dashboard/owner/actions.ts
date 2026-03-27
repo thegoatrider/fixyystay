@@ -37,6 +37,47 @@ async function generatePropertyUid(supabaseAdmin: any, city: string) {
   return `${prefix}${nextNum.toString().padStart(3, '0')}`
 }
 
+async function geocodeAddress(address: string) {
+  const apiKey = process.env.GOOGLE_GEOCODING_API_KEY
+  if (!apiKey) {
+    console.warn('GOOGLE_GEOCODING_API_KEY is not set')
+    return null
+  }
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+    )
+    const data = await response.json()
+
+    if (data.status === 'OK' && data.results.length > 0) {
+      const result = data.results[0]
+      const { lat, lng } = result.geometry.location
+      
+      let area_name = ''
+      let city = ''
+      let state = ''
+      
+      result.address_components.forEach((comp: any) => {
+        if (comp.types.includes('sublocality') || comp.types.includes('neighborhood')) {
+          area_name = comp.long_name
+        }
+        if (comp.types.includes('locality')) {
+          city = comp.long_name
+        }
+        if (comp.types.includes('administrative_area_level_1')) {
+          state = comp.long_name
+        }
+      })
+
+      return { lat, lng, area_name, city, state }
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error)
+  }
+  return null
+}
+
 export async function createProperty(formData: FormData) {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
@@ -75,6 +116,10 @@ export async function createProperty(formData: FormData) {
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
   const extra_per_pax = parseFloat(formData.get('extra_per_pax') as string) || 0
 
+  // 3.5 Automated Geocoding
+  const searchQuery = `${cityArea}, ${city}, ${pincode}, India`
+  const geoData = await geocodeAddress(searchQuery)
+
   // 4. Handle multiple image uploads
   const imageFiles = formData.getAll('image') as File[]
   const image_urls: string[] = []
@@ -112,9 +157,13 @@ export async function createProperty(formData: FormData) {
       image_urls,
       image_url: image_urls[0] || null, // Keep for backward compatibility
       helpdesk_number: helpdeskNumber,
-      city,
+      city: geoData?.city || city,
       city_area: cityArea,
+      area_name: geoData?.area_name || cityArea,
+      state: geoData?.state || null,
       pincode,
+      latitude: geoData?.lat || null,
+      longitude: geoData?.lng || null,
       approved: false,
       uid: propertyUid,
       max_guests,
