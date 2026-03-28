@@ -436,11 +436,16 @@ export default function PropertyDetailClient({
                           {room.is_ac === false ? '❄️ Non-AC' : '❄️ AC'} &nbsp;·&nbsp; per night
                         </div>
                       </div>
-                      <div className={cn(
-                        "font-extrabold text-lg shrink-0",
-                        roomAvailable ? "text-green-600" : "text-gray-400 line-through"
-                      )}>
-                        ₹{room.currentPrice || room.base_price}
+                      <div className="flex flex-col items-end shrink-0">
+                        <div className={cn(
+                          "font-extrabold text-lg",
+                          roomAvailable ? "text-green-600" : "text-gray-400 line-through"
+                        )}>
+                          ₹{(room.currentPrice || room.base_price).toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                          upto {property.max_guests || 2} guests
+                        </div>
                       </div>
                     </label>
                   );
