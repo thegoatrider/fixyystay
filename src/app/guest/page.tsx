@@ -33,7 +33,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   const supabase = await createClient()
 
   // Find approved properties and their rooms
-  const { data: properties, error } = await supabase
+  let query = supabase
     .from('properties')
     .select(`
       *,
@@ -44,11 +44,16 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
         price_bucket,
         image_url,
         room_availability (date, available),
-        bookings (id, created_at)
+        bookings (id, checkin_date, checkout_date)
       )
     `)
     .eq('approved', true)
-    .eq('city', selectedCity || 'Alibag')
+
+  if (selectedCity && selectedCity !== 'All') {
+    query = query.eq('city', selectedCity)
+  }
+
+  const { data: properties, error } = await query
 
   const { data: { user } } = await supabase.auth.getUser()
   const isInfluencer = user?.user_metadata?.role === 'influencer'
@@ -85,12 +90,12 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
         if (availabilityRecord && !availabilityRecord.available) return false
         
         // 2. Check if already booked
-        // (Note: This is a simplification; in a real app bookings might have start/end dates)
-        // Here we assume bookings track specific check-in dates.
-        const bookingsOnDate = room.bookings?.filter((b: any) => {
-          return format(new Date(b.created_at), 'yyyy-MM-dd') === dateStr
+        const hasOverlappingBooking = room.bookings?.some((b: any) => {
+          if (!b.checkin_date || !b.checkout_date) return false
+          // Room is booked if the target date is between checkin and checkout
+          return dateStr >= b.checkin_date && dateStr < b.checkout_date
         })
-        if (bookingsOnDate && bookingsOnDate.length > 0) return false
+        if (hasOverlappingBooking) return false
 
         return true
       })
