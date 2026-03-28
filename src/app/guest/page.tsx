@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { MapPin, Star } from 'lucide-react'
 import { format, eachDayOfInterval, subDays, isSameDay } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
@@ -104,11 +105,6 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     }
   }) || []
 
-  // Only filter by availability if the user explicitly searched for dates
-  if (hasDates) {
-    availableProperties = availableProperties.filter((p: any) => p.available_rooms > 0)
-  }
-
   // Apply Price Bucket Filter or See All Types
   if (selectedBucket === 'See All Rooms') {
     availableProperties = availableProperties.filter(prop => prop.type === 'multi-room property')
@@ -138,37 +134,60 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   const sortedAreas = Object.keys(propertiesByArea).sort()
 
   // Shared card component (inline)
-  const PropertyCard = (prop: any) => (
-    <Link href={buildPropertyUrl(prop.id)} key={prop.id} className="group flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
-      <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
-        {getPropImage(prop) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={getPropImage(prop)} alt={prop.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-        ) : (
-          <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🏨</span>
-        )}
-        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-blue-800 shadow-sm">
-          {prop.type}
-        </div>
-      </div>
-      <div className="p-6 flex-1 flex flex-col">
-        <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{prop.name}</h3>
-        <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-          <MapPin className="w-3 h-3" /> {prop.city_area || 'Alibag Region'}
-        </p>
-        <p className="text-gray-500 text-sm line-clamp-2 mb-6 leading-relaxed">{prop.description}</p>
-        <div className="mt-auto flex justify-between items-end pt-4 border-t border-gray-100">
-          <div className="text-sm font-medium text-gray-500">
-            {prop.type === 'villa' ? 'Entire Villa' : (hasDates ? `${prop.available_rooms} Rooms` : `${prop.total_rooms} Rooms`)}
+  const PropertyCard = (prop: any) => {
+    const isSoldOut = hasDates && prop.available_rooms === 0
+    
+    return (
+      <Link href={buildPropertyUrl(prop.id)} key={prop.id} className={cn(
+        "group flex flex-col bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300",
+        isSoldOut && "opacity-80 grayscale-[0.3]"
+      )}>
+        <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
+          {getPropImage(prop) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={getPropImage(prop)} alt={prop.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          ) : (
+            <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🏨</span>
+          )}
+          <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
+          
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-blue-800 shadow-sm w-fit">
+              {prop.type}
+            </div>
+            {isSoldOut && (
+              <div className="bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg animate-pulse">
+                Sold Out
+              </div>
+            )}
           </div>
-          <div className="text-sm font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100/50">
-            {prop.type === 'villa' ? 'Bookable' : (hasDates ? `${prop.available_rooms} Available` : 'Bookable')}
+        </div>
+        <div className="p-6 flex-1 flex flex-col">
+          <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
+            {prop.name}
+            {isSoldOut && <span className="ml-2 text-xs font-black text-red-600 uppercase">Booked</span>}
+          </h3>
+          <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+            <MapPin className="w-3 h-3" /> {prop.city_area || 'Alibag Region'}
+          </p>
+          <p className="text-gray-500 text-sm line-clamp-2 mb-6 leading-relaxed">{prop.description}</p>
+          <div className="mt-auto flex justify-between items-end pt-4 border-t border-gray-100">
+            <div className="text-sm font-medium text-gray-500">
+              {prop.type === 'villa' ? 'Entire Villa' : (hasDates ? `${prop.available_rooms} Rooms Left` : `${prop.total_rooms} Rooms`)}
+            </div>
+            <div className={cn(
+              "text-sm font-bold px-3 py-1.5 rounded-lg border",
+              isSoldOut 
+                ? "text-red-700 bg-red-50 border-red-100" 
+                : "text-green-700 bg-green-50 border-green-100/50"
+            )}>
+              {isSoldOut ? 'Sold Out' : (prop.type === 'villa' ? 'Bookable' : (hasDates ? `${prop.available_rooms} Available` : 'Bookable'))}
+            </div>
           </div>
         </div>
-      </div>
-    </Link>
-  )
+      </Link>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-10">
