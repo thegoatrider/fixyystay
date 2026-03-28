@@ -64,9 +64,14 @@ export default async function PropertyDetailPage(
                 <CheckCircle className="w-3.5 h-3.5 sm:w-4 h-4" /> Approved
               </span>
             ) : (
-              <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-orange-100 shadow-sm">
-                <Clock className="w-3.5 h-3.5 sm:w-4 h-4" /> Pending
-              </span>
+              <div className="flex flex-col items-end gap-1.5">
+                <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-orange-100 shadow-sm w-fit">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 h-4" /> Pending Approval
+                </span>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-black animate-pulse bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                  📞 Contact <span className="text-blue-600">7506288907</span> for admin approval
+                </p>
+              </div>
             )}
           </div>
         </div>

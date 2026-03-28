@@ -44,11 +44,18 @@ export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
             </span>
           </div>
           <p className="text-[10px] sm:text-sm text-gray-400 capitalize truncate font-medium">{prop.type} • {prop.room_count || 0} Rooms</p>
-          <div className="flex items-center gap-1 mt-1 sm:mt-2 text-[9px] sm:text-xs font-bold uppercase tracking-wider">
-            {prop.approved ? (
-              <span className="text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded"><CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Approved</span>
-            ) : (
-              <span className="text-orange-500 flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded"><Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Pending</span>
+          <div className="mt-1 sm:mt-2">
+            <div className="flex items-center gap-1 text-[9px] sm:text-xs font-bold uppercase tracking-wider">
+              {prop.approved ? (
+                <span className="text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded"><CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Approved</span>
+              ) : (
+                <span className="text-orange-500 flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded"><Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Pending</span>
+              )}
+            </div>
+            {!prop.approved && (
+              <p className="text-[9px] sm:text-[10px] text-gray-500 font-bold mt-1.5 animate-pulse">
+                📞 Contact <span className="text-blue-600">7506288907</span> for admin approval
+              </p>
             )}
           </div>
         </div>
