@@ -163,9 +163,9 @@ export async function createProperty(formData: FormData) {
       image_urls,
       image_url: image_urls[0] || null, // Keep for backward compatibility
       helpdesk_number: helpdeskNumber,
-      city: geoData?.city || city,
+      city: city,
       city_area: cityArea,
-      area_name: geoData?.area_name || cityArea,
+      area_name: cityArea,
       state: geoData?.state || null,
       pincode,
       latitude: geoData?.lat || null,
@@ -190,16 +190,17 @@ export async function createProperty(formData: FormData) {
     if (isMultiRoom) {
       // Sync categories (creates the physical rooms)
       for (const cat of initialCategories) {
-        // We can call syncCategoryRooms from the other actions file or duplicate logic
-        // Since it's in a different folder, let's just do a direct insert here for speed/simplicity
         const { error: roomError } = await supabaseAdmin.from('rooms').insert({
           property_id: property.id,
-          name: `${cat.name} Room 1`,
+          name: `${cat.name} Room`,
           category: cat.name,
           base_price: cat.base_price,
           price_bucket: cat.price_bucket,
         })
-        if (roomError) console.error('Initial category room error:', roomError)
+        if (roomError) {
+          await supabaseAdmin.from('properties').delete().eq('id', property.id)
+          return { error: `Failed to create initial room: ${roomError.message}. Upload cancelled.` }
+        }
       }
     } else {
       // Villa: one room
@@ -210,7 +211,10 @@ export async function createProperty(formData: FormData) {
         base_price: basePrice,
         price_bucket: priceBucket,
       })
-      if (roomError) console.error('Default villa room error:', roomError)
+      if (roomError) {
+        await supabaseAdmin.from('properties').delete().eq('id', property.id)
+        return { error: `Failed to create Villa room constraint: ${roomError.message}. Upload cancelled.` }
+      }
     }
   }
 

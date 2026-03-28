@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+export const fetchCache = 'force-no-store'
+
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
 // checks if the property is approved and has rooms. For availability, we fetch properties and perform filtering.
@@ -75,41 +77,46 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   const hasDates = !!(checkin && checkout)
 
   // Filter properties logic: available_rooms > 0
-  const stayDates = checkin && checkout 
+  const stayDates = hasDates 
     ? eachDayOfInterval({ 
-        start: new Date(checkin), 
-        end: subDays(new Date(checkout), 1) // stay ends morning of checkout
+        start: new Date(checkin as string), 
+        end: subDays(new Date(checkout as string), 1) // stay ends morning of checkout
       }).map(d => format(d, 'yyyy-MM-dd'))
-    : [format(new Date(), 'yyyy-MM-dd')] // default to today only
+    : [] 
 
   let availableProperties = properties?.map(prop => {
     let available_rooms = 0
 
-    prop.rooms.forEach((room: any) => {
-      // For each room, it must be available for ALL stayDates
-      const isRoomAvailable = stayDates.every(dateStr => {
-        // 1. Check if specifically blocked
-        const availabilityRecord = room.room_availability?.find((a: any) => a.date === dateStr)
-        if (availabilityRecord && !availabilityRecord.available) return false
-        
-        // 2. Check if already booked
-        const hasOverlappingBooking = room.bookings?.some((b: any) => {
-          if (!b.checkin_date || !b.checkout_date) return false
-          // Room is booked if the target date is between checkin and checkout
-          return dateStr >= b.checkin_date && dateStr < b.checkout_date
+    if (!hasDates) {
+      // If user is just browsing without dates, show total physical property inventory
+      available_rooms = prop.rooms?.length || 0
+    } else {
+      prop.rooms?.forEach((room: any) => {
+        // For each room, it must be available for ALL stayDates
+        const isRoomAvailable = stayDates.every(dateStr => {
+          // 1. Check if specifically blocked
+          const availabilityRecord = room.room_availability?.find((a: any) => a.date === dateStr)
+          if (availabilityRecord && !availabilityRecord.available) return false
+          
+          // 2. Check if already booked
+          const hasOverlappingBooking = room.bookings?.some((b: any) => {
+            if (!b.checkin_date || !b.checkout_date) return false
+            // Room is booked if the target date is between checkin and checkout
+            return dateStr >= b.checkin_date && dateStr < b.checkout_date
+          })
+          if (hasOverlappingBooking) return false
+
+          return true
         })
-        if (hasOverlappingBooking) return false
 
-        return true
+        if (isRoomAvailable) available_rooms++
       })
-
-      if (isRoomAvailable) available_rooms++
-    })
+    }
 
     return {
       ...prop,
       available_rooms,
-      total_rooms: prop.rooms.length
+      total_rooms: prop.rooms?.length || 0
     }
   }) || []
 
@@ -120,7 +127,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     availableProperties = availableProperties.filter(prop => prop.type === 'villa')
   } else if (selectedBucket) {
     availableProperties = availableProperties.filter(prop =>
-      prop.rooms.some((r: any) => r.price_bucket === selectedBucket)
+      prop.rooms?.some((r: any) => r.price_bucket === selectedBucket)
     )
   } else {
     // No bucket selected — show only featured properties on homepage
@@ -134,7 +141,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   const propertiesByArea: Record<string, typeof availableProperties> = {}
   if (selectedBucket && selectedBucket !== 'See All Rooms' && selectedBucket !== 'See All Villas') {
     availableProperties.forEach(prop => {
-      const area = prop.city_area || 'Other'
+      const area = prop.city_area?.trim() || 'Other locations'
       if (!propertiesByArea[area]) propertiesByArea[area] = []
       propertiesByArea[area].push(prop)
     })

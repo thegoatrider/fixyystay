@@ -44,6 +44,7 @@ export async function approveProperty(propertyId: string) {
     }
 
     revalidatePath('/dashboard/admin')
+    revalidatePath('/guest')
     return { success: true }
   } catch (err: any) {
     return { error: err.message || 'An unexpected error occurred' }
