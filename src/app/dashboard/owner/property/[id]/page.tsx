@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { addRoom } from './actions'
 import BookingCalendar from './Calendar'
 import { ArrowLeft, CheckCircle, Clock } from 'lucide-react'
-import AddRoomForm from './AddRoomForm'
+import ManageCategories from './ManageCategories'
 
 export default async function PropertyDetailPage(
   props: {
@@ -46,7 +46,7 @@ export default async function PropertyDetailPage(
       
       <div>
         <Link href="/dashboard/owner" className="text-xs sm:text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 mb-4 w-fit font-medium">
-          <ArrowLeft className="w-3.5 h-3.5 sm:w-4 h-4" /> Back to Properties
+          <ArrowLeft className="w-3.5 h-3.5 sm:w-4 h-4" /> Back to Dashboard
         </Link>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -79,46 +79,46 @@ export default async function PropertyDetailPage(
 
       <div className="flex flex-col gap-6 items-stretch w-full overflow-hidden">
         
-        {/* Top: Rooms List & Add Form */}
+        {/* Top: Configuration */}
         <div className="flex flex-col gap-6">
-          <div className="bg-white border rounded-lg p-5 shadow-sm">
-            <h2 className="text-xl font-bold mb-4">
-              {property.type === 'villa' ? 'Villa Configuration' : 'Rooms Configuration'}
-            </h2>
-            <div className="flex flex-col gap-3">
-              {rooms?.map(room => (
-                <div key={room.id} className="border p-3 flex justify-between rounded-md bg-gray-50 items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0">
-                      {room.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={room.image_url} alt={room.name} className="object-cover w-full h-full" />
-                      ) : (
-                        <div className="flex w-full h-full items-center justify-center">
-                          <span className="text-xs font-bold text-blue-400">R</span>
-                        </div>
-                      )}
+          {property.type === 'villa' ? (
+            <div className="bg-white border rounded-lg p-5 shadow-sm">
+              <h2 className="text-xl font-bold mb-4">Villa Configuration</h2>
+              <div className="flex flex-col gap-3">
+                {rooms?.map(room => (
+                  <div key={room.id} className="border p-3 flex justify-between rounded-md bg-gray-50 items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0">
+                        {room.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={room.image_url} alt={room.name} className="object-cover w-full h-full" />
+                        ) : (
+                          <div className="flex w-full h-full items-center justify-center">
+                            <span className="text-xs font-bold text-blue-400">V</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{room.name}</h3>
+                        <p className="text-xs text-gray-500">{room.category}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold">{room.name}</h3>
-                      <p className="text-xs text-gray-500">{room.category}</p>
+                    <div className="text-right">
+                      <span className="font-bold text-green-600">₹{room.base_price}</span>
+                      <p className="text-[10px] text-gray-400 capitalize">{room.price_bucket} bucket</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-bold text-green-600">₹{room.base_price}</span>
-                    <p className="text-[10px] text-gray-400 capitalize">{room.price_bucket} bucket</p>
-                  </div>
-                </div>
-              ))}
-              {(!rooms || rooms.length === 0) && (
-                <p className="text-sm text-gray-500 italic">No configuration defined yet.</p>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
-
-          {property.type !== 'villa' && (
-            <AddRoomForm propertyId={propertyId} />
+          ) : (
+            <ManageCategories
+              propertyId={propertyId}
+              initialCategories={property.room_categories || []}
+            />
           )}
+
+          {/* Legacy individual room list removed for multi-room properties as requested */}
         </div>
 
         {/* Right: Unified Calendar View */}
@@ -130,6 +130,7 @@ export default async function PropertyDetailPage(
             bookings={bookings || []}
             availability={availability || []}
             rates={rates || []}
+            propertyType={property.type}
           />
 
           <div className="mt-8 flex gap-4 text-xs text-gray-500 border-t pt-4">

@@ -146,6 +146,12 @@ export async function createProperty(formData: FormData) {
   const propertyUid = await generatePropertyUid(supabaseAdmin, city)
 
   // 5. Insert property (admin bypasses RLS)
+  const isMultiRoom = type !== 'villa'
+  const basePrice = parseInt(priceBucket.replace(/[^0-9]/g, ''), 10) || 0
+  const initialCategories = isMultiRoom ? [
+    { name: 'Standard', count: 1, base_price: basePrice, price_bucket: priceBucket }
+  ] : []
+
   const { data: property, error: insertError } = await supabaseAdmin
     .from('properties')
     .insert({
@@ -169,6 +175,7 @@ export async function createProperty(formData: FormData) {
       max_guests,
       max_capacity,
       extra_per_pax,
+      room_categories: initialCategories
     })
     .select('id')
     .single()
@@ -178,18 +185,35 @@ export async function createProperty(formData: FormData) {
     return { error: `DB Error (${insertError.code}): ${insertError.message}` }
   }
 
-  // 6. Create a default room
-  if (priceBucket && property?.id) {
-    const basePrice = parseInt(priceBucket.replace(/[^0-9]/g, ''), 10) || 0
-    const { error: roomError } = await supabaseAdmin.from('rooms').insert({
-      property_id: property.id,
-      name: type === 'villa' ? 'Entire Villa' : 'Standard Room',
-      category: 'Standard',
-      base_price: basePrice,
-      price_bucket: priceBucket,
-      is_ac: true,
-    })
-    if (roomError) console.error('Default room error (non-fatal):', roomError)
+  // 6. Create initial room(s)
+  if (property?.id) {
+    if (isMultiRoom) {
+      // Sync categories (creates the physical rooms)
+      for (const cat of initialCategories) {
+        // We can call syncCategoryRooms from the other actions file or duplicate logic
+        // Since it's in a different folder, let's just do a direct insert here for speed/simplicity
+        const { error: roomError } = await supabaseAdmin.from('rooms').insert({
+          property_id: property.id,
+          name: `${cat.name} Room 1`,
+          category: cat.name,
+          base_price: cat.base_price,
+          price_bucket: cat.price_bucket,
+          is_ac: true,
+        })
+        if (roomError) console.error('Initial category room error:', roomError)
+      }
+    } else {
+      // Villa: one room
+      const { error: roomError } = await supabaseAdmin.from('rooms').insert({
+        property_id: property.id,
+        name: 'Entire Villa',
+        category: 'Villa',
+        base_price: basePrice,
+        price_bucket: priceBucket,
+        is_ac: true,
+      })
+      if (roomError) console.error('Default villa room error:', roomError)
+    }
   }
 
   revalidatePath('/dashboard/owner')

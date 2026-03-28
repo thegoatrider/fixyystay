@@ -215,3 +215,157 @@ export async function saveMultipleChanges(
     return { error: err.message || 'An unexpected error occurred' }
   }
 }
+
+export async function updateRoomCategories(propertyId: string, categories: any[]) {
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('properties')
+      .update({ room_categories: categories })
+      .eq('id', propertyId)
+
+    if (error) throw error
+
+    // After updating categories metadata, sync the rooms table
+    for (const cat of categories) {
+      await syncCategoryRooms(propertyId, cat.name, cat.count, cat.base_price, cat.price_bucket)
+    }
+
+    revalidatePath(`/dashboard/owner/property/${propertyId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message }
+  }
+}
+
+export async function syncCategoryRooms(
+  propertyId: string, 
+  categoryName: string, 
+  targetCount: number, 
+  basePrice: number, 
+  priceBucket: string
+) {
+  try {
+    const supabaseAdmin = createAdminClient()
+    
+    // Get current rooms in this category
+    const { data: currentRooms } = await supabaseAdmin
+      .from('rooms')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('category', categoryName)
+
+    const currentCount = currentRooms?.length || 0
+
+    if (currentCount < targetCount) {
+      // Add rooms
+      const toAdd = targetCount - currentCount
+      const newRooms = Array.from({ length: toAdd }).map((_, i) => ({
+        property_id: propertyId,
+        name: `${categoryName} Room ${currentCount + i + 1}`,
+        category: categoryName,
+        base_price: basePrice,
+        price_bucket: priceBucket,
+        is_ac: true // Default
+      }))
+      await supabaseAdmin.from('rooms').insert(newRooms)
+    } else if (currentCount > targetCount) {
+      // Remove rooms (simplification: remove the most recently added ones)
+      // Ideally check for bookings before removing
+      const toRemove = currentCount - targetCount
+      const roomsToRemove = currentRooms!.slice(-toRemove).map(r => r.id)
+      await supabaseAdmin.from('rooms').delete().in('id', roomsToRemove)
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Sync error:', err)
+    return { error: err.message }
+  }
+}
+
+export async function saveCategoryChanges(
+  propertyId: string,
+  categoryName: string,
+  dateStrings: string[],
+  roomsToUpdateCount: number,
+  available: boolean | null,
+  price: number | null
+) {
+  try {
+    const supabaseAdmin = createAdminClient()
+    
+    // 1. Get all room IDs for this category
+    const { data: rooms } = await supabaseAdmin
+      .from('rooms')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('category', categoryName)
+
+    if (!rooms || rooms.length === 0) return { error: 'No rooms found in this category' }
+
+    // 2. For each date, identify which rooms to update
+    const promises = []
+
+    for (const date of dateStrings) {
+      // Find currently available rooms for this specific date
+      const { data: availabilityInfo } = await supabaseAdmin
+        .from('room_availability')
+        .select('room_id, available')
+        .in('room_id', rooms.map(r => r.id))
+        .eq('date', date)
+
+      const blockedRoomIds = new Set(availabilityInfo?.filter(a => !a.available).map(a => a.room_id) || [])
+      
+      // If we are blocking, we want to block 'roomsToUpdateCount' rooms.
+      // If we are pricing, we apply to 'roomsToUpdateCount' rooms? 
+      // User said "select a subset of number of rooms to edit". 
+      // Usually this means "I want to block 2 rooms today".
+      
+      let targetRoomIds: string[] = []
+
+      if (available === false) {
+        // We want to block N rooms. 
+        // Pick rooms that are currently NOT blocked.
+        const freeRooms = rooms.filter(r => !blockedRoomIds.has(r.id)).map(r => r.id)
+        targetRoomIds = freeRooms.slice(0, roomsToUpdateCount)
+      } else if (available === true) {
+        // We want to open N rooms.
+        // Pick rooms that ARE currently blocked.
+        const blockedRooms = rooms.filter(r => blockedRoomIds.has(r.id)).map(r => r.id)
+        targetRoomIds = blockedRooms.slice(0, roomsToUpdateCount)
+      } else {
+        // Just pricing? Apply to the first N rooms.
+        targetRoomIds = rooms.slice(0, roomsToUpdateCount).map(r => r.id)
+      }
+
+      if (targetRoomIds.length > 0) {
+        if (available !== null) {
+          promises.push(
+            supabaseAdmin.from('room_availability').upsert(
+              targetRoomIds.map(id => ({ room_id: id, date, available })),
+              { onConflict: 'room_id, date' }
+            )
+          )
+        }
+        if (price !== null) {
+          promises.push(
+            supabaseAdmin.from('room_rates').upsert(
+              targetRoomIds.map(id => ({ room_id: id, date, price })),
+              { onConflict: 'room_id, date' }
+            )
+          )
+        }
+      }
+    }
+
+    if (promises.length > 0) {
+      await Promise.all(promises)
+    }
+
+    revalidatePath(`/dashboard/owner/property/${propertyId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message }
+  }
+}
