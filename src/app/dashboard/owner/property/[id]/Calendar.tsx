@@ -305,7 +305,17 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                   
                   const dateAvailability = availability.filter(a => roomIds.includes(a.room_id) && a.date === dateStr)
                   const blockedCount = dateAvailability.filter(a => !a.available).length
-                  const availableCount = isMultiRoom ? (categoryRooms.length - blockedCount) : (dateAvailability[0]?.available !== false ? 1 : 0)
+                  
+                  // Subtract actual bookings from room inventory for this date
+                  const bookedCount = bookings.filter(b => 
+                    roomIds.includes(b.room_id) && 
+                    b.checkin_date && b.checkout_date &&
+                    dateStr >= b.checkin_date && dateStr < b.checkout_date
+                  ).length
+                  
+                  const availableCount = isMultiRoom 
+                    ? Math.max(0, categoryRooms.length - blockedCount - bookedCount) 
+                    : (dateAvailability[0]?.available !== false && bookedCount === 0 ? 1 : 0)
                   
                   const dateRates = rates.filter(r => roomIds.includes(r.room_id) && r.date === dateStr)
                   const basePrice = isMultiRoom 

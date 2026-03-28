@@ -54,6 +54,7 @@ export default function PropertyDetailClient({
   const [isCopied, setIsCopied] = useState(false)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [bookingDetails, setBookingDetails] = useState<{name: string, email: string, phone: string, checkin: string, checkout: string} | null>(null)
 
   const propImages = property.image_urls || []
   const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
@@ -226,10 +227,20 @@ export default function PropertyDetailClient({
         return
       }
 
-      const confirmed = JSON.parse(localStorage.getItem('confirmed_bookings') || '[]')
-      if (!confirmed.includes(property.id)) {
-        confirmed.push(property.id)
-        localStorage.setItem('confirmed_bookings', JSON.stringify(confirmed))
+      try {
+        const name = formData.get('guestName') as string
+        const email = formData.get('guestEmail') as string
+        const phone = formData.get('guestPhone') as string
+        
+        setBookingDetails({
+          name,
+          email,
+          phone,
+          checkin,
+          checkout
+        })
+      } catch (e) {
+        console.warn('Could not capture details for confirmation screen', e)
       }
       
       setSuccess(true)
@@ -243,13 +254,43 @@ export default function PropertyDetailClient({
 
   if (success) {
     return (
-      <div className="bg-white p-12 rounded-xl border border-green-200 text-center flex flex-col items-center gap-4 max-w-lg mx-auto mt-12 shadow-sm">
-        <CheckCircle className="w-16 h-16 text-green-500" />
-        <h2 className="text-2xl font-bold text-gray-900">Booking Confirmed!</h2>
-        <p className="text-gray-600">Your room at {property.name} has been successfully booked.</p>
-        <Button onClick={() => window.location.href='/guest'} className="mt-4">
-          Browse More Properties
-        </Button>
+      <div className="bg-white p-8 md:p-12 rounded-2xl border border-green-200 text-center flex flex-col items-center gap-6 max-w-2xl mx-auto mt-12 shadow-xl shadow-green-50 animate-in zoom-in-95 duration-500">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2">
+          <CheckCircle className="w-12 h-12" />
+        </div>
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 mb-2">Booking Confirmed!</h2>
+          <p className="text-gray-500 font-medium">Your stay at <span className="text-gray-900 font-bold">{property.name}</span> is successfully reserved.</p>
+        </div>
+
+        {bookingDetails && (
+          <div className="w-full bg-gray-50 rounded-2xl p-6 border text-left grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Guest Details</p>
+              <p className="text-sm font-bold text-gray-900">{bookingDetails.name}</p>
+              <p className="text-xs text-gray-500">{bookingDetails.email}</p>
+              <p className="text-xs text-gray-500">{bookingDetails.phone}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Stay Duration</p>
+              <p className="text-sm font-bold text-gray-900">
+                {format(new Date(bookingDetails.checkin), 'MMM dd')} — {format(new Date(bookingDetails.checkout), 'MMM dd, yyyy')}
+              </p>
+              <p className="text-xs text-gray-500">
+                {Math.ceil((new Date(bookingDetails.checkout).getTime() - new Date(bookingDetails.checkin).getTime()) / (1000 * 60 * 60 * 24))} Nights
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
+          <Button onClick={() => window.location.href='/guest'} variant="outline" className="flex-1 h-12 rounded-xl font-bold">
+            Browse More
+          </Button>
+          <Button onClick={() => window.print()} className="flex-1 h-12 rounded-xl font-bold bg-green-600 hover:bg-green-700">
+            Print Receipt
+          </Button>
+        </div>
       </div>
     )
   }
