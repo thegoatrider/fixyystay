@@ -198,7 +198,6 @@ export async function createProperty(formData: FormData) {
           category: cat.name,
           base_price: cat.base_price,
           price_bucket: cat.price_bucket,
-          is_ac: true,
         })
         if (roomError) console.error('Initial category room error:', roomError)
       }
@@ -210,7 +209,6 @@ export async function createProperty(formData: FormData) {
         category: 'Villa',
         base_price: basePrice,
         price_bucket: priceBucket,
-        is_ac: true,
       })
       if (roomError) console.error('Default villa room error:', roomError)
     }

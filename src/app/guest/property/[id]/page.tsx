@@ -35,7 +35,7 @@ export default async function PropertyDetailPage(
         base_price,
         room_rates (date, price),
         room_availability (date, available),
-        bookings (id, created_at, checkin_date, checkout_date)
+        bookings (*)
       )
     `)
     .eq('id', propertyId)

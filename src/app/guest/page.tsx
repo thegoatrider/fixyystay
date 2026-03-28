@@ -47,7 +47,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
         price_bucket,
         image_url,
         room_availability (date, available),
-        bookings (id, checkin_date, checkout_date)
+        bookings (*)
       )
     `)
     .eq('approved', true)
