@@ -397,7 +397,7 @@ export default function PropertyDetailClient({
                   
                   return (
                     <label
-                      key={room.id}
+                      key={room.category}
                       className={cn(
                         "flex gap-4 items-center p-3 rounded-xl border cursor-pointer transition-all",
                         selectedRoomId === room.id ? 'border-blue-600 bg-blue-50 shadow-sm' : 'hover:bg-gray-50 border-gray-200',
@@ -430,10 +430,14 @@ export default function PropertyDetailClient({
                       <div className="flex-1">
                         <div className="font-bold text-gray-900 flex items-center gap-2">
                           {room.category} Room
-                          {!roomAvailable && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-black uppercase">Booked</span>}
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {room.is_ac === false ? '❄️ Non-AC' : '❄️ AC'} &nbsp;·&nbsp; per night
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400 font-medium">per night</span>
+                          {roomAvailable ? (
+                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter animate-pulse">Available</span>
+                          ) : (
+                            <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Sold Out</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end shrink-0">

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import PropertyDetailClient from './ClientWrapper'
-import { format, eachDayOfInterval, subDays } from 'date-fns'
+import { format, eachDayOfInterval, subDays, addDays } from 'date-fns'
 
 export default async function PropertyDetailPage(
   props: {
@@ -50,41 +50,60 @@ export default async function PropertyDetailPage(
       }).map(d => format(d, 'yyyy-MM-dd'))
     : [format(new Date(), 'yyyy-MM-dd')]
   
-  const allRooms = []
+  const groupedRooms: Record<string, any> = {}
   
   for (const room of property.rooms) {
-    let totalStayPrice = 0
+    const category = room.category || 'Standard'
+    if (!groupedRooms[category]) {
+      groupedRooms[category] = {
+        name: room.name,
+        category: category,
+        base_price: room.base_price,
+        image_url: room.image_url,
+        image_urls: room.image_urls,
+        roomIds: [],
+        availableRoomIds: [],
+        totalStayPrice: 0,
+        count: 0
+      }
+    }
+
     let isRoomAvailable = true
-
-    // 1. Check Manual Blocks
-    const isInRangeBlocked = room.room_availability?.some((a: any) => {
-      return stayDates.includes(a.date) && !a.available
-    })
-
-    // 2. Check Overlapping Bookings
+    const isInRangeBlocked = room.room_availability?.some((a: any) => stayDates.includes(a.date) && !a.available)
     const hasOverlappingBooking = room.bookings?.some((b: any) => {
       if (!b.checkin_date || !b.checkout_date) return false
       const ci = checkin || stayDates[0]
-      const co = checkout || format(new Date(new Date(ci).getTime() + 86400000), 'yyyy-MM-dd') 
+      const co = checkout || format(addDays(new Date(ci), 1), 'yyyy-MM-dd')
       return b.checkin_date < co && b.checkout_date > ci
     })
 
     if (isInRangeBlocked || hasOverlappingBooking) {
       isRoomAvailable = false
-    } 
-
-    // 3. Accumulate Price (even if not available, for display)
-    for (const dateStr of stayDates) {
-      const rateRecord = room.room_rates?.find((r: any) => r.date === dateStr)
-      totalStayPrice += rateRecord ? rateRecord.price : room.base_price
     }
 
-    allRooms.push({
-      ...room,
-      isAvailable: isRoomAvailable,
-      currentPrice: totalStayPrice
-    })
+    let roomStayPrice = 0
+    for (const dateStr of stayDates) {
+      const rateRecord = room.room_rates?.find((r: any) => r.date === dateStr)
+      roomStayPrice += rateRecord ? rateRecord.price : room.base_price
+    }
+
+    groupedRooms[category].roomIds.push(room.id)
+    if (isRoomAvailable) {
+      groupedRooms[category].availableRoomIds.push(room.id)
+    }
+    // We pick the price from the first room as representative
+    if (groupedRooms[category].count === 0) {
+      groupedRooms[category].totalStayPrice = roomStayPrice
+    }
+    groupedRooms[category].count++
   }
+
+  const allRooms = Object.values(groupedRooms).map(cat => ({
+    ...cat,
+    id: cat.availableRoomIds[0] || cat.roomIds[0], // Representative ID for selection logic
+    isAvailable: cat.availableRoomIds.length > 0,
+    currentPrice: cat.totalStayPrice
+  }))
 
   return (
     <div className="flex flex-col gap-6">
