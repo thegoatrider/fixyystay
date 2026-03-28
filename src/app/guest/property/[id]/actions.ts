@@ -90,14 +90,33 @@ export async function bookRoom(
 
     if (bookingError || !insertedBooking) {
       console.error('Booking insert failed:', bookingError)
-      // If error is about missing column guest_email, inform the user
-      if (bookingError?.message?.includes('column "guest_email" does not exist')) {
-        return { error: 'Database schema mismatch: guest_email column is missing. Please run notifications_migration.sql.' }
+      if (bookingError?.message?.includes('column "guest_email" does not exist') || bookingError?.message?.includes('column "checkin_date"')) {
+        return { error: 'Database schema mismatch. Please run supabase/bookings_leads_migration.sql in your Supabase SQL editor.' }
       }
       return { error: `Booking failed: ${bookingError?.message || 'Unknown error'}` }
     }
 
-    // 3. Financial Splits & Wallet Ledger (non-fatal)
+    // 3. Automated Lead Creation (Ensure owner sees this in their "Leads" tab)
+    try {
+      const { data: propData } = await supabaseAdmin.from('properties').select('owner_id').eq('id', propertyId).single()
+      if (propData?.owner_id) {
+        await supabaseAdmin.from('leads').insert([{
+          owner_id: propData.owner_id,
+          property_id: propertyId,
+          guest_name: guestName,
+          guest_email: guestEmail,
+          phone_number: guestPhone,
+          checkin_date: checkinDate,
+          checkout_date: checkoutDate,
+          status: 'Booked',
+          marking: 'Booked'
+        }])
+      }
+    } catch (leadErr) {
+      console.error('Automated lead creation failed (non-fatal):', leadErr)
+    }
+
+    // 4. Financial Splits & Wallet Ledger (non-fatal)
     try {
       const bookingId = insertedBooking.id
       const { data: prop } = await supabaseAdmin
