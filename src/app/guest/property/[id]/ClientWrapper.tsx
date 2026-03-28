@@ -40,7 +40,8 @@ export default function PropertyDetailClient({
   initialGuests: string | null,
   isLoggedIn: boolean
 }) {
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(availableRooms[0]?.id || '')
+  const firstAvailable = availableRooms.find(r => r.isAvailable)
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(firstAvailable?.id || availableRooms[0]?.id || '')
   const [checkin, setCheckin] = useState(initialCheckin || '')
   const [checkout, setCheckout] = useState(initialCheckout || '')
   const [guests, setGuests] = useState(initialGuests || '2')
@@ -112,7 +113,7 @@ export default function PropertyDetailClient({
   }, [property.id])  
 
   // --- Dynamic Pricing & Availability Logic ---
-  const selectedRoom = property.rooms?.find((r: any) => r.id === selectedRoomId)
+  const selectedRoom = availableRooms.find((r: any) => r.id === selectedRoomId)
   
   // 1. Calculate Stay Interval
   const stayDates = (checkin && checkout && new Date(checkin) < new Date(checkout))
@@ -129,6 +130,9 @@ export default function PropertyDetailClient({
   let isRangeAvailable = numNights > 0
 
   if (selectedRoom && numNights > 0) {
+    // If we're using the server-calculated isAvailable flag, we should still re-check if dates changed on client
+    // For now, let's keep the client-side check robust.
+    
     // Check Manual Blocks
     const isInRangeBlocked = selectedRoom.room_availability?.some((a: any) => {
       return stayDates.includes(a.date) && !a.available
@@ -386,44 +390,61 @@ export default function PropertyDetailClient({
           <form action={handleBook} className="flex flex-col gap-5">
             <input type="hidden" name="influencerId" value={influencerId || ''} />
             <div className="space-y-2">
-              <Label>Available Room Types</Label>
+              <Label>Room Selection</Label>
               <div className="flex flex-col gap-3">
-                {availableRooms.map(room => (
-                  <label
-                    key={room.id}
-                    className={`flex gap-4 items-center p-3 rounded-xl border cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-600 bg-blue-50 shadow-sm' : 'hover:bg-gray-50 border-gray-200'}`}
-                  >
-                    <input
-                      type="radio"
-                      name="roomId"
-                      value={room.id}
-                      checked={selectedRoomId === room.id}
-                      onChange={() => setSelectedRoomId(room.id)}
-                      className="sr-only"
-                    />
-                    {/* Room image */}
-                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border">
-                      {room.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={room.image_url} alt={room.category} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">No Img</div>
+                {availableRooms.map(room => {
+                  const roomAvailable = room.isAvailable;
+                  
+                  return (
+                    <label
+                      key={room.id}
+                      className={cn(
+                        "flex gap-4 items-center p-3 rounded-xl border cursor-pointer transition-all",
+                        selectedRoomId === room.id ? 'border-blue-600 bg-blue-50 shadow-sm' : 'hover:bg-gray-50 border-gray-200',
+                        !roomAvailable && "opacity-60 grayscale-[0.5]"
                       )}
-                    </div>
-                    {/* Room info — no name/number shown */}
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900">
-                        {room.category} Room
+                    >
+                      <input
+                        type="radio"
+                        name="roomId"
+                        value={room.id}
+                        checked={selectedRoomId === room.id}
+                        onChange={() => setSelectedRoomId(room.id)}
+                        className="sr-only"
+                      />
+                      {/* Room image */}
+                      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border relative">
+                        {room.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={room.image_url} alt={room.category} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">No Img</div>
+                        )}
+                        {!roomAvailable && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="text-[8px] font-black text-white uppercase tracking-tighter">Sold Out</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {room.is_ac === false ? '❄️ Non-AC' : '❄️ AC'} &nbsp;·&nbsp; per night
+                      {/* Room info */}
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                          {room.category} Room
+                          {!roomAvailable && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-black uppercase">Booked</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {room.is_ac === false ? '❄️ Non-AC' : '❄️ AC'} &nbsp;·&nbsp; per night
+                        </div>
                       </div>
-                    </div>
-                    <div className="font-extrabold text-green-600 text-lg shrink-0">
-                      ₹{room.currentPrice || room.base_price}
-                    </div>
-                  </label>
-                ))}
+                      <div className={cn(
+                        "font-extrabold text-lg shrink-0",
+                        roomAvailable ? "text-green-600" : "text-gray-400 line-through"
+                      )}>
+                        ₹{room.currentPrice || room.base_price}
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
                    <div className="grid grid-cols-2 gap-4 relative" ref={calendarRef}>
