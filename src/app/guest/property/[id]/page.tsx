@@ -32,7 +32,7 @@ export default async function PropertyDetailPage(
         base_price,
         room_rates (date, price),
         room_availability (date, available),
-        bookings (id, created_at)
+        bookings (id, created_at, checkin_date, checkout_date)
       )
     `)
     .eq('id', propertyId)
@@ -56,26 +56,29 @@ export default async function PropertyDetailPage(
     let totalStayPrice = 0
     let isRoomAvailable = true
 
-    for (const dateStr of stayDates) {
-      // 1. Check if specifically blocked
-      const availabilityRecord = room.room_availability?.find((a: any) => a.date === dateStr)
-      if (availabilityRecord && !availabilityRecord.available) {
-        isRoomAvailable = false
-        break
-      }
-      
-      // 2. Check if already booked
-      const bookingsOnDate = room.bookings?.filter((b: any) => {
-        return format(new Date(b.created_at), 'yyyy-MM-dd') === dateStr
-      })
-      if (bookingsOnDate && bookingsOnDate.length > 0) {
-        isRoomAvailable = false
-        break
-      }
+    // 1. Check Manual Blocks
+    const isInRangeBlocked = room.room_availability?.some((a: any) => {
+      return stayDates.includes(a.date) && !a.available
+    })
 
+    // 2. Check Overlapping Bookings
+    const hasOverlappingBooking = room.bookings?.some((b: any) => {
+      if (!b.checkin_date || !b.checkout_date) return false
+      // If checkin/checkout params are provided, use them. 
+      // Otherwise use the first date of stayDates (default)
+      const ci = checkin || stayDates[0]
+      const co = checkout || format(new Date(new Date(ci).getTime() + 86400000), 'yyyy-MM-dd') 
+      return b.checkin_date < co && b.checkout_date > ci
+    })
+
+    if (isInRangeBlocked || hasOverlappingBooking) {
+      isRoomAvailable = false
+    } else {
       // 3. Accumulate Price
-      const rateRecord = room.room_rates?.find((r: any) => r.date === dateStr)
-      totalStayPrice += rateRecord ? rateRecord.price : room.base_price
+      for (const dateStr of stayDates) {
+        const rateRecord = room.room_rates?.find((r: any) => r.date === dateStr)
+        totalStayPrice += rateRecord ? rateRecord.price : room.base_price
+      }
     }
 
     if (isRoomAvailable) {
