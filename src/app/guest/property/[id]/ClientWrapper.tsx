@@ -61,6 +61,31 @@ export default function PropertyDetailClient({
 
   useEffect(() => {
     if (isLightboxOpen) {
+      window.history.pushState({ lightbox: true }, '')
+      
+      const handlePopState = (e: PopStateEvent) => {
+        setIsLightboxOpen(false)
+      }
+      
+      window.addEventListener('popstate', handlePopState)
+      return () => {
+        window.removeEventListener('popstate', handlePopState)
+        // If the component unmounts while lightbox is open (e.g. navigation), 
+        // we might want to ensure history is clean, but usually Next.js handles route changes.
+      }
+    }
+  }, [isLightboxOpen])
+
+  const handleCloseLightbox = () => {
+    if (window.history.state?.lightbox) {
+      window.history.back()
+    } else {
+      setIsLightboxOpen(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isLightboxOpen) {
       const container = document.getElementById('lightbox-scroll-container')
       if (container) {
         container.scrollTo({
@@ -69,7 +94,7 @@ export default function PropertyDetailClient({
         })
       }
     }
-  }, [isLightboxOpen])
+  }, [isLightboxOpen, lightboxIndex])
 
   const handleNextLightbox = () => {
     if (lightboxIndex < allImages.length - 1) {
@@ -590,7 +615,7 @@ export default function PropertyDetailClient({
               {lightboxIndex + 1} / {allImages.length}
             </div>
             <button 
-              onClick={() => setIsLightboxOpen(false)} 
+              onClick={handleCloseLightbox} 
               className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
             >
               <X className="w-5 h-5" />
