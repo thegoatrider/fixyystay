@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { MessageCircle, Phone, UserPlus } from 'lucide-react'
 import { createLead } from './leads-actions'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
+import { formatWhatsAppNumber } from '@/lib/utils'
 
 type Property = { id: string; name: string }
 
@@ -25,7 +26,7 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
     if (result.success && result.lead) {
       const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
-      window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
+      window.open(`https://wa.me/${formatWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`, '_blank')
       
       setPhone('')
       setCheckin('')

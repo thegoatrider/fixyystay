@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook } from 'lucide-react'
 import { submitCheckin } from './actions'
-import { cn } from '@/lib/utils'
+import { cn, formatWhatsAppNumber } from '@/lib/utils'
 import { Suspense } from 'react'
 
 export default function CheckinPage() {
@@ -178,7 +178,7 @@ const compressImage = async (file: File): Promise<File> => {
 
   if (step === 2) {
     const whatsappLink = successData?.helpdesk 
-      ? `https://wa.me/${successData.helpdesk.replace(/\D/g, '')}`
+      ? `https://wa.me/${formatWhatsAppNumber(successData.helpdesk)}`
       : 'https://wa.me/'
 
     return (

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle } from 'lucide-react'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { formatWhatsAppNumber } from '@/lib/utils'
 import React from 'react'
 
 type Property = { id: string; name: string }
@@ -119,7 +120,7 @@ export default React.memo(function LeadsSection({
     if (result.success && result.lead) {
       const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
-      window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
+      window.open(`https://wa.me/${formatWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`, '_blank')
       
       queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
       setLocalLeads([{ ...result.lead, properties: { name: propertyName } } as Lead, ...localLeads])
@@ -387,7 +388,7 @@ export default React.memo(function LeadsSection({
                         </select>
 
                         <a
-                          href={`https://wa.me/${lead.phone_number.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`}
+                          href={`https://wa.me/${formatWhatsAppNumber(lead.phone_number)}?text=${encodeURIComponent(waMessage)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold rounded-lg border border-green-100 transition-colors"
