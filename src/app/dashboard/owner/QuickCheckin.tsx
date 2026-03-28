@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageSquare, Phone } from 'lucide-react'
+import { Phone, MessageSquare } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
+import { formatWhatsAppNumber } from '@/lib/utils'
 
 type Property = {
   id: string
@@ -27,7 +28,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
     const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}`
     const message = `Hello! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
     
-    const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, '_blank')
     setPhone('')
   }
