@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Phone, MessageSquare } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
-import { formatWhatsAppNumber } from '@/lib/utils'
+import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 
 type Property = {
   id: string
@@ -14,6 +14,7 @@ type Property = {
 }
 
 export default function QuickCheckin({ properties }: { properties: Property[] }) {
+  const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
 
@@ -28,7 +29,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
     const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}`
     const message = `Hello! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
     
-    const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`
+    const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone, countryCode)}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, '_blank')
     setPhone('')
   }
@@ -38,15 +39,26 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
           <Label htmlFor="guestPhone">Guest Phone Number</Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-            <Input 
-              id="guestPhone"
-              placeholder="e.g. 9876543210" 
-              className="pl-9"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
+          <div className="flex gap-2">
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className="w-[100px] h-10 px-2 py-2 rounded-md border border-gray-300 bg-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {COUNTRY_CODES.map(c => (
+                <option key={c.code} value={c.code}>{c.icon} +{c.code}</option>
+              ))}
+            </select>
+            <div className="relative flex-1">
+              <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+              <Input 
+                id="guestPhone"
+                placeholder="e.g. 9876543210" 
+                className="pl-9"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
