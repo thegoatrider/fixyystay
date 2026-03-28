@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook } from 'lucide-react'
 import { submitCheckin } from './actions'
-import { cn, formatWhatsAppNumber } from '@/lib/utils'
+import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
 
 export default function CheckinPage() {
@@ -30,6 +30,7 @@ function CheckinForm() {
   const [step, setStep] = useState(1) // 1: Info, 2: Success
   
   const [guestName, setGuestName] = useState('')
+  const [countryCode, setCountryCode] = useState('91')
   const [guestPhone, setGuestPhone] = useState('')
   const [numPeople, setNumPeople] = useState(1)
   const [checkinDate, setCheckinDate] = useState('')
@@ -132,7 +133,7 @@ const compressImage = async (file: File): Promise<File> => {
     try {
       const formData = new FormData()
       formData.append('propertyId', propertyId)
-      formData.append('guestPhone', guestPhone)
+      formData.append('guestPhone', formatWhatsAppNumber(guestPhone, countryCode))
       formData.append('guestName', guestName)
       formData.append('numPeople', numPeople.toString())
       formData.append('checkinDate', checkinDate)
@@ -257,13 +258,28 @@ const compressImage = async (file: File): Promise<File> => {
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
-              <Input 
-                id="phone" 
-                placeholder="9876543210" 
-                required 
-                value={guestPhone}
-                onChange={(e) => setGuestPhone(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="w-[90px] h-10 px-2 py-2 rounded-md border border-gray-300 bg-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>{c.icon} +{c.code}</option>
+                  ))}
+                </select>
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <Input 
+                    id="phone" 
+                    placeholder="9876543210" 
+                    required 
+                    className="pl-9"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
