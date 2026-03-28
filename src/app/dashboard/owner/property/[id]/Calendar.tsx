@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ChevronLeft, ChevronRight, Hash, Layers, CheckCircle, XCircle, Info, Save, Plus, Minus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { setRoomAvailability, setRoomRate, setMultipleRoomAvailability, setMultipleRoomRates, saveMultipleChanges, saveCategoryChanges } from './actions'
 
 type CalendarProps = {
@@ -323,19 +324,22 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
                       onClick={() => toggleDateSelection(date)}
                       className={`
                         min-h-[60px] sm:min-h-[80px] border-2 rounded-xl p-2 flex flex-col transition-all cursor-pointer relative group
-                        ${!isCurrentMonth ? 'opacity-0 pointer-events-none' : 'bg-white border-gray-50 hover:border-blue-200 hover:shadow-lg'}
-                        ${isSelected ? 'border-blue-500 bg-blue-50/30' : ''}
+                        ${!isCurrentMonth ? 'opacity-0 pointer-events-none' : 'bg-white border-gray-50 hover:border-blue-300 hover:shadow-lg'}
+                        ${isSelected ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100 ring-offset-1' : ''}
                         ${availableCount === 0 && isCurrentMonth ? 'bg-red-50/30' : ''}
                       `}
                     >
                       <div className="flex justify-between items-start">
                         <span className={`
                           text-xs font-black 
-                          ${isToday ? 'text-white bg-blue-600 px-1.5 py-0.5 rounded-lg' : 'text-gray-400'}
+                          ${isToday ? 'text-white bg-blue-600 px-1.5 py-0.5 rounded-lg' : isSelected ? 'text-blue-700' : 'text-gray-400'}
                         `}>
                           {format(date, 'd')}
                         </span>
-                        {isMultiRoom && isCurrentMonth && (
+                        {isSelected && (
+                          <CheckCircle className="w-3.5 h-3.5 text-blue-600 animate-in zoom-in-50 duration-200" />
+                        )}
+                        {isMultiRoom && isCurrentMonth && !isSelected && (
                           <div className={`text-[8px] font-black uppercase px-1 rounded ${availableCount > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                             {availableCount}/{categoryRooms.length}
                           </div>
@@ -344,12 +348,15 @@ export default function BookingCalendar({ propertyId, rooms, bookings, availabil
 
                       {isCurrentMonth && (
                         <div className="mt-auto">
-                          <div className={`text-[10px] sm:text-xs font-black flex items-baseline gap-0.5 leading-none mb-1.5 ${dateRates.length > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                          <div className={`text-[10px] sm:text-xs font-black flex items-baseline gap-0.5 leading-none mb-1.5 ${dateRates.length > 0 ? 'text-orange-600' : isSelected ? 'text-blue-600' : 'text-green-600'}`}>
                             <span className="text-[8px] uppercase">₹</span>
                             <span>{displayPrice.toLocaleString()}</span>
                           </div>
                           <div className={`h-1.5 w-full rounded-full bg-gray-100 overflow-hidden flex`}>
-                             <div className="bg-green-500 h-full" style={{ width: `${(availableCount / roomIds.length) * 100}%` }} />
+                             <div className={cn(
+                               "h-full transition-all duration-500",
+                               availableCount === 0 ? "bg-red-500" : "bg-green-500"
+                             )} style={{ width: `${(availableCount / roomIds.length) * 100}%` }} />
                           </div>
                         </div>
                       )}
