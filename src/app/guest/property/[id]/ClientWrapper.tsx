@@ -129,20 +129,25 @@ export default function PropertyDetailClient({
   let isRangeAvailable = numNights > 0
 
   if (selectedRoom && numNights > 0) {
-    for (const d of stayDates) {
-      // Check Blocked
-      const isBlocked = selectedRoom.room_availability?.some((a: any) => a.date === d && !a.available)
-      // Check Booked
-      const isBooked = selectedRoom.bookings?.some((b: any) => format(new Date(b.created_at), 'yyyy-MM-dd') === d)
-      
-      if (isBlocked || isBooked) {
-        isRangeAvailable = false
-        break
-      }
-      
+    // Check Manual Blocks
+    const isInRangeBlocked = selectedRoom.room_availability?.some((a: any) => {
+      return stayDates.includes(a.date) && !a.available
+    })
+
+    // Check Overlapping Bookings
+    const hasOverlappingBooking = selectedRoom.bookings?.some((b: any) => {
+      if (!b.checkin_date || !b.checkout_date) return false
+      return b.checkin_date < checkout && b.checkout_date > checkin
+    })
+    
+    if (isInRangeBlocked || hasOverlappingBooking) {
+      isRangeAvailable = false
+    } else {
       // Accumulate Rate
-      const customRate = selectedRoom.room_rates?.find((r: any) => r.date === d)?.price
-      baseStayPrice += customRate !== undefined ? customRate : selectedRoom.base_price
+      for (const d of stayDates) {
+        const customRate = selectedRoom.room_rates?.find((r: any) => r.date === d)?.price
+        baseStayPrice += customRate !== undefined ? customRate : selectedRoom.base_price
+      }
     }
   }
 
@@ -185,7 +190,7 @@ export default function PropertyDetailClient({
     setError(null)
     
     try {
-      const result = await bookRoom(property.id, selectedRoomId, totalPrice, formData)
+      const result = await bookRoom(property.id, selectedRoomId, totalPrice, checkin, checkout, formData)
       
       if (result?.error) {
         setError(result.error)

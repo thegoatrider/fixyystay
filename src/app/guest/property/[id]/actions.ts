@@ -19,7 +19,14 @@ export async function logClick(propertyId: string, influencerId: string) {
   }
 }
 
-export async function bookRoom(propertyId: string, roomId: string, amount: number, formData: FormData) {
+export async function bookRoom(
+  propertyId: string, 
+  roomId: string, 
+  amount: number, 
+  checkinDate: string,
+  checkoutDate: string,
+  formData: FormData
+) {
   try {
     const supabase = await createClient()
 
@@ -28,28 +35,42 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
     const guestPhone = formData.get('guestPhone') as string
     const influencerId = formData.get('influencerId') as string || null
 
-    // 1. Check room availability
-    const todayStr = new Date().toISOString().split('T')[0]
-    const { data: availability } = await supabase
-      .from('room_availability')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('date', todayStr)
-      .maybeSingle()
-
-    if (availability && !availability.available) {
-      return { error: 'Room is no longer available.' }
+    if (!checkinDate || !checkoutDate) {
+      return { error: 'Please select valid check-in and check-out dates.' }
     }
 
-    // Check if already booked today
-    const { data: existingBookings } = await supabase
+    // 1. Check room availability (Overlapping bookings)
+    // A room is unavailable if an existing booking overlaps:
+    // existing.checkin < stay.checkout AND existing.checkout > stay.checkin
+    const { data: existingBookings, error: fetchErr } = await supabase
       .from('bookings')
-      .select('id, created_at')
+      .select('id, checkin_date, checkout_date')
       .eq('room_id', roomId)
 
-    const isBookedToday = existingBookings?.some(b => new Date(b.created_at).toISOString().split('T')[0] === todayStr)
-    if (isBookedToday) {
-      return { error: 'Room was just booked by someone else. Refresh and try another.' }
+    if (fetchErr) {
+      console.error('Error checking availability:', fetchErr)
+    } else {
+      const hasOverlap = existingBookings?.some(b => {
+        if (!b.checkin_date || !b.checkout_date) return false
+        return b.checkin_date < checkoutDate && b.checkout_date > checkinDate
+      })
+
+      if (hasOverlap) {
+        return { error: 'This room was just booked for these dates. Please try another room or date.' }
+      }
+    }
+
+    // Also check manual blocks
+    const { data: blocks } = await supabase
+      .from('room_availability')
+      .select('date')
+      .eq('room_id', roomId)
+      .eq('available', false)
+      .gte('date', checkinDate)
+      .lt('date', checkoutDate)
+
+    if (blocks && blocks.length > 0) {
+      return { error: 'Some dates in your stay are manually blocked by the owner.' }
     }
 
     // 2. Insert booking (use admin client to bypass RLS)
@@ -62,6 +83,8 @@ export async function bookRoom(propertyId: string, roomId: string, amount: numbe
       guest_name: guestName,
       guest_email: guestEmail,
       guest_phone: guestPhone,
+      checkin_date: checkinDate,
+      checkout_date: checkoutDate,
       amount
     }]).select().single()
 
