@@ -28,8 +28,6 @@ function CheckinForm() {
   const propertyId = searchParams.get('p')
 
   const [step, setStep] = useState(1) // 1: Info, 2: Success
-  const [isOtpVerified, setIsOtpVerified] = useState(false)
-  const [isVerifying, setIsVerifying] = useState(false)
   
   const [guestName, setGuestName] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
@@ -84,23 +82,8 @@ function CheckinForm() {
     )
   }
 
-  const handleVerifyOtp = () => {
-    if (!guestPhone) return
-    setIsVerifying(true)
-    // Simulate API delay
-    setTimeout(() => {
-      setIsVerifying(false)
-      setIsOtpVerified(true)
-    }, 1500)
-  }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!isOtpVerified) {
-      alert('Please verify your phone number first.')
-      return
-    }
-    
     setIsLoading(true)
     
     const formData = new FormData(e.currentTarget)
@@ -214,25 +197,13 @@ function CheckinForm() {
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="phone" 
-                  placeholder="9876543210" 
-                  required 
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                  disabled={isOtpVerified}
-                />
-                <Button 
-                  type="button" 
-                  onClick={handleVerifyOtp} 
-                  disabled={!guestPhone || isVerifying || isOtpVerified}
-                  variant={isOtpVerified ? "outline" : "default"}
-                  className={isOtpVerified ? "border-green-200 text-green-600 bg-green-50" : ""}
-                >
-                  {isVerifying ? 'Wait...' : isOtpVerified ? 'Verified' : 'Verify'}
-                </Button>
-              </div>
+              <Input 
+                id="phone" 
+                placeholder="9876543210" 
+                required 
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -383,7 +354,7 @@ function CheckinForm() {
             type="submit" 
             size="lg" 
             className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4 shadow-lg shadow-blue-100"
-            disabled={isLoading || !isOtpVerified}
+            disabled={isLoading}
           >
             {isLoading ? 'Processing Check-in...' : 'Complete Check-in'}
           </Button>
