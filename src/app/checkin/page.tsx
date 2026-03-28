@@ -70,6 +70,49 @@ function CheckinForm() {
     if (input) input.value = ''
   }
 
+const compressImage = async (file: File): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            reject(new Error('Canvas to Blob failed'));
+          }
+        }, 'image/jpeg', 0.8); // 80% quality
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
   if (!propertyId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
@@ -86,15 +129,33 @@ function CheckinForm() {
     e.preventDefault()
     setIsLoading(true)
     
-    const formData = new FormData(e.currentTarget)
-    formData.append('propertyId', propertyId)
-    formData.append('guestPhone', guestPhone)
-    formData.append('guestName', guestName)
-    formData.append('numPeople', numPeople.toString())
-    formData.append('checkinDate', checkinDate)
-    formData.append('checkoutDate', checkoutDate)
-
     try {
+      const formData = new FormData()
+      formData.append('propertyId', propertyId)
+      formData.append('guestPhone', guestPhone)
+      formData.append('guestName', guestName)
+      formData.append('numPeople', numPeople.toString())
+      formData.append('checkinDate', checkinDate)
+      formData.append('checkoutDate', checkoutDate)
+
+      // Handle ID Compression and Appending
+      const rawFormData = new FormData(e.currentTarget)
+      
+      for (let i = 0; i < numPeople; i++) {
+        const frontFile = rawFormData.get(`guestID_front_${i}`) as File
+        const backFile = rawFormData.get(`guestID_back_${i}`) as File
+
+        if (frontFile && frontFile.size > 0) {
+          const compressed = await compressImage(frontFile)
+          formData.append(`guestID_front_${i}`, compressed)
+        }
+
+        if (backFile && backFile.size > 0) {
+          const compressed = await compressImage(backFile)
+          formData.append(`guestID_back_${i}`, compressed)
+        }
+      }
+
       const result = await submitCheckin(formData)
 
       if (result.success) {
@@ -104,13 +165,12 @@ function CheckinForm() {
         })
         setStep(2)
       } else {
-        // Log the specific error for debugging
         console.error('Check-in Submission Failed:', result.error)
         alert(`Check-in failed: ${result.error}`)
       }
     } catch (err: any) {
       console.error('Checkin Error:', err)
-      alert('An unexpected server error occurred while submitting your check-in. Please try again.')
+      alert('An unexpected server error occurred while archiving your check-in. Please try again.')
     } finally {
       setIsLoading(false)
     }
