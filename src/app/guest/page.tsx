@@ -4,6 +4,9 @@ import { MapPin, Star } from 'lucide-react'
 import { format, eachDayOfInterval, subDays, isSameDay } from 'date-fns'
 import { cn } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
 // checks if the property is approved and has rooms. For availability, we fetch properties and perform filtering.

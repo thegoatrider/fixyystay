@@ -5,6 +5,9 @@ import { ArrowLeft } from 'lucide-react'
 import PropertyDetailClient from './ClientWrapper'
 import { format, eachDayOfInterval, subDays, addDays } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function PropertyDetailPage(
   props: {
     params: Promise<{ id: string }>
