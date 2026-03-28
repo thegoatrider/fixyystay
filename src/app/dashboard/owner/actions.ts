@@ -117,7 +117,7 @@ export async function createProperty(formData: FormData) {
   const extra_per_pax = parseFloat(formData.get('extra_per_pax') as string) || 0
 
   // 3.5 Automated Geocoding
-  const searchQuery = `${cityArea}, ${city}, ${pincode}, India`
+  const searchQuery = `${pincode}, India`
   const geoData = await geocodeAddress(searchQuery)
 
   // 4. Handle multiple image uploads
