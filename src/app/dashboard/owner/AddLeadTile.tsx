@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Phone, UserPlus } from 'lucide-react'
+import { MessageCircle, Phone, UserPlus, User } from 'lucide-react'
 import { createLead } from './leads-actions'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
@@ -16,13 +16,21 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
   const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
+  const [guestName, setGuestName] = useState('')
   const [checkin, setCheckin] = useState('')
   const [checkout, setCheckout] = useState('')
 
   async function handleCreateEnquiry(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
-    const result = await createLead({ ownerId, propertyId: selectedPropertyId, phoneNumber: phone, checkinDate: checkin, checkoutDate: checkout })
+    const result = await createLead({ 
+      ownerId, 
+      propertyId: selectedPropertyId, 
+      phoneNumber: phone, 
+      guestName: guestName,
+      checkinDate: checkin, 
+      checkoutDate: checkout 
+    })
     
     if (result.success && result.lead) {
       const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
@@ -30,6 +38,7 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
       window.open(`https://wa.me/${formatWhatsAppNumber(phone, countryCode)}?text=${encodeURIComponent(message)}`, '_blank')
       
       setPhone('')
+      setGuestName('')
       setCheckin('')
       setCheckout('')
       alert("Enquiry created successfully and added to your Leads Calendar!")
@@ -48,6 +57,13 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
             className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm" required>
             {properties?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+        </div>
+        <div className="space-y-2">
+          <Label>Guest Name (Optional)</Label>
+          <div className="relative">
+            <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+            <Input placeholder="e.g. Rahul Sharma" className="pl-9 bg-white" value={guestName} onChange={e => setGuestName(e.target.value)} />
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Phone Number</Label>
