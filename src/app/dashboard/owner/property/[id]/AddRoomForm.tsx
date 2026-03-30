@@ -109,6 +109,9 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
             <option value="₹2999">₹2999</option>
             <option value="₹3499">₹3499</option>
             <option value="₹3999">₹3999</option>
+            <option value="₹4499">₹4499</option>
+            <option value="₹4999">₹4999</option>
+            <option value="₹5499">₹5499</option>
             <option value="₹6999">₹6999</option>
           </select>
         </div>

@@ -25,6 +25,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 
   // 2. Extract fields
   const name = formData.get('name') as string
+  const description = formData.get('description') as string
+  const house_rules = formData.get('houseRules') as string
   const amenities = formData.getAll('amenities') as string[]
   
   // Parse existing photos to keep
@@ -57,15 +59,45 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     }
   }
 
+  // 3.5 Handle new Cover Image upload
+  const coverImageFile = formData.get('coverImage') as File | null;
+  let newCoverImageUrl: string | null = null;
+
+  if (coverImageFile && coverImageFile.size > 0) {
+    const fileExt = coverImageFile.name.split('.').pop()
+    const fileName = `prop-cover-update-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+    
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('property_images')
+      .upload(fileName, coverImageFile)
+      
+    if (!uploadError) {
+      const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
+      newCoverImageUrl = urlData.publicUrl
+    } else {
+      console.error('Cover image upload failed during update:', uploadError)
+    }
+  }
+
   // 4. Update property
+  const updatePayload: any = {
+    name,
+    description,
+    house_rules,
+    amenities,
+    image_urls,
+  }
+  
+  if (newCoverImageUrl) {
+    updatePayload.image_url = newCoverImageUrl
+  } else if (image_urls.length === 0) {
+    // If they wipe out all images and never set a cover, we can null it out, 
+    // though usually cover remains untouched. I'll leave it unchanged unless new cover uploaded.
+  }
+
   const { error: updateError } = await supabaseAdmin
     .from('properties')
-    .update({
-      name,
-      amenities,
-      image_urls,
-      image_url: image_urls[0] || null, // Keep backward compatibility
-    })
+    .update(updatePayload)
     .eq('id', propertyId)
 
   if (updateError) {

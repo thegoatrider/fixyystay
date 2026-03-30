@@ -12,7 +12,7 @@ export default async function GuestLayout({
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <DashboardHeader userEmail={user?.email} userRole={user?.user_metadata?.role || 'guest'} />
-      <main className="flex-1 w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
         {children}
       </main>
     </div>

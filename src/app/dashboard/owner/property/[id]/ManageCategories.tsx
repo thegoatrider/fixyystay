@@ -20,7 +20,7 @@ interface ManageCategoriesProps {
 }
 
 const PRICE_BUCKETS = [
-  '₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999'
+  '₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹4499', '₹4999', '₹5499', '₹6999'
 ]
 
 export default function ManageCategories({ propertyId, initialCategories }: ManageCategoriesProps) {

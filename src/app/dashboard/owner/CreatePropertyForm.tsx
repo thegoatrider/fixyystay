@@ -12,6 +12,8 @@ export default function CreatePropertyForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
+  const [coverImage, setCoverImage] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -77,6 +79,11 @@ export default function CreatePropertyForm() {
     compressedFiles.forEach(file => {
       formData.append('image', file)
     })
+    
+    if (coverImage) {
+      const compressedCover = await compressImage(coverImage)
+      formData.append('coverImage', compressedCover)
+    }
 
     try {
       const result = await createProperty(formData)
@@ -113,6 +120,15 @@ export default function CreatePropertyForm() {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (coverPreview) URL.revokeObjectURL(coverPreview)
+    setCoverImage(file)
+    setCoverPreview(URL.createObjectURL(file))
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="space-y-2">
@@ -145,6 +161,16 @@ export default function CreatePropertyForm() {
         />
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="houseRules">House Rules</Label>
+        <textarea 
+          name="houseRules" 
+          rows={3}
+          placeholder="List any property rules here..."
+          className="flex w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-600"
+        />
+      </div>
+
       <div className="space-y-3">
         <Label>Amenities</Label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -173,13 +199,18 @@ export default function CreatePropertyForm() {
           {propertyType === 'villa' ? (
             <>
               <option value="₹4999">₹4999</option>
+              <option value="₹6999">₹6999</option>
               <option value="₹7999">₹7999</option>
               <option value="₹9999">₹9999</option>
+              <option value="₹12999">₹12999</option>
               <option value="₹14999">₹14999</option>
+              <option value="₹17999">₹17999</option>
               <option value="₹19999">₹19999</option>
               <option value="₹24999">₹24999</option>
               <option value="₹29999">₹29999</option>
+              <option value="₹34999">₹34999</option>
               <option value="₹39999">₹39999</option>
+              <option value="₹44999">₹44999</option>
               <option value="₹49999">₹49999</option>
             </>
           ) : (
@@ -193,6 +224,9 @@ export default function CreatePropertyForm() {
               <option value="₹2999">₹2999</option>
               <option value="₹3499">₹3499</option>
               <option value="₹3999">₹3999</option>
+              <option value="₹4499">₹4499</option>
+              <option value="₹4999">₹4999</option>
+              <option value="₹5499">₹5499</option>
               <option value="₹6999">₹6999</option>
             </>
           )}
@@ -334,8 +368,27 @@ export default function CreatePropertyForm() {
         <Input name="helpdeskNumber" required placeholder="e.g. +91 98765 43210" />
       </div>
 
+      <div className="space-y-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+        <Label htmlFor="coverImageInput" className="font-bold text-gray-900">Cover Image (Main Display)</Label>
+        <p className="text-[11px] text-gray-500 mb-2">This will be the primary image shown to guests.</p>
+        <Input 
+          name="coverImageInput" 
+          type="file" 
+          accept="image/*" 
+          onChange={handleCoverChange}
+          className="cursor-pointer bg-white"
+        />
+        {coverPreview && (
+          <div className="relative w-full h-48 sm:h-64 rounded-xl overflow-hidden border-2 border-blue-200 shadow-md mt-4 group">
+            <span className="absolute top-2 left-2 z-10 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-md">Main Cover</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2">
-        <Label htmlFor="image">Property Images</Label>
+        <Label htmlFor="image" className="font-bold text-gray-900">Property Images (Gallery)</Label>
         <Input 
           name="image" 
           type="file" 
