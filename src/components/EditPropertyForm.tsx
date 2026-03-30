@@ -18,6 +18,10 @@ export default function EditPropertyForm({ property }: { property: any }) {
   // Track newly selected photos
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [newPreviews, setNewPreviews] = useState<string[]>([])
+  
+  // Track Cover Image
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
+  const [coverImagePreview, setCoverImagePreview] = useState<string | null>(property.image_url || null)
 
   const ALL_AMENITIES = [
     'WiFi', 'Pool', 'AC', 'Parking', 'Kitchen', 'TV', 
@@ -47,6 +51,14 @@ export default function EditPropertyForm({ property }: { property: any }) {
     setNewFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setCoverImageFile(file)
+    setCoverImagePreview(URL.createObjectURL(file))
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
@@ -62,6 +74,10 @@ export default function EditPropertyForm({ property }: { property: any }) {
     newFiles.forEach(file => {
       formData.append('newImages', file)
     })
+    
+    if (coverImageFile) {
+      formData.append('coverImage', coverImageFile)
+    }
 
     try {
       const result = await updateProperty(property.id, formData)
@@ -92,6 +108,27 @@ export default function EditPropertyForm({ property }: { property: any }) {
         <Input name="name" defaultValue={property.name} required className="font-semibold" />
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="description" className="text-gray-700 font-bold">Description</Label>
+        <textarea 
+          name="description" 
+          defaultValue={property.description || ''} 
+          rows={3}
+          className="flex w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-600"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="houseRules" className="text-gray-700 font-bold">House Rules</Label>
+        <textarea 
+          name="houseRules" 
+          defaultValue={property.house_rules || ''} 
+          rows={3}
+          placeholder="List any property rules here..."
+          className="flex w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-600"
+        />
+      </div>
+
       <div className="space-y-3">
         <Label className="text-gray-700 font-bold">Amenities</Label>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -110,9 +147,47 @@ export default function EditPropertyForm({ property }: { property: any }) {
         </div>
       </div>
 
+      <div className="space-y-4 bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5">
+        <div className="flex flex-col gap-1 mb-2">
+          <Label className="text-gray-900 font-bold text-base">Cover Image (Main Display)</Label>
+          <p className="text-xs text-gray-500">This image represents the property in listings.</p>
+        </div>
+        
+        <div className="relative w-full sm:w-72 h-48 rounded-2xl overflow-hidden border-2 border-dashed border-gray-300 bg-white group hover:border-blue-400 transition-colors">
+          {coverImagePreview ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={coverImagePreview} alt="Cover Preview" className="w-full h-full object-cover" />
+              {coverImageFile && (
+                <div className="absolute top-2 left-2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
+                  NEW COVER
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-2">
+              <ImageIcon className="w-8 h-8 opacity-20" />
+              <span className="text-xs font-semibold">No cover image</span>
+            </div>
+          )}
+          <Input 
+            type="file" 
+            accept="image/*" 
+            onChange={handleCoverChange} 
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+            title="Change Cover Image"
+          />
+          <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-3 pt-8 transition-opacity ${coverImagePreview ? 'opacity-0 group-hover:opacity-100' : ''}`}>
+            <p className="text-white text-xs font-bold text-center drop-shadow-md flex items-center justify-center gap-1">
+              <Upload className="w-3 h-3" /> Click to upload new
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label className="text-gray-700 font-bold">Photos ({existingPhotos.length + newFiles.length})</Label>
+          <Label className="text-gray-700 font-bold">Photos Gallery ({existingPhotos.length + newFiles.length})</Label>
           <div className="relative">
             <input 
               type="file" 

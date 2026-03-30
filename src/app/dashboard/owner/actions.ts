@@ -106,6 +106,7 @@ export async function createProperty(formData: FormData) {
   const name = formData.get('name') as string
   const type = formData.get('type') as string
   const description = formData.get('description') as string
+  const houseRules = formData.get('houseRules') as string // Added houseRules extraction
   const amenities = formData.getAll('amenities') as string[]
   const priceBucket = formData.get('priceBucket') as string
   const pincode = (formData.get('pincode') as string || '').trim()
@@ -119,6 +120,25 @@ export async function createProperty(formData: FormData) {
   // 3.5 Automated Geocoding
   const searchQuery = `${pincode}, India`
   const geoData = await geocodeAddress(searchQuery)
+
+  // 3.8 Handle Cover Image upload
+  const coverImageFile = formData.get('coverImage') as File | null;
+  let coverImageUrl: string | null = null;
+
+  if (coverImageFile && coverImageFile.size > 0) {
+    const fileExt = coverImageFile.name.split('.').pop()
+    const fileName = `prop-cover-${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('property_images')
+      .upload(fileName, coverImageFile)
+      
+    if (!uploadError) {
+      const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
+      coverImageUrl = urlData.publicUrl
+    } else {
+      console.error('Cover Image upload failed:', uploadError)
+    }
+  }
 
   // 4. Handle multiple image uploads
   const imageFiles = formData.getAll('image') as File[]
@@ -159,9 +179,10 @@ export async function createProperty(formData: FormData) {
       name,
       type,
       description,
+      house_rules: houseRules, // Save houseRules to DB
       amenities,
       image_urls,
-      image_url: image_urls[0] || null, // Keep for backward compatibility
+      image_url: coverImageUrl || image_urls[0] || null, // Priority to coverImage
       helpdesk_number: helpdeskNumber,
       city: city,
       city_area: cityArea,

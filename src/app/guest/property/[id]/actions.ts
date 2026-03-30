@@ -75,10 +75,15 @@ export async function bookRoom(
 
     // 2. Insert booking (use admin client to bypass RLS)
     const supabaseAdmin = createAdminClient()
+    
+    // Get current user to link to profile
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
 
     const { data: insertedBooking, error: bookingError } = await supabaseAdmin.from('bookings').insert([{
       property_id: propertyId,
       room_id: roomId,
+      user_id: userId,
       influencer_id: influencerId,
       guest_name: guestName,
       guest_email: guestEmail,

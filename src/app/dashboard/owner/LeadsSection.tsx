@@ -5,7 +5,7 @@ import { format, isSameDay } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle } from 'lucide-react'
+import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User } from 'lucide-react'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
@@ -17,6 +17,7 @@ type Lead = {
   id: string
   property_id: string
   phone_number: string
+  guest_name?: string
   checkin_date: string | null
   checkout_date: string | null
   status: string
@@ -81,6 +82,7 @@ export default React.memo(function LeadsSection({
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties?.[0]?.id || '')
   const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
+  const [guestName, setGuestName] = useState('')
   const [checkin, setCheckin] = useState('')
   const [checkout, setCheckout] = useState('')
 
@@ -117,7 +119,7 @@ export default React.memo(function LeadsSection({
   async function handleCreateEnquiry(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
-    const result = await createLead({ ownerId, propertyId: selectedPropertyId, phoneNumber: phone, checkinDate: checkin, checkoutDate: checkout })
+    const result = await createLead({ ownerId, propertyId: selectedPropertyId, phoneNumber: phone, guestName: guestName, checkinDate: checkin, checkoutDate: checkout })
     if (result.success && result.lead) {
       const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
@@ -126,7 +128,7 @@ export default React.memo(function LeadsSection({
       queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
       setLocalLeads([{ ...result.lead, properties: { name: propertyName } } as Lead, ...localLeads])
       
-      setPhone(''); setCheckin(''); setCheckout('')
+      setPhone(''); setGuestName(''); setCheckin(''); setCheckout('')
       setIsFormVisible(false)
     } else {
       alert(result.error || 'Failed to create lead')
@@ -217,6 +219,13 @@ export default React.memo(function LeadsSection({
                 className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm" required>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Guest Name (Optional)</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <Input placeholder="e.g. Rahul Sharma" className="pl-9" value={guestName} onChange={e => setGuestName(e.target.value)} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Phone Number</Label>
@@ -365,12 +374,28 @@ export default React.memo(function LeadsSection({
                     <div key={lead.id} className="p-5 hover:bg-gray-50/60 transition-colors">
                       {/* Top row: phone + marking badge */}
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          <p className="font-bold text-gray-900 text-base flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5 text-gray-400" />
-                            {lead.phone_number}
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 text-base flex items-center gap-1.5 truncate">
+                            {lead.guest_name ? (
+                              <>
+                                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                {lead.guest_name}
+                              </>
+                            ) : (
+                              <>
+                                <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                {lead.phone_number}
+                              </>
+                            )}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{propName}</p>
+                          <div className="flex flex-col gap-0.5 mt-1">
+                            {lead.guest_name && (
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Phone className="w-2.5 h-2.5" /> {lead.phone_number}
+                              </p>
+                            )}
+                            <p className="text-[10px] uppercase font-bold text-blue-500">{propName}</p>
+                          </div>
                         </div>
                         {/* Marking selector as pill */}
                         <select

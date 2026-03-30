@@ -134,8 +134,8 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     availableProperties = availableProperties.filter(p => p.featured)
   }
 
-  const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹6999', 'See All Rooms']
-  const villaBuckets = ['₹4999', '₹7999', '₹9999', '₹14999', '₹19999', '₹24999', '₹29999', '₹39999', '₹49999', 'See All Villas']
+  const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹4499', '₹4999', '₹5499', '₹6999', 'See All Rooms']
+  const villaBuckets = ['₹4999', '₹6999', '₹7999', '₹9999', '₹12999', '₹14999', '₹17999', '₹19999', '₹24999', '₹29999', '₹34999', '₹39999', '₹44999', '₹49999', 'See All Villas']
 
   // Group by area — only when a specific price bucket is active (not See All)
   const propertiesByArea: Record<string, typeof availableProperties> = {}

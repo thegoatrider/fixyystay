@@ -7,6 +7,7 @@ export async function createLead(formData: {
   ownerId: string
   propertyId: string
   phoneNumber: string
+  guestName?: string
   checkinDate: string
   checkoutDate: string
 }) {
@@ -19,6 +20,7 @@ export async function createLead(formData: {
         owner_id: formData.ownerId,
         property_id: formData.propertyId,
         phone_number: formData.phoneNumber,
+        guest_name: formData.guestName || null,
         checkin_date: formData.checkinDate || null,
         checkout_date: formData.checkoutDate || null,
         status: 'Enquired'
