@@ -67,7 +67,7 @@ export function BottomNav() {
         </Link>
       ) : (
         <Link 
-          href="/profile" 
+          href="/guest/profile" 
           className={`flex flex-col items-center gap-1 transition-colors ${pathname.includes('/profile') ? 'text-blue-600' : 'text-gray-400'}`}
         >
           <User className="w-6 h-6" />

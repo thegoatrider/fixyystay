@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LayoutDashboard, LogOut, Home } from 'lucide-react'
+import { LayoutDashboard, LogOut, Home, User } from 'lucide-react'
 
 type DashboardHeaderProps = {
   userEmail?: string
@@ -9,7 +9,8 @@ type DashboardHeaderProps = {
 }
 
 export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
-  const dashboardLink = `/dashboard/${userRole || 'guest'}`
+  const isGuest = !userRole || userRole === 'guest'
+  const dashboardLink = isGuest ? '/guest' : `/dashboard/${userRole}`
 
   return (
     <header className="bg-white border-b sticky top-0 z-50 w-full shadow-sm pt-[env(safe-area-inset-top)]">
@@ -38,7 +39,17 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
               title="Dashboard"
             >
               <LayoutDashboard className="w-5 h-5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Dashboard</span>
+              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">{isGuest ? 'Browse' : 'Dashboard'}</span>
+            </Link>
+
+            {/* Profile Link */}
+            <Link 
+              href="/guest/profile"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all group"
+              title="Profile"
+            >
+              <User className="w-5 h-5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Profile</span>
             </Link>
 
             {/* Logout Action */}
