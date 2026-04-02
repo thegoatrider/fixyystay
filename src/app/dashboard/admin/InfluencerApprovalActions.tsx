@@ -45,6 +45,15 @@ export default function InfluencerApprovalActions({ influencerId }: { influencer
             className="border rounded px-2 py-1.5 focus:ring-blue-500 outline-none text-sm w-full font-bold" 
           />
         </div>
+        <div className="flex flex-col gap-1 w-full mt-2">
+          <label className="text-[10px] uppercase text-gray-500 font-bold tracking-tighter">Link to User UUID (Auth ID)</label>
+          <input 
+            type="text" 
+            name="userId" 
+            placeholder="paste uuid from auth.users"
+            className="border rounded px-2 py-1.5 focus:ring-blue-500 outline-none text-[10px] font-mono w-full" 
+          />
+        </div>
         <Button 
           type="submit" 
           size="sm" 

@@ -48,7 +48,7 @@ export default async function AdminDashboard() {
       property_id,
       influencer_id,
       properties(name),
-      influencers(name)
+      influencers(name, commission_rate)
     `)
 
   const { data: clicks } = await supabase.from('influencer_clicks').select('*')
@@ -58,7 +58,11 @@ export default async function AdminDashboard() {
     const promoClicks = clicks?.filter(c => c.property_id === promo.property_id && c.influencer_id === promo.influencer_id).length || 0
     const promoBookings = bookings?.filter(b => b.property_id === promo.property_id && b.influencer_id === promo.influencer_id) || []
     const totalRevenue = promoBookings.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-    const commission = totalRevenue * 0.10 // 10% commission rule
+    
+    // Use dynamic commission rate from the influencer record
+    const infInfo = promo.influencers as any
+    const rate = Number(infInfo?.commission_rate || 0)
+    const commission = totalRevenue * (rate / 100)
 
     return {
       ...promo,
@@ -304,7 +308,7 @@ export default async function AdminDashboard() {
                   <th className="px-6 py-3 text-right">Clicks</th>
                   <th className="px-6 py-3 text-right">Bookings</th>
                   <th className="px-6 py-3 text-right">Revenue</th>
-                  <th className="px-6 py-3 text-right">Commission (10%)</th>
+                  <th className="px-6 py-3 text-right">Commission Earned</th>
                 </tr>
               </thead>
               <tbody className="divide-y">

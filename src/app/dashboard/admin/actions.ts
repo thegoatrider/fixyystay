@@ -197,10 +197,15 @@ export async function approveInfluencer(formData: FormData) {
 
     const influencerId = formData.get('influencerId') as string
     const commissionRate = parseFloat(formData.get('commissionRate') as string) || 0
+    const userId = formData.get('userId') as string || null
 
     const { error } = await supabaseAdmin
       .from('influencers')
-      .update({ approved: true, commission_rate: commissionRate })
+      .update({ 
+        approved: true, 
+        commission_rate: commissionRate,
+        user_id: userId
+      })
       .eq('id', influencerId)
 
     if (error) {
