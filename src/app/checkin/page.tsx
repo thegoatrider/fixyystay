@@ -26,6 +26,8 @@ export default function CheckinPage() {
 function CheckinForm() {
   const searchParams = useSearchParams()
   const propertyId = searchParams.get('p')
+  const prefilledPhone = searchParams.get('pn')
+  const prefilledName = searchParams.get('gn')
 
   const [step, setStep] = useState(1) // 1: Info, 2: Success
   
@@ -37,6 +39,12 @@ function CheckinForm() {
   const [checkoutDate, setCheckoutDate] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
+
+  // Pre-fill from URL
+  useEffect(() => {
+    if (prefilledPhone) setGuestPhone(prefilledPhone)
+    if (prefilledName) setGuestName(prefilledName)
+  }, [prefilledPhone, prefilledName])
 
   // File Preview State
   const [previews, setPreviews] = useState<Record<string, string>>({})

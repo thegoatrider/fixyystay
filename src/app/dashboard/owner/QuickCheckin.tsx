@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Phone, MessageSquare } from 'lucide-react'
+import { Phone, MessageSquare, User } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 
@@ -16,6 +16,7 @@ type Property = {
 export default function QuickCheckin({ properties }: { properties: Property[] }) {
   const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
+  const [guestName, setGuestName] = useState('')
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
 
   const handleSendForm = () => {
@@ -26,17 +27,32 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
 
     const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
     const baseUrl = window.location.origin
-    const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}`
-    const message = `Hello! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
+    const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}&pn=${phone}&gn=${encodeURIComponent(guestName)}`
+    const message = `Hello ${guestName}! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
     
     const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone, countryCode)}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, '_blank')
     setPhone('')
+    setGuestName('')
   }
 
   return (
     <CollapsibleTile title="Send Guest ID Form" icon={MessageSquare}>
       <div className="flex flex-col gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="guestName">Guest Name</Label>
+          <div className="relative">
+            <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+            <Input 
+              id="guestName"
+              placeholder="e.g. John Doe" 
+              className="pl-9"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="guestPhone">Guest Phone Number</Label>
           <div className="flex gap-2">
