@@ -20,13 +20,15 @@ export default function InfluencerDashboardClient({
   if (isLoading) return <DashboardSkeleton />
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
 
-  const { properties, clicks, bookings, wallet_transactions, payout_requests } = data
+  const { influencer, properties, clicks, bookings, wallet_transactions, payout_requests } = data
+  const commissionRate = influencer?.commission_rate || 0
+  const publicInfluencerId = influencer?.id || influencerId
 
   // Aggregate global stats
   const totalClicks = clicks?.length || 0
   const totalBookings = bookings?.length || 0
   const totalRevenue = bookings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0
-  const totalCommission = totalRevenue * 0.10
+  const totalCommission = totalRevenue * (commissionRate / 100)
 
   // Use production domain for affiliate links
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.fixystays.com'
@@ -113,7 +115,7 @@ export default function InfluencerDashboardClient({
         ) : (
           <div className="grid gap-6">
             {properties.map((prop: any) => {
-              const link = `${appOrigin}/guest/property/${prop.id}?ref=${influencerId}`
+              const link = `${appOrigin}/guest/property/${prop.id}?ref=${publicInfluencerId}`
               const propClicks = clicks?.filter(c => c.property_id === prop.id).length || 0
               const propBookings = bookings?.filter(b => b.property_id === prop.id) || []
               const propRev = propBookings.reduce((sum, b) => sum + Number(b.amount || 0), 0)
@@ -145,7 +147,7 @@ export default function InfluencerDashboardClient({
                       </div>
                       <div className="bg-gray-50/50 p-3 rounded-xl border border-transparent hover:border-green-100 hover:bg-green-50/30 transition-all text-center">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Earnings</p>
-                        <p className="font-black text-xl text-green-600">₹{(propRev * 0.10).toLocaleString()}</p>
+                        <p className="font-black text-xl text-green-600">₹{(propRev * (commissionRate / 100)).toLocaleString()}</p>
                       </div>
                     </div>
                     

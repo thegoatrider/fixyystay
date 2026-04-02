@@ -2,6 +2,12 @@ import { createClient } from '@/utils/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 
 export type InfluencerDashboardData = {
+  influencer: {
+    id: string
+    name: string
+    commission_rate: number
+    approved: boolean
+  }
   properties: any[]
   clicks: any[]
   bookings: any[]

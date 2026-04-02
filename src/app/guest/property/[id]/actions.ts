@@ -145,13 +145,18 @@ export async function bookRoom(
 
       const infId = influencerId
       if (infId) {
-        // Here influencers use auth.users(id) directly or we need to find their user_id
-        // Assuming influencers table 'id' matches auth.users(id) or we need to look it up.
-        // Let's check influencers table.
-        const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate, user_id').eq('id', infId).single()
-        const rate = inf?.commission_rate || 0
-        const infUserId = inf?.user_id || infId // Fallback to infId if it's already a user_id
+        // influencers table has 'id' and 'user_id'. Link the earning to 'user_id'.
+        const { data: inf } = await supabaseAdmin
+          .from('influencers')
+          .select('commission_rate, user_id')
+          .eq('id', infId)
+          .single()
         
+        // Safety: rate comes from database, but we ensure it doesn't exceed FixStay's 20% share
+        const rawRate = Number(inf?.commission_rate || 0)
+        const rate = Math.min(rawRate, 20) 
+        const infUserId = inf?.user_id
+
         if (rate > 0 && infUserId) {
           const influencerEarning = amount * (rate / 100)
           await supabaseAdmin.from('wallet_transactions').insert({
@@ -159,7 +164,7 @@ export async function bookRoom(
             amount: influencerEarning,
             transaction_type: 'earning',
             booking_id: bookingId,
-            description: `Commission for referring ${guestName} (${rate}%)`
+            description: `Referral commission (${rate}%) for ${guestName}`
           })
         }
       }
