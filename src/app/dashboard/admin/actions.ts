@@ -14,11 +14,11 @@ export async function approveProperty(propertyId: string) {
       return { error: 'Unauthorized' }
     }
 
-    // Generate a collision-safe unique PRP-XXXXXXXX identifier
+    // Generate a collision-safe unique ALB-XXXXXXXX identifier (Standard for Alibag)
     let uid = ''
     let attempts = 0
     while (attempts < 10) {
-      const candidate = 'PRP-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      const candidate = 'ALB-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
         .toUpperCase()
