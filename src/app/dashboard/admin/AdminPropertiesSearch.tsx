@@ -50,7 +50,7 @@ export default function AdminPropertiesSearch({
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
         <Input
-          placeholder="Search by name, UID (ALB001...), or owner..."
+          placeholder="Search by name, UID (ALB-XXXX...), or owner..."
           className="pl-9 h-9 text-sm"
           value={query}
           onChange={e => setQuery(e.target.value)}
