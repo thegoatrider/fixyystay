@@ -112,7 +112,7 @@ export async function signup(formData: FormData) {
   } else if (role === 'influencer') {
     redirect('/dashboard/influencer')
   } else {
-    redirect('/guest')
+    redirect('/')
   }
 }
 
@@ -123,7 +123,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${origin}/auth/callback?next=/`,
     },
   })
 

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // Standardize default redirect to the home page (/)
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
           data: { role: 'guest' }
         })
       }
-      return NextResponse.redirect(`${origin}/auth/confirm-success`)
+      return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
