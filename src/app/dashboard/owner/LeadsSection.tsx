@@ -5,7 +5,7 @@ import { format, isSameDay } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User } from 'lucide-react'
+import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User, Download, CheckSquare, Square } from 'lucide-react'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
@@ -72,6 +72,7 @@ export default React.memo(function LeadsSection({
   const [isLoading, setIsLoading] = useState(false)
   const [isFormVisible, setIsFormVisible] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
 
   // Calendar navigation
   const today = new Date()
@@ -193,6 +194,48 @@ export default React.memo(function LeadsSection({
   const calendarDays = getDaysInMonth(viewYear, viewMonth)
   const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
 
+  // Helper: Download Leads to CSV
+  const exportToCSV = (leads: Lead[], filename: string) => {
+    const headers = ['Guest Name', 'Phone Number', 'Interested Property', 'Check-in', 'Check-out', 'Status', 'Rating']
+    const rows = leads.map(l => [
+      l.guest_name || 'N/A',
+      l.phone_number,
+      l.properties?.name || 'our property',
+      l.checkin_date || 'TBD',
+      l.checkout_date || 'TBD',
+      l.status,
+      l.marking
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const toggleLeadSelection = (id: string) => {
+    const next = new Set(selectedLeadIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedLeadIds(next)
+  }
+
+  const toggleAllInPanel = () => {
+    if (selectedLeadIds.size === selectedLeads.length) {
+      setSelectedLeadIds(new Set())
+    } else {
+      setSelectedLeadIds(new Set(selectedLeads.map(l => l.id)))
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -201,9 +244,21 @@ export default React.memo(function LeadsSection({
           <h2 className="text-xl font-bold text-gray-900">Leads Calendar</h2>
           <p className="text-sm text-gray-400 mt-0.5">{localLeads.length} total leads · click a date to view</p>
         </div>
-        <Button onClick={() => setIsFormVisible(!isFormVisible)} size="sm" className="gap-2">
-          {isFormVisible ? <><X className="w-4 h-4" /> Close</> : <><Plus className="w-4 h-4" /> New Enquiry</>}
-        </Button>
+        <div className="flex items-center gap-2">
+          {localLeads.length > 0 && (
+             <Button 
+               variant="outline" 
+               size="sm" 
+               onClick={() => exportToCSV(localLeads, `FixStay_All_Leads_${format(new Date(), 'yyyy-MM-dd')}.csv`)}
+               className="gap-2 border-green-200 text-green-700 hover:bg-green-50"
+             >
+               <Download className="w-4 h-4" /> Download All (CSV)
+             </Button>
+          )}
+          <Button onClick={() => setIsFormVisible(!isFormVisible)} size="sm" className="gap-2">
+            {isFormVisible ? <><X className="w-4 h-4" /> Close</> : <><Plus className="w-4 h-4" /> New Enquiry</>}
+          </Button>
+        </div>
       </div>
 
       {/* New Enquiry Form */}
@@ -349,15 +404,39 @@ export default React.memo(function LeadsSection({
             <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
               {/* Panel header */}
               <div className="flex items-center justify-between px-5 py-4 border-b bg-gray-50">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Check-in Leads</p>
-                  <h3 className="font-bold text-gray-900 text-base">{format(selectedDate, 'MMMM d, yyyy')}</h3>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={toggleAllInPanel}
+                    className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center bg-white hover:border-blue-400 transition-colors"
+                  >
+                    {selectedLeadIds.size === selectedLeads.length && selectedLeads.length > 0 ? (
+                      <CheckSquare className="w-3.5 h-3.5 text-blue-600 fill-current" />
+                    ) : selectedLeadIds.size > 0 ? (
+                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-sm" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5 text-gray-200" />
+                    )}
+                  </button>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">{format(selectedDate, 'MMM d, yyyy')}</h3>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{selectedLeads.length} leads listed</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="bg-blue-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
-                    {selectedLeads.length}
-                  </span>
-                  <button onClick={() => setSelectedDate(null)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                  {selectedLeadIds.size > 0 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        const filtered = selectedLeads.filter(l => selectedLeadIds.has(l.id))
+                        exportToCSV(filtered, `FixStay_Selected_Leads_${format(selectedDate, 'yyyy-MM-dd')}.csv`)
+                      }}
+                      className="h-8 px-2 gap-1.5 border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 text-[10px] font-black"
+                    >
+                      <Download className="w-3 h-3" /> Export ({selectedLeadIds.size})
+                    </Button>
+                  )}
+                  <button onClick={() => { setSelectedDate(null); setSelectedLeadIds(new Set()) }} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
                     <X className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
@@ -371,75 +450,87 @@ export default React.memo(function LeadsSection({
                   const waMessage = `Hello! I am the owner of ${propName}. Following up on your enquiry for ${lead.checkin_date || 'TBD'} to ${lead.checkout_date || 'TBD'}. View property: https://www.fixystays.com/guest/property/${lead.property_id}`
 
                   return (
-                    <div key={lead.id} className="p-5 hover:bg-gray-50/60 transition-colors">
-                      {/* Top row: phone + marking badge */}
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900 text-base flex items-center gap-1.5 truncate">
-                            {lead.guest_name ? (
-                              <>
-                                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                {lead.guest_name}
-                              </>
-                            ) : (
-                              <>
-                                <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                {lead.phone_number}
-                              </>
-                            )}
-                          </p>
-                          <div className="flex flex-col gap-0.5 mt-1">
-                            {lead.guest_name && (
-                              <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Phone className="w-2.5 h-2.5" /> {lead.phone_number}
-                              </p>
-                            )}
-                            <p className="text-[10px] uppercase font-bold text-blue-500">{propName}</p>
-                          </div>
-                        </div>
-                        {/* Marking selector as pill */}
-                        <select
-                          value={lead.marking}
-                          onChange={e => handleMarkingChange(lead.id, e.target.value)}
-                          className={`text-xs font-bold rounded-full px-3 py-1 border outline-none cursor-pointer transition-colors ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                    <div key={lead.id} className={`p-5 hover:bg-gray-50/60 transition-all relative flex gap-4 group ${selectedLeadIds.has(lead.id) ? 'bg-blue-50/50 shadow-inner' : ''}`}>
+                      {/* Selection Checkbox */}
+                      <div className="pt-1">
+                        <button 
+                          onClick={() => toggleLeadSelection(lead.id)}
+                          className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${selectedLeadIds.has(lead.id) ? 'bg-blue-600 border-blue-600 shadow-sm' : 'border-gray-200 bg-white group-hover:border-blue-300'}`}
                         >
-                          {markings.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </div>
-
-                      {/* Dates */}
-                      <div className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                        <span className="bg-gray-100 px-2 py-0.5 rounded font-medium">{lead.checkin_date || '—'}</span>
-                        <span>→</span>
-                        <span className="bg-gray-100 px-2 py-0.5 rounded font-medium">{lead.checkout_date || '—'}</span>
-                      </div>
-
-                      {/* Status + Actions */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <select
-                          value={lead.status}
-                          onChange={e => handleStatusChange(lead.id, e.target.value)}
-                          className="text-xs rounded-md px-2 py-1 border border-gray-200 bg-white outline-none cursor-pointer text-gray-600"
-                        >
-                          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-
-                        <a
-                          href={`https://wa.me/${formatWhatsAppNumber(lead.phone_number)}?text=${encodeURIComponent(waMessage)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold rounded-lg border border-green-100 transition-colors"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                        </a>
-
-                        <button
-                          onClick={() => handleDelete(lead.id)}
-                          className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
-                          title="Remove lead"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                          {selectedLeadIds.has(lead.id) && <CheckCircle className="w-3.5 h-3.5 text-white fill-current" />}
                         </button>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        {/* Top row: phone + marking badge */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-gray-900 text-base flex items-center gap-1.5 truncate">
+                              {lead.guest_name ? (
+                                <>
+                                  <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                  {lead.guest_name}
+                                </>
+                              ) : (
+                                <>
+                                  <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                  {lead.phone_number}
+                                </>
+                              )}
+                            </p>
+                            <div className="flex flex-col gap-0.5 mt-1">
+                              {lead.guest_name && (
+                                <p className="text-xs text-gray-500 flex items-center gap-1 font-medium">
+                                  <Phone className="w-2.5 h-2.5" /> {lead.phone_number}
+                                </p>
+                              )}
+                              <p className="text-[10px] uppercase font-black text-blue-600 tracking-tight">{propName}</p>
+                            </div>
+                          </div>
+                          {/* Marking selector as pill */}
+                          <select
+                            value={lead.marking}
+                            onChange={e => handleMarkingChange(lead.id, e.target.value)}
+                            className={`text-[10px] font-black uppercase tracking-wider rounded-full px-3 py-1 border outline-none cursor-pointer transition-colors shadow-sm ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                          >
+                            {markings.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        </div>
+
+                        {/* Dates */}
+                        <div className="text-[11px] text-gray-500 mb-4 flex items-center gap-2">
+                          <span className="bg-gray-100 px-2 py-0.5 rounded-md font-bold text-gray-600 border border-gray-200/50">{lead.checkin_date || '—'}</span>
+                          <span className="text-gray-300 font-bold">→</span>
+                          <span className="bg-gray-100 px-2 py-0.5 rounded-md font-bold text-gray-600 border border-gray-200/50">{lead.checkout_date || '—'}</span>
+                        </div>
+
+                        {/* Status + Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={lead.status}
+                            onChange={e => handleStatusChange(lead.id, e.target.value)}
+                            className="text-[11px] font-bold rounded-lg px-2.5 py-1.5 border border-gray-200 bg-white outline-none cursor-pointer text-gray-500 hover:border-gray-300 transition-colors"
+                          >
+                            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+
+                          <a
+                            href={`https://wa.me/${formatWhatsAppNumber(lead.phone_number)}?text=${encodeURIComponent(waMessage)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-600 text-green-700 hover:text-white text-[11px] font-bold rounded-lg border border-green-100 transition-all shadow-sm"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                          </a>
+
+                          <button
+                            onClick={() => handleDelete(lead.id)}
+                            className="p-2 text-gray-300 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"
+                            title="Remove lead"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
