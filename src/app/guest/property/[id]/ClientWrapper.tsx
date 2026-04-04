@@ -59,7 +59,12 @@ export default function PropertyDetailClient({
 
   const propImages = property.image_urls || []
   const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
-  const allImages = Array.from(new Set([...propImages, ...roomImages])) as string[]
+  // Ensure property.image_url exists and is at the very beginning of the unique set
+  const allImages = Array.from(new Set([
+    ...(property.image_url ? [property.image_url] : []),
+    ...propImages, 
+    ...roomImages
+  ])) as string[]
 
   useEffect(() => {
     if (isLightboxOpen) {
@@ -359,7 +364,7 @@ export default function PropertyDetailClient({
           <div className="relative aspect-video lg:aspect-[16/9] bg-gray-100 rounded-3xl overflow-hidden shadow-sm group border-2 border-white ring-1 ring-gray-100">
             {/* Logic to determine main image and gallery images */}
             {(() => {
-              const mainImg = activeImage || allImages[0] || property.image_url
+              const mainImg = activeImage || property.image_url || allImages[0]
               
               if (mainImg) {
                 return (
