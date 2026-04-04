@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { logClick, bookRoom } from './actions'
+import { logClick, createBookingOrder, confirmBooking } from './actions'
+import Script from 'next/script'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -214,40 +215,92 @@ export default function PropertyDetailClient({
     }
   }
 
-  async function handleBook(formData: FormData) {
-    if (!selectedRoomId) return
+  async function handleBook(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!selectedRoomId || !checkin || !checkout) return
+
+    const formData = new FormData(e.currentTarget)
+    const guestName = formData.get('guestName') as string
+    const guestEmail = formData.get('guestEmail') as string
+    const guestPhone = formData.get('guestPhone') as string
+
     setIsLoading(true)
     setError(null)
     
     try {
-      const result = await bookRoom(property.id, selectedRoomId, totalPrice, checkin, checkout, formData)
-      
-      if (result?.error) {
-        setError(result.error)
-        return
+      // 1. Create Razorpay Order
+      const orderRes = await createBookingOrder(property.id, selectedRoomId, totalPrice, checkin, checkout)
+      if (orderRes.error) throw new Error(orderRes.error)
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        key: orderRes.key,
+        amount: orderRes.amount,
+        currency: "INR",
+        name: "FixStay Booking",
+        description: `Booking at ${property.name}`,
+        order_id: orderRes.orderId,
+        prefill: {
+          name: guestName,
+          email: guestEmail,
+          contact: guestPhone
+        },
+        theme: {
+          color: "#2563eb",
+        },
+        handler: async function (response: any) {
+          // 3. Confirm Booking on Server
+          setIsLoading(true)
+          const confirmRes = await confirmBooking(
+            property.id, 
+            selectedRoomId, 
+            totalPrice, 
+            checkin, 
+            checkout,
+            {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            },
+            {
+              name: guestName,
+              email: guestEmail,
+              phone: guestPhone,
+              influencerId
+            }
+          )
+
+          if (confirmRes.error) {
+            alert(`Payment success, but booking failed: ${confirmRes.error}. Please contact support.`)
+            setError(confirmRes.error)
+          } else {
+            setBookingDetails({
+              name: guestName,
+              email: guestEmail,
+              phone: guestPhone,
+              checkin,
+              checkout
+            })
+            setSuccess(true)
+            setIsConfirmed(true)
+            localStorage.setItem('confirmed_bookings', JSON.stringify([
+              ...JSON.parse(localStorage.getItem('confirmed_bookings') || '[]'),
+              property.id
+            ]))
+          }
+          setIsLoading(false)
+        },
+        modal: {
+          ondismiss: function() {
+            setIsLoading(false)
+          }
+        }
       }
 
-      try {
-        const name = formData.get('guestName') as string
-        const email = formData.get('guestEmail') as string
-        const phone = formData.get('guestPhone') as string
-        
-        setBookingDetails({
-          name,
-          email,
-          phone,
-          checkin,
-          checkout
-        })
-      } catch (e) {
-        console.warn('Could not capture details for confirmation screen', e)
-      }
-      
-      setSuccess(true)
-      setIsConfirmed(true)
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
     } catch (err: any) {
       setError(err.message || 'Booking failed. Please try again.')
-    } finally {
       setIsLoading(false)
     }
   }
@@ -469,7 +522,8 @@ export default function PropertyDetailClient({
               </p>
             </div>
           ) : (
-            <form action={handleBook} className="flex flex-col gap-5">
+            <form onSubmit={handleBook} className="flex flex-col gap-5">
+              <Script src="https://checkout.razorpay.com/v1/checkout.js" />
               <input type="hidden" name="influencerId" value={influencerId || ''} />
               <div className="space-y-2">
                 <Label>Room Selection</Label>

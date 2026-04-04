@@ -60,7 +60,7 @@ export default function OwnerDashboardClient({
         <WalletSection 
           transactions={wallet.transactions || []} 
           payouts={wallet.payouts || []} 
-          onRequestPayout={requestPayout.bind(null, ownerId || '')} 
+          onRequestPayout={requestPayout.bind(null, userId || '')} 
         />
       ) : activeTab === 'properties' ? (
         <div className="flex flex-col gap-6 items-start w-full">
