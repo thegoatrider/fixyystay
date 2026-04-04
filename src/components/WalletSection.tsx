@@ -31,7 +31,9 @@ export default function WalletSection({
   onRequestPayout: (amount: number, bankDetails: string) => Promise<void>
 }) {
   const [isRequesting, setIsRequesting] = useState(false)
-  const [bankDetails, setBankDetails] = useState('')
+  const [payoutType, setPayoutType] = useState<'upi' | 'bank'>('upi')
+  const [upiId, setUpiId] = useState('')
+  const [bankAccount, setBankAccount] = useState({ name: '', number: '', ifsc: '' })
   const [amount, setAmount] = useState('')
 
   const earnings = transactions.filter(t => t.transaction_type === 'earning').reduce((acc, t) => acc + Number(t.amount), 0)
@@ -42,16 +44,27 @@ export default function WalletSection({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!amount || !bankDetails) return
+    if (!amount) return
+    
+    let details = ''
+    if (payoutType === 'upi') {
+      if (!upiId) return
+      details = `UPI: ${upiId}`
+    } else {
+      if (!bankAccount.name || !bankAccount.number || !bankAccount.ifsc) return
+      details = `Bank: ${bankAccount.name} | A/C: ${bankAccount.number} | IFSC: ${bankAccount.ifsc}`
+    }
+
     if (Number(amount) > availableBalance) {
       alert("Amount exceeds available balance.")
       return
     }
     
-    await onRequestPayout(Number(amount), bankDetails)
+    await onRequestPayout(Number(amount), details)
     setIsRequesting(false)
     setAmount('')
-    setBankDetails('')
+    setUpiId('')
+    setBankAccount({ name: '', number: '', ifsc: '' })
   }
 
   return (
@@ -69,7 +82,7 @@ export default function WalletSection({
             <div className="mt-6 bg-white/10 p-4 rounded-xl backdrop-blur-sm relative z-10">
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <div>
-                  <Label className="text-white text-xs">Amount to Withdraw</Label>
+                  <Label className="text-white text-xs">Amount to Withdraw (Min ₹100)</Label>
                   <Input 
                     type="number" max={availableBalance} min="100" 
                     value={amount} onChange={e => setAmount(e.target.value)}
@@ -77,17 +90,55 @@ export default function WalletSection({
                     placeholder="₹0.00" autoFocus
                   />
                 </div>
-                <div>
-                  <Label className="text-white text-xs">Bank Details / UPI ID</Label>
-                  <Input 
-                    value={bankDetails} onChange={e => setBankDetails(e.target.value)}
-                    className="bg-white/20 border-white/30 text-white placeholder-white/50" 
-                    placeholder="you@upi" 
-                  />
+
+                <div className="flex gap-2 p-1 bg-white/10 rounded-lg">
+                   <button 
+                    type="button"
+                    onClick={() => setPayoutType('upi')}
+                    className={`flex-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${payoutType === 'upi' ? 'bg-white text-blue-700' : 'text-white hover:bg-white/10'}`}
+                   >UPI</button>
+                   <button 
+                    type="button"
+                    onClick={() => setPayoutType('bank')}
+                    className={`flex-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${payoutType === 'bank' ? 'bg-white text-blue-700' : 'text-white hover:bg-white/10'}`}
+                   >Bank Account</button>
                 </div>
+
+                {payoutType === 'upi' ? (
+                  <div>
+                    <Label className="text-white text-xs">UPI ID</Label>
+                    <Input 
+                      value={upiId} onChange={e => setUpiId(e.target.value)}
+                      className="bg-white/20 border-white/30 text-white placeholder-white/50" 
+                      placeholder="yourname@upi" 
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input 
+                      placeholder="Account Holder Name"
+                      value={bankAccount.name}
+                      onChange={e => setBankAccount({...bankAccount, name: e.target.value})}
+                      className="bg-white/20 border-white/30 text-xs text-white placeholder-white/50"
+                    />
+                    <Input 
+                      placeholder="Account Number"
+                      value={bankAccount.number}
+                      onChange={e => setBankAccount({...bankAccount, number: e.target.value})}
+                      className="bg-white/20 border-white/30 text-xs text-white placeholder-white/50"
+                    />
+                    <Input 
+                      placeholder="IFSC Code"
+                      value={bankAccount.ifsc}
+                      onChange={e => setBankAccount({...bankAccount, ifsc: e.target.value})}
+                      className="bg-white/20 border-white/30 text-xs text-white placeholder-white/50 uppercase"
+                    />
+                  </div>
+                )}
+
                 <div className="flex gap-2 mt-2">
-                  <Button type="button" variant="ghost" className="text-white hover:bg-white/10" onClick={() => setIsRequesting(false)}>Cancel</Button>
-                  <Button type="submit" className="bg-white text-blue-700 hover:bg-blue-50 font-bold">Submit Request</Button>
+                  <Button type="button" variant="ghost" className="text-white hover:bg-white/10 px-2 h-9 text-xs" onClick={() => setIsRequesting(false)}>Cancel</Button>
+                  <Button type="submit" className="flex-1 bg-white text-blue-700 hover:bg-blue-50 font-bold h-9">Submit Request</Button>
                 </div>
               </form>
             </div>
