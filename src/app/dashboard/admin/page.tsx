@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3 } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2 } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -118,6 +118,12 @@ export default async function AdminDashboard() {
       userType: isInf ? 'Influencer' : (isOwner ? 'Owner' : 'Unknown'),
     }
   }) || []
+  
+  // 6. Inbound Business Leads (New Property Owners)
+  const { data: inboundLeads } = await supabase
+    .from('property_owner_leads')
+    .select('*')
+    .order('created_at', { ascending: false })
 
   return (
     <div className="flex flex-col gap-10">
@@ -215,6 +221,90 @@ export default async function AdminDashboard() {
 
           {pendingPayouts.length === 0 && (
             <div className="px-6 py-12 text-center text-gray-500">No pending payout requests. All caught up!</div>
+          )}
+        </div>
+      </section>
+      
+      {/* SECTION 0.7: Inbound Business Leads */}
+      <section>
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+          <div className="p-2 bg-purple-50 rounded-xl"><Building2 className="text-purple-600 w-6 h-6" /></div>
+          Inbound Business Leads
+          <span className="text-sm font-normal text-gray-400 ml-2">{inboundLeads?.length || 0} total enquiries</span>
+        </h2>
+        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3">Owner Name</th>
+                  <th className="px-6 py-3">Location</th>
+                  <th className="px-6 py-3">Phone</th>
+                  <th className="px-6 py-3">Property Map Link</th>
+                  <th className="px-6 py-3">Submitted</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {inboundLeads?.map((lead) => (
+                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-900">{lead.full_name}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-700">{lead.area}</span>
+                        <span className="text-xs text-gray-400 uppercase font-black tracking-tighter">{lead.city}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-blue-600 font-bold">{lead.phone}</td>
+                    <td className="px-6 py-4">
+                      <a 
+                        href={lead.google_link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-black text-[10px] uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                      >
+                        <MapPin className="w-3 h-3" /> View on Map
+                      </a>
+                    </td>
+                    <td className="px-6 py-4 text-gray-400 text-xs text-right whitespace-nowrap">
+                      {new Date(lead.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="md:hidden divide-y">
+            {inboundLeads?.map((lead) => (
+              <div key={lead.id} className="p-4 flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                   <div className="font-bold text-gray-900">{lead.full_name}</div>
+                   <div className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                   <div>
+                      <p className="font-black text-gray-400 uppercase tracking-tighter mb-1">Phone</p>
+                      <p className="font-bold text-blue-600">{lead.phone}</p>
+                   </div>
+                   <div>
+                      <p className="font-black text-gray-400 uppercase tracking-tighter mb-1">Location</p>
+                      <p className="text-gray-700">{lead.area}, {lead.city}</p>
+                   </div>
+                </div>
+                <a 
+                  href={lead.google_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
+                >
+                  <MapPin className="w-3.5 h-3.5" /> Open Google Maps
+                </a>
+              </div>
+            ))}
+          </div>
+
+          {(!inboundLeads || inboundLeads.length === 0) && (
+            <div className="px-6 py-12 text-center text-gray-500">No new inbound leads yet.</div>
           )}
         </div>
       </section>
