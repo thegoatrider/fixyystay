@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import React from 'react'
 
@@ -272,6 +272,70 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
             </div>
           )}
         </div>
+        
+        {/* ── Helpers for ID Actions ── */}
+        {(() => {
+          const handleDownload = async (url: string, filename: string) => {
+            try {
+              const res = await fetch(url)
+              const blob = await res.blob()
+              const link = document.createElement('a')
+              link.href = URL.createObjectURL(blob)
+              link.download = filename
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+            } catch (err) {
+              window.open(url, '_blank')
+            }
+          }
+
+          const handlePrint = (url: string) => {
+            const printWindow = window.open('', '_blank')
+            if (printWindow) {
+              printWindow.document.write(`
+                <html>
+                  <head><title>Print ID</title></head>
+                  <body style="margin:0;display:flex;align-items:center;justify-content:center;">
+                    <img src="${url}" style="max-width:100%;max-height:100vh;object-contain:contain;" onload="window.print();window.close();" />
+                  </body>
+                </html>
+              `)
+              printWindow.document.close()
+            }
+          }
+
+          const handleShare = async (url: string, title: string) => {
+            if (navigator.share) {
+              try {
+                await navigator.share({ title, url })
+              } catch (err) {
+                console.log('User cancelled share')
+              }
+            } else {
+              navigator.clipboard.writeText(url)
+              alert('Link copied to clipboard!')
+            }
+          }
+
+          const handleDownloadAll = async (guest: GuestCheckin) => {
+            if (!guest.id_documents) return
+            const urls: {url: string, name: string}[] = []
+            guest.id_documents.forEach((doc: any, i: number) => {
+              const baseName = `ID_${guest.guest_name.replace(/\s+/g, '_')}_P${i+1}`
+              if (doc.frontUrl) urls.push({ url: doc.frontUrl, name: `${baseName}_Front` })
+              if (doc.backUrl) urls.push({ url: doc.backUrl, name: `${baseName}_Back` })
+            })
+
+            for (let i = 0; i < urls.length; i++) {
+              await handleDownload(urls[i].url, urls[i].name)
+              // Small delay to prevent browser download blocking
+              await new Promise(r => setTimeout(r, 300))
+            }
+          }
+
+          return null
+        })()}
 
         {/* ── Guest Detail Card ── */}
         <div className={`transition-all duration-300 ${selectedGuest ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -339,58 +403,140 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
 
                 {/* ID Documents */}
                 <div className="flex flex-col gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Documents</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Documents</p>
+                    {selectedGuest.id_documents && selectedGuest.id_documents.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          const guest = selectedGuest;
+                          const internalDownload = async (url: string, filename: string) => {
+                            try {
+                              const res = await fetch(url)
+                              const blob = await res.blob()
+                              const link = document.createElement('a')
+                              link.href = URL.createObjectURL(blob)
+                              link.download = filename
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                            } catch (err) { window.open(url, '_blank') }
+                          };
+
+                          (async () => {
+                            const docs = guest.id_documents;
+                            const itemsToDownload: {url: string, name: string}[] = [];
+                            docs.forEach((doc: any, i: number) => {
+                              const base = `ID_${guest.guest_name.replace(/\s+/g, '_')}_P${i+1}`;
+                              if (doc.frontUrl) itemsToDownload.push({ url: doc.frontUrl, name: `${base}_Front` });
+                              if (doc.backUrl) itemsToDownload.push({ url: doc.backUrl, name: `${base}_Back` });
+                            });
+                            for (const item of itemsToDownload) {
+                              await internalDownload(item.url, item.name);
+                              await new Promise(r => setTimeout(r, 600)); // Delay to prevent browser throttling
+                            }
+                          })();
+                        }}
+                        className="group flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 border border-indigo-100 rounded-lg text-[10px] font-black text-indigo-600 hover:text-white transition-all shadow-sm"
+                      >
+                        <Download className="w-3 h-3 transition-transform group-hover:-translate-y-0.5" />
+                        Download All IDs
+                      </button>
+                    )}
+                  </div>
+
                   {selectedGuest.id_documents && selectedGuest.id_documents.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {selectedGuest.id_documents.map((doc: any, i: number) => (
-                        <div key={i} className="flex flex-col gap-2">
-                          {doc.frontUrl && (
-                            <a
-                              href={doc.frontUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-between gap-2 p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl transition-all group"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                                  <FileText className="w-4 h-4 text-indigo-500" />
+                    <div className="flex flex-col gap-3">
+                      {selectedGuest.id_documents.map((doc: any, i: number) => {
+                        const personLabel = `Person ${doc.personIndex || i + 1}`;
+                        
+                        const renderDocItem = (url: string, label: string) => (
+                          <div className="flex flex-col gap-2 p-4 bg-gray-50 border border-gray-100 rounded-2xl group hover:border-indigo-200 hover:bg-white transition-all shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center shadow-inner flex-shrink-0">
+                                  <FileText className="w-5 h-5 text-indigo-500" />
                                 </div>
-                                <div>
-                                  <p className="text-sm font-bold text-gray-800 group-hover:text-indigo-700">
-                                    ID Document (Front) — Person {doc.personIndex || i + 1}
-                                  </p>
-                                  <p className="text-[11px] text-gray-400">Tap to view image</p>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-gray-800 truncate">{label}</p>
+                                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{personLabel}</p>
                                 </div>
                               </div>
-                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
-                            </a>
-                          )}
-                          {doc.backUrl && (
-                            <a
-                              href={doc.backUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-between gap-2 p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-xl transition-all group"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                                  <FileText className="w-4 h-4 text-indigo-500" />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-gray-800 group-hover:text-indigo-700">
-                                    ID Document (Back) — Person {doc.personIndex || i + 1}
-                                  </p>
-                                  <p className="text-[11px] text-gray-400">Tap to view image</p>
-                                </div>
-                              </div>
-                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
-                            </a>
-                          )}
-                        </div>
-                      ))}
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-indigo-50 rounded-lg transition-colors" title="View Fullscreen">
+                                <ExternalLink className="w-4 h-4 text-gray-400 hover:text-indigo-600" />
+                              </a>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-gray-100/60">
+                              <button 
+                                onClick={() => {
+                                  const filename = `ID_${selectedGuest.guest_name.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}`;
+                                  (async () => {
+                                    try {
+                                      const res = await fetch(url);
+                                      const blob = await res.blob();
+                                      const link = document.createElement('a');
+                                      link.href = URL.createObjectURL(blob);
+                                      link.download = filename;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    } catch (e) { window.open(url, '_blank'); }
+                                  })();
+                                }}
+                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
+                              >
+                                <Download className="w-4 h-4 text-gray-600" />
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Save</span>
+                              </button>
+                              
+                              <button 
+                                onClick={() => {
+                                  const win = window.open('', '_blank');
+                                  if (win) {
+                                    win.document.write(`
+                                      <html>
+                                        <body style="margin:0;display:flex;justify-content:center;background:#000;">
+                                          <img src="${url}" style="max-height:100vh;max-width:100%;object-fit:contain;" onload="window.print();window.close();"/>
+                                        </body>
+                                      </html>
+                                    `);
+                                    win.document.close();
+                                  }
+                                }}
+                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
+                              >
+                                <Printer className="w-4 h-4 text-gray-600" />
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Print</span>
+                              </button>
+
+                              <button 
+                                onClick={async () => {
+                                  if (navigator.share) {
+                                    try { await navigator.share({ title: `${label} - ${selectedGuest.guest_name}`, url }); } catch (e) {}
+                                  } else {
+                                    navigator.clipboard.writeText(url);
+                                    alert('Image link copied!');
+                                  }
+                                }}
+                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
+                              >
+                                <Share2 className="w-4 h-4 text-gray-600" />
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Send</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+
+                        return (
+                          <div key={i} className="space-y-3">
+                            {doc.frontUrl && renderDocItem(doc.frontUrl, 'ID (Front)')}
+                            {doc.backUrl && renderDocItem(doc.backUrl, 'ID (Back)')}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+                    <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-medium">
                       <AlertCircle className="w-4 h-4 flex-shrink-0" />
                       No ID documents uploaded yet
                     </div>
@@ -399,9 +545,9 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
               </div>
             </div>
           ) : (
-            <div className="bg-gray-50 border border-dashed rounded-2xl p-8 text-center text-gray-400 flex flex-col items-center gap-3">
-              <User className="w-8 h-8 opacity-30" />
-              <p className="text-xs font-medium">Select a guest<br/>to view details</p>
+            <div className="bg-gray-50 border border-dashed rounded-2xl p-8 text-center text-gray-400 flex flex-col items-center gap-3 h-full justify-center">
+              <User className="w-10 h-10 opacity-20" />
+              <p className="text-xs font-medium">Select a guest<br/>to view ID details</p>
             </div>
           )}
         </div>
