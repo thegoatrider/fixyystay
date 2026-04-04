@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3 } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
