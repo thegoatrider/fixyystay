@@ -1,3 +1,16 @@
+-- SQL Migration: Owner Subscription Tracking & Payment Records
+-- Ensure public.owners has user_id before we start
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='owners' AND column_name='user_id') THEN
+    ALTER TABLE public.owners ADD COLUMN user_id UUID REFERENCES auth.users(id);
+  END IF;
+END $$;
+
+-- Clean start to avoid schema mismatches from failed runs
+DROP TABLE IF EXISTS public.owner_payments CASCADE;
+DROP TABLE IF EXISTS public.owner_subscriptions CASCADE;
+
 -- 1. Owner Subscriptions Table
 CREATE TABLE IF NOT EXISTS public.owner_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

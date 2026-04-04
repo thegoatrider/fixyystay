@@ -77,7 +77,7 @@ export default function OwnerDashboardClient({
           <div className="flex flex-col gap-4 w-full">
             <h2 className="text-xl font-bold mt-4 lg:mt-2 px-1">Your Properties Database</h2>
             {properties && properties.length > 0 ? (
-              properties.map(prop => <PropertyCard key={prop.id} prop={prop} />)
+              properties.map((prop: any) => <PropertyCard key={prop.id} prop={prop} />)
             ) : (
               <EmptyState message="You haven't added any properties yet." icon={<Home className="w-12 h-12 mx-auto text-gray-300 mb-4" />} />
             )}
