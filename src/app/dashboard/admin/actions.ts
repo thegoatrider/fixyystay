@@ -334,9 +334,16 @@ export async function onboardPartner(formData: FormData) {
     }
 
     // 3. Calculate Expiry Date
-    const months = planName === 'Monthly' ? 1 : (planName === 'Quarterly' ? 3 : (planName === '6-Months' ? 6 : 12))
     const expiryDate = new Date()
-    expiryDate.setMonth(expiryDate.getMonth() + months)
+    let months = 1
+    
+    if (planName === '7-Day Free Trial') {
+      expiryDate.setDate(expiryDate.getDate() + 7)
+      months = 0 // For payment record
+    } else {
+      months = planName === 'Monthly' ? 1 : (planName === 'Quarterly' ? 3 : (planName === '6-Months' ? 6 : 12))
+      expiryDate.setMonth(expiryDate.getMonth() + months)
+    }
 
     // 4. Create Subscription
     const { error: subError } = await supabaseAdmin

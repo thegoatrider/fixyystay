@@ -267,3 +267,54 @@ export async function updatePassword(formData: FormData) {
     return { error: err.message || 'An unexpected error occurred' }
   }
 }
+
+export async function claimFreeTrial() {
+  try {
+    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Verify session
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Session expired.' }
+
+    // 2. Get owner record
+    const { data: owner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!owner) return { error: 'Owner profile not found.' }
+
+    // 3. Verify they have NEVER had a subscription (including trials)
+    const { data: existingSub } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('id')
+      .eq('owner_id', owner.id)
+      .maybeSingle()
+
+    if (existingSub) {
+      return { error: 'You are not eligible for a free trial. Please pick a premium plan.' }
+    }
+
+    // 4. Create 7-day Trial
+    const expiryDate = new Date()
+    expiryDate.setDate(expiryDate.getDate() + 7)
+
+    const { error: subError } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .insert({
+        owner_id: owner.id,
+        plan_name: '7-Day Free Trial',
+        end_date: expiryDate.toISOString(),
+        status: 'active'
+      })
+
+    if (subError) return { error: 'Failed to activate trial.' }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Error claiming trial' }
+  }
+}

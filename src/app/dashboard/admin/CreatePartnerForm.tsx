@@ -95,7 +95,30 @@ export function CreatePartnerForm() {
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="plan" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Selected Plan</Label>
-            <select name="plan" id="plan" required className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500">
+            <select 
+              name="plan" 
+              id="plan" 
+              required 
+              defaultValue="Monthly"
+              onChange={(e) => {
+                const amountInput = document.getElementById('amount') as HTMLInputElement
+                if (e.target.value === '7-Day Free Trial') {
+                  if (amountInput) amountInput.value = '0'
+                } else if (e.target.value === 'Monthly') {
+                  if (amountInput) amountInput.value = '399'
+                } else if (e.target.value === 'Quarterly') {
+                  if (amountInput) amountInput.value = '1099'
+                } else if (e.target.value === '6-Months') {
+                  if (amountInput) amountInput.value = '1999'
+                } else if (e.target.value === 'Yearly') {
+                  if (amountInput) amountInput.value = '3999'
+                }
+              }}
+              className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500"
+            >
+              <optgroup label="Free Access">
+                <option value="7-Day Free Trial">7-Day Free Trial - ₹0</option>
+              </optgroup>
               <optgroup label="Subscription Tiers">
                 <option value="Monthly">Monthly - ₹399</option>
                 <option value="Quarterly">Quarterly - ₹1099</option>
@@ -106,7 +129,7 @@ export function CreatePartnerForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount Paid (₹)</Label>
-            <Input id="amount" name="amount" type="number" placeholder="399, 1099, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
+            <Input id="amount" name="amount" type="number" defaultValue="399" placeholder="399, 1099, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
           </div>
         </div>
 

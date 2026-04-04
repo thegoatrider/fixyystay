@@ -70,12 +70,14 @@ export default async function OwnerProfilePage() {
             <div className="bg-white border-2 border-white ring-1 ring-gray-100 rounded-[32px] p-8 shadow-xl shadow-blue-900/5 relative overflow-hidden">
                {isActive && <div className="absolute top-0 right-0 p-8 opacity-5"><Zap className="w-32 h-32 text-blue-600" /></div>}
                
-               <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-4 mb-8">
                   <div className={cn("p-4 rounded-2xl", isActive ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600")}>
-                    <Zap className="w-6 h-6 font-black" />
+                    {subscription?.plan_name === '7-Day Free Trial' ? <History className="w-6 h-6 border-2 rounded-full p-0.5" /> : <Zap className="w-6 h-6 font-black" />}
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Current Subscription</h3>
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight">
+                      {subscription?.plan_name === '7-Day Free Trial' ? 'Free Trial Active' : 'Current Subscription'}
+                    </h3>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{subscription?.plan_name || 'No Plan Active'}</p>
                   </div>
                </div>
