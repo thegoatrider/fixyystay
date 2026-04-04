@@ -9,6 +9,12 @@ export type DashboardData = {
     transactions: any[]
     payouts: any[]
   }
+  subscription: {
+    plan_name: string
+    end_date: string
+    status: string
+    is_active: boolean
+  }
 }
 
 export function useDashboardData(ownerId: string | undefined, isSuperAdmin: boolean) {

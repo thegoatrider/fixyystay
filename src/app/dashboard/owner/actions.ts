@@ -242,3 +242,28 @@ export async function createProperty(formData: FormData) {
   revalidatePath('/dashboard/owner')
   return { success: true, id: property.id }
 }
+
+export async function updatePassword(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const password = formData.get('password') as string
+    const confirmPassword = formData.get('confirmPassword') as string
+
+    if (!password || password.length < 6) {
+      return { error: 'Password must be at least 6 characters long.' }
+    }
+    if (password !== confirmPassword) {
+      return { error: 'Passwords do not match.' }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password })
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}

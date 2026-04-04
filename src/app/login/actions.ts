@@ -136,3 +136,23 @@ export async function signInWithGoogle() {
     redirect(data.url)
   }
 }
+
+export async function resetPassword(formData: FormData) {
+  const supabase = await createClient()
+  const email = formData.get('email') as string
+  const origin = (await headers()).get('origin')
+
+  if (!email) {
+    redirect('/login?message=Please enter your email to reset password')
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/dashboard/owner/profile`,
+  })
+
+  if (error) {
+    redirect(`/login?message=${encodeURIComponent(error.message)}`)
+  }
+
+  redirect('/login?message=Check your email for a reset link')
+}

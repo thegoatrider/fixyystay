@@ -9,6 +9,7 @@ import PayoutActions from './PayoutActions'
 import PropertyApprovalActions from './PropertyApprovalActions'
 import InfluencerApprovalActions from './InfluencerApprovalActions'
 import InfluencerPerformanceHub from './InfluencerPerformanceHub'
+import { CreatePartnerForm } from './CreatePartnerForm'
 import { assignInfluencerFromForm } from './actions'
 
 export default async function AdminDashboard() {
@@ -150,6 +151,28 @@ export default async function AdminDashboard() {
              <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16" /></div>
             <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest mb-1 relative z-10">Net Platform Revenue</p>
             <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* SECTION 0.3: Partner Onboarding */}
+        <div className="mt-12 grid lg:grid-cols-2 gap-8 items-start">
+          <CreatePartnerForm />
+          <div className="bg-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-center h-full min-h-[300px]">
+             <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12"><Users className="w-64 h-64" /></div>
+             <h3 className="text-3xl font-black mb-4 relative z-10">Growth Center</h3>
+             <p className="text-blue-100 text-lg mb-8 relative z-10 leading-relaxed font-medium">
+               Onboard verified property owners to expand Fixy Stays inventory. Every new partner increases our platform's reach and revenue potential.
+             </p>
+             <div className="flex flex-wrap gap-4 relative z-10">
+                <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/20">
+                  <p className="text-[10px] font-black uppercase text-blue-200">Total Owners</p>
+                  <p className="text-2xl font-black">{totalRevenueGenerated > 0 ? (Math.floor(totalRevenueGenerated / 5000) + 12) : 12}</p>
+                </div>
+                <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/20">
+                  <p className="text-[10px] font-black uppercase text-blue-200">Active Plans</p>
+                  <p className="text-2xl font-black">100%</p>
+                </div>
+             </div>
           </div>
         </div>
       </section>

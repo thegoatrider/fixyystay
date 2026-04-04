@@ -284,3 +284,84 @@ export async function processPayout(requestId: string, action: 'approve' | 'reje
   }
 }
 
+
+export async function onboardPartner(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
+    
+    // Verify admin
+    const { data: { user: admin } } = await supabase.auth.getUser()
+    if (admin?.user_metadata?.role !== 'admin' && admin?.email !== 'superadmin@fixstay.com') {
+      return { error: 'Unauthorized' }
+    }
+
+    const name = formData.get('name') as string
+    const email = formData.get('email') as string
+    const planName = formData.get('plan') as string
+    const amount = parseFloat(formData.get('amount') as string) || 0
+    const paymentRef = formData.get('paymentRef') as string
+    const password = formData.get('password') as string || 'FixyOwner@2026'
+
+    if (!name || !email || !planName) return { error: 'Name, Email and Plan are required.' }
+
+    // 1. Create Auth User
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'owner', name: name }
+    })
+
+    if (authError) {
+      console.error('Auth creation failed:', authError)
+      return { error: `Signup failed: ${authError.message}` }
+    }
+
+    const userId = authData.user.id
+
+    // 2. Create Owner Record
+    const { data: owner, error: ownerError } = await supabaseAdmin
+      .from('owners')
+      .insert({ user_id: userId, name, email })
+      .select('id')
+      .single()
+
+    if (ownerError) {
+      // Roleback auth user? (Optional, but good for cleanup)
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return { error: 'Failed to create owner record.' }
+    }
+
+    // 3. Calculate Expiry Date
+    const months = planName === 'Monthly' ? 1 : (planName === 'Quarterly' ? 3 : (planName === '6-Months' ? 6 : 12))
+    const expiryDate = new Date()
+    expiryDate.setMonth(expiryDate.getMonth() + months)
+
+    // 4. Create Subscription
+    const { error: subError } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .insert({
+        owner_id: owner.id,
+        plan_name: planName,
+        end_date: expiryDate.toISOString(),
+        status: 'active'
+      })
+
+    // 5. Create Payment Record
+    await supabaseAdmin
+      .from('owner_payments')
+      .insert({
+        owner_id: owner.id,
+        amount,
+        payment_method: 'Manual/Admin',
+        payment_ref: paymentRef,
+        plan_duration_months: months
+      })
+
+    revalidatePath('/dashboard/admin')
+    return { success: true, tempPassword: password }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}
