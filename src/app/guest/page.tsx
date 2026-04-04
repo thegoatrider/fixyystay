@@ -65,8 +65,8 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
 
   // Prepare simple helper for image fallbacks
   const getPropImage = (prop: any) => {
-    if (prop.image_urls && prop.image_urls.length > 0) return prop.image_urls[0];
     if (prop.image_url) return prop.image_url;
+    if (prop.image_urls && prop.image_urls.length > 0) return prop.image_urls[0];
     if (prop.rooms && prop.rooms.length > 0) {
       const roomWithImg = prop.rooms.find((r: any) => r.image_url);
       if (roomWithImg) return roomWithImg.image_url;
