@@ -81,10 +81,10 @@ export default function OwnerContactPage() {
             <Building2 className="w-3.5 h-3.5" /> For Property Owners
           </div>
           <h1 className="text-5xl md:text-6xl font-black text-gray-900 leading-[1.1] mb-8 tracking-tight">
-            List your Alibag <span className="text-blue-600">property</span> with the best.
+            List your <span className="text-blue-600">property</span> with the best in India.
           </h1>
           <p className="text-xl text-gray-500 leading-relaxed mb-10 max-w-xl font-medium">
-            Join the fastest-growing property management network in Alibag. We handle the bookings, marketing, and influencers—you enjoy the revenue.
+            Join the fastest-growing property management network in India. We handle the bookings, marketing, and influencers—you enjoy the revenue.
           </p>
 
           <div className="space-y-6">
