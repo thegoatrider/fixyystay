@@ -4,8 +4,9 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet, User } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User, Zap } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
+import { claimFreeTrial } from './actions'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
@@ -112,12 +113,31 @@ export default function OwnerDashboardClient({
               <p className="text-xl font-bold text-blue-600">+91 75062 88907</p>
             </div>
 
-            <Button 
-              onClick={() => window.location.href = '/dashboard/owner/profile'} 
-              className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg"
-            >
-              View My Plan
-            </Button>
+            <div className="grid gap-3">
+              {subscription?.status === 'none' && (
+                <Button 
+                  onClick={async () => {
+                    if (confirm('Start your 7-day free trial?')) {
+                      const res = await claimFreeTrial()
+                      if (res.success) window.location.reload()
+                      else alert(res.error)
+                    }
+                  }} 
+                  className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-black rounded-xl shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-5 h-5 fill-current" />
+                  Start 7-Day Free Trial
+                </Button>
+              )}
+              
+              <Button 
+                onClick={() => window.location.href = '/dashboard/owner/profile'} 
+                variant="outline"
+                className="w-full h-14 text-lg font-black rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                View My Account
+              </Button>
+            </div>
           </div>
         </div>
       )}
