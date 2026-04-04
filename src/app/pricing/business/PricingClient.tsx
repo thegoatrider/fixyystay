@@ -6,13 +6,21 @@ import { Button } from '@/components/ui/button'
 import { createOwnerOrder } from './actions'
 import Script from 'next/script'
 
+const SHARED_FEATURES = [
+  "List Unlimited Properties",
+  "Instant Lead Notifications",
+  "Virtual Wallet & Payouts",
+  "Verified Business Badge",
+  "Dedicated Support"
+]
+
 const PLANS = [
   {
     name: "Monthly",
     price: 399,
     originalPrice: 399,
     discount: 0,
-    features: ["Manage up to 2 Properties", "Instant Lead Notifications", "Wallet & Payout Access", "24/7 Support"],
+    features: SHARED_FEATURES,
     bestValue: false,
     icon: Zap
   },
@@ -21,7 +29,7 @@ const PLANS = [
     price: 1099,
     originalPrice: 1197,
     discount: 8,
-    features: ["Manage up to 5 Properties", "Priority Lead Matching", "Wallet & Payout Access", "Dedicated Account Manager"],
+    features: SHARED_FEATURES,
     bestValue: false,
     icon: Star
   },
@@ -30,7 +38,7 @@ const PLANS = [
     price: 1999,
     originalPrice: 2394,
     discount: 16,
-    features: ["Unlimited Properties", "Featured Property Listings", "Custom Promotion Links", "Direct Guest Chat"],
+    features: SHARED_FEATURES,
     bestValue: true,
     icon: ShieldCheck
   },
@@ -39,7 +47,7 @@ const PLANS = [
     price: 3999,
     originalPrice: 4788,
     discount: 16,
-    features: ["All 6-Month Features", "Verified Business Badge", "Early Access to New Features", "No Platform Fee for 1 Month"],
+    features: SHARED_FEATURES,
     bestValue: false,
     icon: Crown
   }
