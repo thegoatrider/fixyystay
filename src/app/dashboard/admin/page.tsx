@@ -8,6 +8,7 @@ import AdminPropertiesSearch from './AdminPropertiesSearch'
 import PayoutActions from './PayoutActions'
 import PropertyApprovalActions from './PropertyApprovalActions'
 import InfluencerApprovalActions from './InfluencerApprovalActions'
+import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { assignInfluencerFromForm } from './actions'
 
 export default async function AdminDashboard() {
@@ -131,17 +132,18 @@ export default async function AdminDashboard() {
             <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-1">Total Booking Value</p>
             <p className="text-3xl font-bold text-gray-900">₹{totalRevenueGenerated.toLocaleString()}</p>
           </div>
-          <div className="bg-white border p-6 rounded-xl shadow-sm">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-1">Owner Earnings (80%)</p>
-            <p className="text-3xl font-bold text-gray-900">₹{paidToOwners.toLocaleString()}</p>
+          <div className="bg-white border-2 border-green-100 p-6 rounded-2xl shadow-sm">
+            <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Owner Earnings (80%)</p>
+            <p className="text-3xl font-black text-gray-900">₹{paidToOwners.toLocaleString()}</p>
           </div>
-          <div className="bg-white border p-6 rounded-xl shadow-sm">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-1">Influencer Earnings</p>
-            <p className="text-3xl font-bold text-gray-900">₹{paidToInfluencers.toLocaleString()}</p>
+          <div className="bg-white border-2 border-indigo-100 p-6 rounded-2xl shadow-sm">
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Influencer Commissions</p>
+            <p className="text-3xl font-black text-gray-900">₹{paidToInfluencers.toLocaleString()}</p>
           </div>
-          <div className="bg-blue-600 border border-blue-600 p-6 rounded-xl shadow-md text-white">
-            <p className="text-sm font-semibold text-blue-200 uppercase tracking-widest mb-1">Net Platform Revenue</p>
-            <p className="text-3xl font-black">₹{platformCommission.toLocaleString()}</p>
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-800 p-6 rounded-2xl shadow-xl text-white relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16" /></div>
+            <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest mb-1 relative z-10">Net Platform Revenue</p>
+            <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
           </div>
         </div>
       </section>
@@ -198,8 +200,11 @@ export default async function AdminDashboard() {
                   <div className="text-lg font-black text-orange-600">₹{Number(req.amount).toLocaleString()}</div>
                 </div>
                 <div className="bg-gray-50 p-2.5 rounded border border-gray-100 font-mono text-xs text-gray-600 break-all">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bank / UPI</p>
-                  {req.bank_details}
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Settlement Details</p>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter mr-2 ${req.bank_details.includes('UPI:') ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {req.bank_details.includes('UPI:') ? 'UPI' : 'Bank'}
+                  </span>
+                  {req.bank_details.replace('UPI: ', '').replace('Bank: ', '')}
                 </div>
                 <div className="pt-2 flex justify-end">
                   <PayoutActions requestId={req.id} />
@@ -292,92 +297,13 @@ export default async function AdminDashboard() {
         />
       </section>
 
-      {/* SECTION 3: Influencer Promotion Properties */}
+      {/* SECTION 3: Influencer Performance Hub */}
       <section>
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Users className="text-blue-500" /> Influencer Promotion Properties
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+          <div className="p-2 bg-blue-50 rounded-xl"><BarChart3 className="text-blue-600 w-6 h-6" /></div>
+          Influencer Performance Center
         </h2>
-        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3">Property</th>
-                  <th className="px-6 py-3">Influencer</th>
-                  <th className="px-6 py-3 text-right">Clicks</th>
-                  <th className="px-6 py-3 text-right">Bookings</th>
-                  <th className="px-6 py-3 text-right">Revenue</th>
-                  <th className="px-6 py-3 text-right">Commission Earned</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {promotions.map((promo) => {
-                  const propVal = promo.properties as any;
-                  const infVal = promo.influencers as any;
-
-                  const propName = propVal && !Array.isArray(propVal) ? propVal.name : 'Unknown Property';
-                  const infName = infVal && !Array.isArray(infVal) ? infVal.name : 'Unknown Influencer';
-                  
-                  return (
-                    <tr key={promo.id}>
-                      <td className="px-6 py-4 font-medium">{propName}</td>
-                      <td className="px-6 py-4">{infName}</td>
-                      <td className="px-6 py-4 text-right text-gray-600">{promo.clicks}</td>
-                      <td className="px-6 py-4 text-right font-medium">{promo.bookingsCount}</td>
-                      <td className="px-6 py-4 text-right text-gray-600">₹{promo.revenue.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right font-bold text-green-600">₹{promo.commission.toLocaleString()}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden flex flex-col divide-y">
-            {promotions.map((promo) => {
-              const propVal = promo.properties as any;
-              const infVal = promo.influencers as any;
-
-              const propName = propVal && !Array.isArray(propVal) ? propVal.name : 'Unknown Property';
-              const infName = infVal && !Array.isArray(infVal) ? infVal.name : 'Unknown Influencer';
-              
-              return (
-                <div key={promo.id} className="p-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0">
-                      <div className="font-bold text-gray-900 truncate">{propName}</div>
-                      <div className="text-xs text-gray-500 truncate">by {infName}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-green-600 uppercase tracking-tighter">Commission</div>
-                      <div className="text-base font-black text-green-700">₹{promo.commission.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-center">
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase">Clicks</p>
-                      <p className="text-sm font-bold text-gray-700">{promo.clicks}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase">Bookings</p>
-                      <p className="text-sm font-bold text-gray-700">{promo.bookingsCount}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase">Revenue</p>
-                      <p className="text-sm font-bold text-gray-700">₹{promo.revenue.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {promotions.length === 0 && (
-            <div className="px-6 py-12 text-center text-gray-500">No influencers assigned to properties yet.</div>
-          )}
-        </div>
+        <InfluencerPerformanceHub promotions={promotions} />
       </section>
 
     </div>

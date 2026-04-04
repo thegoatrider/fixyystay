@@ -16,13 +16,19 @@ export default async function SignupPage(
   let title = "Create a Guest Account"
   if (requestedRole === 'owner') title = "Register as a Property Owner"
   if (requestedRole === 'influencer') title = "Join as an Influencer / Agent"
-  if (requestedRole === 'admin') title = "Create Admin Account" // Usually Admins don't sign up freely, but left for demo purposes
-  if (requestedRole === 'admin') {
+  if (requestedRole === 'admin' || requestedRole === 'owner') {
     return (
       <div className="flex-1 flex flex-col w-full h-screen justify-center items-center text-center gap-4">
-        <h1 className="text-3xl font-bold text-red-600">403 Forbidden</h1>
-        <p className="text-gray-600">Admin accounts cannot be created via public signup.</p>
-        <Link href="/" className="text-blue-600 hover:underline">Return to Home</Link>
+        <h1 className="text-3xl font-bold text-red-600">Registration Restricted</h1>
+        <p className="text-gray-600">
+          {requestedRole === 'admin' 
+            ? 'Admin accounts cannot be created via public signup.' 
+            : 'Property Owner registration is handled privately by the Fixy Stays team.'}
+        </p>
+        <div className="flex gap-4">
+          <Link href="/" className="text-blue-600 hover:underline font-bold">Return to Home</Link>
+          <Link href="/login" className="text-blue-600 hover:underline font-bold">Sign In</Link>
+        </div>
       </div>
     )
   }
