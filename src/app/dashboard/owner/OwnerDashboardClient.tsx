@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
@@ -37,7 +37,8 @@ export default function OwnerDashboardClient({
   if (isLoading) return <DashboardSkeleton />
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
 
-  const { properties, leads, checkins, wallet } = data
+  const { properties, leads, checkins, wallet, subscription } = data as any
+  const isLocked = !subscription?.is_active && !isSuperAdmin
 
   return (
     <div className="flex flex-col gap-8">
@@ -54,6 +55,7 @@ export default function OwnerDashboardClient({
         <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
         <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
         <TabLink href="/dashboard/owner?tab=wallet" active={activeTab === 'wallet'} icon={<Wallet className="w-4 h-4 md:w-5 md:h-5" />} label="Wallet" />
+        <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
       </div>
 
       {activeTab === 'wallet' ? (
@@ -89,6 +91,35 @@ export default function OwnerDashboardClient({
         />
       ) : (
         <GuestList checkins={checkins as any || []} />
+      )}
+
+      {/* Lockout Overlay */}
+      {isLocked && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-white/20 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="bg-white border-2 border-red-100 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6">
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Wallet className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-3xl font-black text-gray-900 italic">Access Locked</h2>
+              <p className="text-gray-500 font-medium leading-relaxed">
+                Your partner subscription has expired or hasn't started yet. Please renew to access your property management tools.
+              </p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col items-center gap-1">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Support Line</p>
+              <p className="text-xl font-bold text-blue-600">+91 75062 88907</p>
+            </div>
+
+            <Button 
+              onClick={() => window.location.href = '/dashboard/owner/profile'} 
+              className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg"
+            >
+              View My Plan
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { login, signInWithGoogle } from './actions'
+import { login, signInWithGoogle, resetPassword } from './actions'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,6 +45,12 @@ export default async function LoginPage({ searchParams }: PageProps) {
             placeholder="••••••••"
             required
           />
+          <button 
+            formAction={resetPassword}
+            className="text-[10px] text-right font-bold text-blue-600 hover:underline mt-1 px-1"
+          >
+            Forgot password?
+          </button>
         </div>
 
         <Button formAction={login} className="mt-4 w-full">
@@ -89,7 +96,12 @@ export default async function LoginPage({ searchParams }: PageProps) {
       </form>
 
       {message && (
-        <p className="mt-4 p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm text-center">
+        <p className={cn(
+          "mt-4 p-4 border rounded-md text-sm text-center",
+          message.toLowerCase().includes('check') || message.toLowerCase().includes('created')
+            ? "bg-green-50 text-green-600 border-green-200"
+            : "bg-red-50 text-red-600 border-red-200"
+        )}>
           {message}
         </p>
       )}
