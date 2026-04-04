@@ -1,5 +1,20 @@
--- RPC to fetch all owner dashboard data in a single call, including subscription status
-CREATE OR REPLACE FUNCTION get_owner_dashboard_data(
+-- RPC to fetch all owner dashboard data (Properties, Leads, Checkins, Wallet, Subscription)
+-- Clear any existing versions with different return signatures
+DROP FUNCTION IF EXISTS public.get_owner_dashboard_data(UUID, BOOLEAN);
+DROP FUNCTION IF EXISTS get_owner_dashboard_data(UUID, BOOLEAN);
+
+-- Ensure dependent columns exist
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leads' AND column_name='owner_id') THEN
+    ALTER TABLE public.leads ADD COLUMN owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='guest_checkins' AND column_name='owner_id') THEN
+    ALTER TABLE public.guest_checkins ADD COLUMN owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.get_owner_dashboard_data(
   p_owner_id UUID,
   p_is_superadmin BOOLEAN DEFAULT FALSE
 )
