@@ -121,14 +121,20 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   }) || []
 
   // Apply Price Bucket Filter or See All Types
-  if (selectedBucket === 'See All Rooms') {
+  const isRoomFilter = selectedBucket?.startsWith('room-')
+  const isVillaFilter = selectedBucket?.startsWith('villa-')
+  const rawBucket = selectedBucket?.replace('room-', '').replace('villa-', '')
+
+  if (selectedBucket === 'room-See All Rooms') {
     availableProperties = availableProperties.filter(prop => prop.type === 'multi-room property')
-  } else if (selectedBucket === 'See All Villas') {
+  } else if (selectedBucket === 'villa-See All Villas') {
     availableProperties = availableProperties.filter(prop => prop.type === 'villa')
   } else if (selectedBucket) {
-    availableProperties = availableProperties.filter(prop =>
-      prop.rooms?.some((r: any) => r.price_bucket === selectedBucket)
-    )
+    availableProperties = availableProperties.filter(prop => {
+      const typeMatch = isRoomFilter ? prop.type === 'multi-room property' : (isVillaFilter ? prop.type === 'villa' : true)
+      if (!typeMatch) return false
+      return prop.rooms?.some((r: any) => r.price_bucket === rawBucket)
+    })
   } else {
     // No bucket selected — show only featured properties on homepage
     availableProperties = availableProperties.filter(p => p.featured)
@@ -216,8 +222,8 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
           </h3>
           <div className="flex flex-wrap gap-3">
             {roomBuckets.map(b => (
-              <Link key={b} href={buildUrl({ bucket: b })}
-                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === b ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
+              <Link key={b} href={buildUrl({ bucket: `room-${b}` })}
+                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === `room-${b}` ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
               >{b}</Link>
             ))}
           </div>
@@ -227,8 +233,8 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
           <h3 className="text-xl font-bold text-gray-900 mb-3">Villas under</h3>
           <div className="flex flex-wrap gap-3">
             {villaBuckets.map(b => (
-              <Link key={b} href={buildUrl({ bucket: b })}
-                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === b ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
+              <Link key={b} href={buildUrl({ bucket: `villa-${b}` })}
+                className={`px-6 py-2 rounded-xl border font-medium text-sm transition-all ${selectedBucket === `villa-${b}` ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900'}`}
               >{b}</Link>
             ))}
           </div>
@@ -238,7 +244,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
       <div>
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <Star className="text-yellow-500" />
-          {selectedBucket ? `Properties under ${selectedBucket}` : 'Featured Properties'}
+          {selectedBucket ? `Properties under ${rawBucket}` : 'Featured Properties'}
         </h2>
 
         {availableProperties.length === 0 ? (
@@ -246,10 +252,10 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
             <p className="text-gray-500 text-lg">No properties found matching your selection.</p>
             {selectedBucket && (
               <Link 
-                href={buildUrl({ bucket: roomBuckets.includes(selectedBucket) ? 'See All Rooms' : 'See All Villas' })} 
+                href={buildUrl({ bucket: isRoomFilter ? 'room-See All Rooms' : 'villa-See All Villas' })} 
                 className="inline-block mt-4 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
               >
-                Show all {roomBuckets.includes(selectedBucket) ? 'rooms' : 'villas'}
+                Show all {isRoomFilter ? 'rooms' : 'villas'}
               </Link>
             )}
           </div>
