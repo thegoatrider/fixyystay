@@ -16,11 +16,17 @@ export async function submitPromotionRequest(propertyId: string, proposalText: s
     // 1. Get Influencer ID representing this user
     const { data: influencer } = await supabase
       .from('influencers')
-      .select('id')
+      .select('id, approved')
       .eq('user_id', user.id)
       .single()
 
-    if (!influencer) return { error: 'You must be an approved influencer to send requests.' }
+    if (!influencer) {
+      return { error: 'Your account is not linked to an influencer profile. Please go to Admin Dashboard -> Influencers and "Approve" your profile by pasting your User UUID.' }
+    }
+
+    if (!influencer.approved) {
+      return { error: 'Your influencer profile is pending administrative approval.' }
+    }
 
     // 2. Insert Request
     const { error } = await supabase
