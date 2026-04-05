@@ -5,10 +5,12 @@ export type InfluencerDashboardData = {
   influencer: {
     id: string
     name: string
+    email: string
     commission_rate: number
     approved: boolean
   }
-  properties: any[]
+  all_properties: any[]
+  my_requests: any[]
   clicks: any[]
   bookings: any[]
   wallet_transactions: any[]
@@ -23,7 +25,8 @@ export function useInfluencerDashboardData(influencerId: string | undefined, isS
     queryFn: async () => {
       if (!influencerId && !isSuperAdmin) return null
 
-      const { data, error } = await supabase.rpc('get_influencer_dashboard_data', {
+      // Use the V2 RPC that returns ALL properties for the marketplace
+      const { data, error } = await supabase.rpc('get_influencer_dashboard_data_v2', {
         p_influencer_id: influencerId,
         p_is_super_admin: isSuperAdmin,
       })

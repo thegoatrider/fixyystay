@@ -5,6 +5,7 @@ export type DashboardData = {
   properties: any[]
   leads: any[]
   checkins: any[]
+  influencer_requests: any[]
   wallet: {
     transactions: any[]
     payouts: any[]

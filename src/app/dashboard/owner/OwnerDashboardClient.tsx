@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet, User, Zap } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { claimFreeTrial } from './actions'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
@@ -20,6 +20,7 @@ import React, { useMemo } from 'react'
 // Lazy load heavy tab sections
 const LeadsSection = dynamic(() => import('./LeadsSection'), { loading: () => <DashboardSkeleton /> })
 const GuestList = dynamic(() => import('./GuestList'), { loading: () => <DashboardSkeleton /> })
+const InfluencerRequestsInbox = dynamic(() => import('./InfluencerRequestsInbox'), { loading: () => <DashboardSkeleton /> })
 
 export default function OwnerDashboardClient({ 
   userId, 
@@ -38,8 +39,10 @@ export default function OwnerDashboardClient({
   if (isLoading) return <DashboardSkeleton />
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
 
-  const { properties, leads, checkins, wallet, subscription } = data as any
+  const { properties, leads, checkins, influencer_requests, wallet, subscription } = data as any
   const isLocked = !subscription?.is_active && !isSuperAdmin
+
+  const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
   return (
     <div className="flex flex-col gap-8">
@@ -55,6 +58,7 @@ export default function OwnerDashboardClient({
         <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<List className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
         <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
         <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
+        <TabLink href="/dashboard/owner?tab=influencers" active={activeTab === 'influencers'} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Influencers" count={pendingInfluencerRequestCount} />
         <TabLink href="/dashboard/owner?tab=wallet" active={activeTab === 'wallet'} icon={<Wallet className="w-4 h-4 md:w-5 md:h-5" />} label="Wallet" />
         <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
       </div>
@@ -89,6 +93,10 @@ export default function OwnerDashboardClient({
           ownerId={ownerId} 
           properties={properties || []} 
           initialLeads={leads as any || []} 
+        />
+      ) : activeTab === 'influencers' ? (
+        <InfluencerRequestsInbox 
+          requests={influencer_requests || []} 
         />
       ) : (
         <GuestList checkins={checkins as any || []} />
