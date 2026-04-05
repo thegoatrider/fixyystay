@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2 } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -126,6 +126,16 @@ export default async function AdminDashboard() {
     .select('*')
     .order('created_at', { ascending: false })
 
+  // 7. Global Influencer Promotion Requests
+  const { data: promotionRequests } = await supabase
+    .from('influencer_promotion_requests')
+    .select(`
+      *,
+      influencers(name, email),
+      properties(name)
+    `)
+    .order('created_at', { ascending: false })
+
   return (
     <div className="flex flex-col gap-10">
 
@@ -153,6 +163,71 @@ export default async function AdminDashboard() {
             <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
           </div>
         </div>
+
+        {/* SECTION 0.2: Promotion Requests & Communications (NEW) */}
+        <section className="mt-12">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-xl"><Megaphone className="text-indigo-600 w-6 h-6" /></div>
+            Influencer Partnerships Audit
+            <span className="text-sm font-normal text-gray-400 ml-2">{promotionRequests?.length || 0} communications</span>
+          </h2>
+          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Influencer</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Property</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pitch Message</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Decision Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Owner Feedback</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {promotionRequests?.map((req: any) => (
+                  <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{req.influencers?.name}</p>
+                      <p className="text-[10px] text-gray-400 font-medium">{req.influencers?.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[11px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        {req.properties?.name}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap text-gray-600 font-medium italic" title={req.proposal_text}>
+                        "{req.proposal_text}"
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {req.status === 'accepted' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                          <CheckCircle className="w-3 h-3" /> Approved
+                        </span>
+                      ) : req.status === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                          <XCircle className="w-3 h-3" /> Declined
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                          <Clock className="w-3 h-3" /> Awaiting Owner
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-medium text-gray-500">
+                      {req.rejection_reason || <span className="opacity-20">—</span>}
+                    </td>
+                  </tr>
+                ))}
+                {(!promotionRequests || promotionRequests.length === 0) && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">No promotion requests logged in the system yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* SECTION 0.3: Partner Onboarding */}
         <div className="mt-12 grid lg:grid-cols-2 gap-8 items-start">

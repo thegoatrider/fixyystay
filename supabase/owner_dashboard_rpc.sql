@@ -26,6 +26,7 @@ DECLARE
   v_wallet_transactions JSON;
   v_payout_requests JSON;
   v_subscription JSON;
+  v_influencer_requests JSON;
 BEGIN
   -- 1. Get properties
   IF p_is_superadmin THEN
@@ -62,7 +63,33 @@ BEGIN
     WHERE pr.user_id = (SELECT user_id FROM public.owners WHERE id = p_owner_id);
   END IF;
 
-  -- 5. Get CURRENT subscription status
+  -- 5. Get influencer requests
+  IF p_is_superadmin THEN
+    SELECT json_agg(ir_complex) INTO v_influencer_requests
+    FROM (
+      SELECT ir.*, 
+             json_build_object('id', i.id, 'name', i.name, 'email', i.email) as influencers,
+             json_build_object('id', pr.id, 'name', pr.name) as properties
+      FROM public.influencer_promotion_requests ir
+      JOIN public.influencers i ON ir.influencer_id = i.id
+      JOIN public.properties pr ON ir.property_id = pr.id
+      ORDER BY ir.created_at DESC
+    ) ir_complex;
+  ELSE
+    SELECT json_agg(ir_complex) INTO v_influencer_requests
+    FROM (
+      SELECT ir.*, 
+             json_build_object('id', i.id, 'name', i.name, 'email', i.email) as influencers,
+             json_build_object('id', pr.id, 'name', pr.name) as properties
+      FROM public.influencer_promotion_requests ir
+      JOIN public.influencers i ON ir.influencer_id = i.id
+      JOIN public.properties pr ON ir.property_id = pr.id
+      WHERE pr.owner_id = p_owner_id
+      ORDER BY ir.created_at DESC
+    ) ir_complex;
+  END IF;
+
+  -- 6. Get CURRENT subscription status
   SELECT json_build_object(
     'plan_name', s.plan_name,
     'end_date', s.end_date,
@@ -77,6 +104,7 @@ BEGIN
     'properties', COALESCE(v_properties, '[]'::json),
     'leads', COALESCE(v_leads, '[]'::json),
     'checkins', COALESCE(v_checkins, '[]'::json),
+    'influencer_requests', COALESCE(v_influencer_requests, '[]'::json),
     'wallet', json_build_object(
       'transactions', COALESCE(v_wallet_transactions, '[]'::json),
       'payout_requests', COALESCE(v_payout_requests, '[]'::json)
