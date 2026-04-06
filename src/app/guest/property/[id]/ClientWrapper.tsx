@@ -41,8 +41,8 @@ export default function PropertyDetailClient({
   initialGuests: string | null,
   isLoggedIn: boolean
 }) {
-  const firstAvailable = availableRooms.find(r => r.isAvailable)
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(firstAvailable?.id || availableRooms[0]?.id || '')
+  // Room Quantities State: { [roomCategoryId]: quantity }
+  const [roomQuantities, setRoomQuantities] = useState<Record<string, number>>({})
   const [checkin, setCheckin] = useState(initialCheckin || '')
   const [checkout, setCheckout] = useState(initialCheckout || '')
   const [guests, setGuests] = useState(initialGuests || '2')
@@ -55,7 +55,7 @@ export default function PropertyDetailClient({
   const [isCopied, setIsCopied] = useState(false)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
-  const [bookingDetails, setBookingDetails] = useState<{name: string, email: string, phone: string, checkin: string, checkout: string} | null>(null)
+  const [bookingDetails, setBookingDetails] = useState<{name: string, email: string, phone: string, checkin: string, checkout: string, roomSummary: string} | null>(null)
 
   const propImages = property.image_urls || []
   const roomImages = property.rooms?.map((r: any) => r.image_url).filter(Boolean) || []
@@ -145,7 +145,19 @@ export default function PropertyDetailClient({
   }, [property.id])  
 
   // --- Dynamic Pricing & Availability Logic ---
-  const selectedRoom = availableRooms.find((r: any) => r.id === selectedRoomId)
+  const selectedRoomSelections = availableRooms
+    .filter(r => (roomQuantities[r.category] || 0) > 0)
+    .map(r => ({
+      id: r.id,
+      name: r.category,
+      quantity: roomQuantities[r.category],
+      price: r.currentPrice || r.base_price,
+      base_capacity: r.base_capacity || 2,
+      extra_guest_price: r.extra_guest_price || property.extra_per_pax || 500,
+      availableCount: r.availableRoomIds.length
+    }))
+
+  const totalRoomsSelected = selectedRoomSelections.reduce((acc, r) => acc + r.quantity, 0)
   
   // 1. Calculate Stay Interval
   const stayDates = (checkin && checkout && new Date(checkin) < new Date(checkout))
@@ -157,46 +169,28 @@ export default function PropertyDetailClient({
 
   const numNights = stayDates.length
 
-  // 2. Multi-night Availability & Base Price Calculation
+  // 2. Base Price & Availability Check
   let baseStayPrice = 0
-  let isRangeAvailable = numNights > 0
+  let totalBaseCapacity = 0
+  let isRangeAvailable = numNights > 0 && totalRoomsSelected > 0
 
-  if (selectedRoom && numNights > 0) {
-    // If we're using the server-calculated isAvailable flag, we should still re-check if dates changed on client
-    // For now, let's keep the client-side check robust.
-    
-    // Check Manual Blocks
-    const isInRangeBlocked = selectedRoom.room_availability?.some((a: any) => {
-      return stayDates.includes(a.date) && !a.available
-    })
-
-    // Check Overlapping Bookings
-    const hasOverlappingBooking = selectedRoom.bookings?.some((b: any) => {
-      if (!b.checkin_date || !b.checkout_date) return false
-      return b.checkin_date < checkout && b.checkout_date > checkin
-    })
-    
-    if (isInRangeBlocked || hasOverlappingBooking) {
-      isRangeAvailable = false
-    } else {
-      // Accumulate Rate
-      for (const d of stayDates) {
-        const customRate = selectedRoom.room_rates?.find((r: any) => r.date === d)?.price
-        baseStayPrice += customRate !== undefined ? customRate : selectedRoom.base_price
-      }
-    }
+  for (const sel of selectedRoomSelections) {
+    baseStayPrice += sel.price * sel.quantity
+    totalBaseCapacity += sel.base_capacity * sel.quantity
+    if (sel.quantity > sel.availableCount) isRangeAvailable = false
   }
 
   // 3. Guest Pricing Logic
-  const maxGuestsBase: number = property.max_guests || 2 // Free guests
-  const maxCapacityGlobal: number = property.max_capacity || 20 // Total limit
-  const extraPerPax: number = property.extra_per_pax || 0
   const guestCount = parseInt(guests) || 1
+  const extraGuests = guestCount > totalBaseCapacity ? guestCount - totalBaseCapacity : 0
+  
+  // For multi-room, we use the highest extra_guest_price found in selection as a safe bet, 
+  // or property default if nothing selected.
+  const extraPricePerPax = selectedRoomSelections.length > 0 
+    ? Math.max(...selectedRoomSelections.map(s => s.extra_guest_price))
+    : (property.extra_per_pax || 500)
 
-  const extraGuests = guestCount > maxGuestsBase ? guestCount - maxGuestsBase : 0
-  const extraChargePerNight = extraGuests * extraPerPax
-  const totalExtraCharge = extraChargePerNight * numNights
-
+  const totalExtraCharge = extraGuests * extraPricePerPax * numNights
   const totalPrice = baseStayPrice + totalExtraCharge
   // --- End Logic ---
   
@@ -222,7 +216,7 @@ export default function PropertyDetailClient({
 
   async function handleBook(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!selectedRoomId || !checkin || !checkout) return
+    if (totalRoomsSelected === 0 || !checkin || !checkout) return
 
     const formData = new FormData(e.currentTarget)
     const guestName = formData.get('guestName') as string
@@ -234,7 +228,7 @@ export default function PropertyDetailClient({
     
     try {
       // 1. Create Razorpay Order
-      const orderRes = await createBookingOrder(property.id, selectedRoomId, totalPrice, checkin, checkout)
+      const orderRes = await createBookingOrder(property.id, selectedRoomSelections, totalPrice, checkin, checkout)
       if (orderRes.error) throw new Error(orderRes.error)
 
       // 2. Open Razorpay Checkout
@@ -258,7 +252,7 @@ export default function PropertyDetailClient({
           setIsLoading(true)
           const confirmRes = await confirmBooking(
             property.id, 
-            selectedRoomId, 
+            selectedRoomSelections, 
             totalPrice, 
             checkin, 
             checkout,
@@ -271,7 +265,8 @@ export default function PropertyDetailClient({
               name: guestName,
               email: guestEmail,
               phone: guestPhone,
-              influencerId
+              influencerId,
+              numGuests: guestCount
             }
           )
 
@@ -284,7 +279,8 @@ export default function PropertyDetailClient({
               email: guestEmail,
               phone: guestPhone,
               checkin,
-              checkout
+              checkout,
+              roomSummary: selectedRoomSelections.map(s => `${s.quantity}x ${s.name}`).join(', ')
             })
             setSuccess(true)
             setIsConfirmed(true)
@@ -337,6 +333,10 @@ export default function PropertyDetailClient({
               <p className="text-xs text-gray-500">
                 {Math.ceil((new Date(bookingDetails.checkout).getTime() - new Date(bookingDetails.checkin).getTime()) / (1000 * 60 * 60 * 24))} Nights
               </p>
+            </div>
+            <div className="col-span-full border-t pt-4 space-y-1">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Rooms Secured</p>
+              <p className="text-sm font-bold text-gray-900">{bookingDetails.roomSummary}</p>
             </div>
           </div>
         )}
@@ -535,61 +535,56 @@ export default function PropertyDetailClient({
                 <div className="flex flex-col gap-3">
                   {availableRooms.map(room => {
                     const roomAvailable = room.isAvailable;
+                    const qty = roomQuantities[room.category] || 0;
                     
                     return (
-                      <label
+                      <div
                         key={room.category}
                         className={cn(
-                          "flex gap-4 items-center p-3 rounded-xl border cursor-pointer transition-all",
-                          selectedRoomId === room.id ? 'border-blue-600 bg-blue-50 shadow-sm' : 'hover:bg-gray-50 border-gray-200',
-                          !roomAvailable && "opacity-60 grayscale-[0.5]"
+                          "flex gap-4 items-center p-3 rounded-xl border transition-all",
+                          qty > 0 ? 'border-blue-600 bg-blue-50 shadow-sm' : 'bg-white border-gray-100',
+                          (!roomAvailable || (room.availableRoomIds.length === 0)) && "opacity-60 grayscale-[0.5]"
                         )}
                       >
-                        <input
-                          type="radio"
-                          name="roomId"
-                          value={room.id}
-                          checked={selectedRoomId === room.id}
-                          onChange={() => setSelectedRoomId(room.id)}
-                          className="sr-only"
-                        />
-                        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border relative">
+                        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border relative">
                           {room.image_url ? (
                             <img src={room.image_url} alt={room.category} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">No Img</div>
                           )}
-                          {!roomAvailable && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="text-[8px] font-black text-white uppercase tracking-tighter">Sold Out</span>
-                            </div>
-                          )}
                         </div>
-                        <div className="flex-1">
-                          <div className="font-bold text-gray-900 flex items-center gap-2">
-                            {room.category} Room
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-gray-900 text-sm truncate">
+                            {room.category}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-gray-400 font-medium">per night</span>
-                            {roomAvailable ? (
-                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter animate-pulse">Available</span>
-                            ) : (
-                              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Sold Out</span>
-                            )}
+                          <div className="text-[10px] text-gray-500 font-medium">
+                            ₹{(room.currentPrice || room.base_price).toLocaleString()} / night
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">
+                            Base: {room.base_capacity || 2} pax
                           </div>
                         </div>
-                        <div className="flex flex-col items-end shrink-0">
-                          <div className={cn(
-                            "font-extrabold text-lg",
-                            roomAvailable ? "text-green-600" : "text-gray-400 line-through"
-                          )}>
-                            ₹{(room.currentPrice || room.base_price).toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
-                            upto {property.max_guests || 2} guests
-                          </div>
+
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => setRoomQuantities(prev => ({ ...prev, [room.category]: Math.max(0, (prev[room.category] || 0) - 1) }))}
+                            className="w-7 h-7 flex items-center justify-center rounded bg-gray-50 hover:bg-gray-100 text-gray-600 disabled:opacity-30"
+                            disabled={qty === 0}
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center text-sm font-black text-gray-900">{qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => setRoomQuantities(prev => ({ ...prev, [room.category]: Math.min(room.availableRoomIds.length, (prev[room.category] || 0) + 1) }))}
+                            className="w-7 h-7 flex items-center justify-center rounded bg-blue-50 hover:bg-blue-100 text-blue-600 disabled:opacity-30"
+                            disabled={!roomAvailable || qty >= room.availableRoomIds.length}
+                          >
+                            +
+                          </button>
                         </div>
-                      </label>
+                      </div>
                     );
                   })}
                 </div>
@@ -648,12 +643,12 @@ export default function PropertyDetailClient({
                   onChange={(e) => setGuests(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-medium"
                 >
-                  {Array.from({ length: maxCapacityGlobal }, (_, i) => i + 1).map(n => (
+                  {Array.from({ length: property.max_capacity || 20 }, (_, i) => i + 1).map(n => (
                     <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                   ))}
                 </select>
-                {maxCapacityGlobal > 0 && (
-                  <p className="text-[11px] text-gray-400">Max capacity: {maxCapacityGlobal} guests</p>
+                {(property.max_capacity || 20) > 0 && (
+                  <p className="text-[11px] text-gray-400">Max capacity: {property.max_capacity || 20} guests</p>
                 )}
               </div>
 
@@ -662,7 +657,7 @@ export default function PropertyDetailClient({
                 {numNights > 0 ? (
                   <>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600 font-medium">Room Price ({numNights} nights)</span>
+                      <span className="text-gray-600 font-medium">Rooms ({totalRoomsSelected} total)</span>
                       <span className="font-bold text-gray-900 font-mono">₹{baseStayPrice.toLocaleString()}</span>
                     </div>
                     {extraGuests > 0 && (
@@ -706,8 +701,8 @@ export default function PropertyDetailClient({
                 </div>
               )}
 
-              <Button type="submit" size="lg" className="w-full mt-2 text-lg" disabled={isLoading || !isRangeAvailable || numNights === 0}>
-                {isLoading ? 'Processing...' : !isRangeAvailable ? 'Sold Out' : numNights === 0 ? 'Select Dates' : `Pay ₹${totalPrice.toLocaleString()}`}
+              <Button type="submit" size="lg" className="w-full mt-2 text-lg" disabled={isLoading || (numNights > 0 && !isRangeAvailable) || numNights === 0 || totalRoomsSelected === 0}>
+                {isLoading ? 'Processing...' : (numNights > 0 && totalRoomsSelected > 0 && !isRangeAvailable) ? 'Not Available' : numNights === 0 ? 'Select Dates' : totalRoomsSelected === 0 ? 'Select Rooms' : `Pay ₹${totalPrice.toLocaleString()}`}
               </Button>
             </form>
           )}
