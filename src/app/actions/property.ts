@@ -28,6 +28,9 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const description = formData.get('description') as string
   const house_rules = formData.get('houseRules') as string
   const amenities = formData.getAll('amenities') as string[]
+  const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
+  const otherAmenities = otherAmenitiesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+  const allAmenities = Array.from(new Set([...amenities, ...otherAmenities]))
   
   // Parse existing photos to keep
   const existingPhotosStr = formData.get('existingPhotos') as string
@@ -84,7 +87,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     name,
     description,
     house_rules,
-    amenities,
+    amenities: allAmenities,
     image_urls,
   }
   

@@ -37,7 +37,64 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
+  const setSearchTerm = (val: string) => setSearchState(val)
+  const [searchTerm, setSearchState] = useState('')
+
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [] })) {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const file = new File([blob], filename + ".jpg", { type: blob.type })
+        try {
+          await navigator.share({ files: [file], title: filename })
+          return
+        } catch (e) {}
+      }
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objUrl
+      link.download = filename + ".jpg"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(objUrl), 100)
+    } catch (err) { window.open(url, '_blank') }
+  }
+
+  const handlePrint = (url: string) => {
+    const iframeId = 'print-iframe'
+    let iframe = document.getElementById(iframeId) as HTMLIFrameElement
+    if (!iframe) {
+      iframe = document.createElement('iframe')
+      iframe.id = iframeId
+      iframe.style.position = 'fixed'
+      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0'
+      document.body.appendChild(iframe)
+    }
+    const doc = iframe.contentWindow?.document || iframe.contentDocument
+    if (doc) {
+      doc.open()
+      doc.write(`<html><body style="margin:0;display:flex;align-items:center;justify-content:center;"><img src="${url}" style="max-width:100%;max-height:100vh;object-fit:contain;" onload="window.print();" /></body></html>`)
+      doc.close()
+    }
+  }
+
+  const handleDownloadAll = async (guest: GuestCheckin) => {
+    if (!guest.id_documents) return
+    const items: {url: string, name: string}[] = []
+    guest.id_documents.forEach((doc: any, i: number) => {
+      const base = `ID_${guest.guest_name.replace(/\s+/g, '_')}_P${i+1}`
+      if (doc.frontUrl) items.push({ url: doc.frontUrl, name: `${base}_Front` })
+      if (doc.backUrl) items.push({ url: doc.backUrl, name: `${base}_Back` })
+    })
+    for (const item of items) {
+      await handleDownload(item.url, item.name)
+      await new Promise(r => setTimeout(r, 600))
+    }
+  }
 
   // Map: 'YYYY-MM-DD' => GuestCheckin[]
   const checkinsByDate = useMemo(() => {
@@ -273,70 +330,6 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
           )}
         </div>
         
-        {/* ── Helpers for ID Actions ── */}
-        {(() => {
-          const handleDownload = async (url: string, filename: string) => {
-            try {
-              const res = await fetch(url)
-              const blob = await res.blob()
-              const link = document.createElement('a')
-              link.href = URL.createObjectURL(blob)
-              link.download = filename
-              document.body.appendChild(link)
-              link.click()
-              document.body.removeChild(link)
-            } catch (err) {
-              window.open(url, '_blank')
-            }
-          }
-
-          const handlePrint = (url: string) => {
-            const printWindow = window.open('', '_blank')
-            if (printWindow) {
-              printWindow.document.write(`
-                <html>
-                  <head><title>Print ID</title></head>
-                  <body style="margin:0;display:flex;align-items:center;justify-content:center;">
-                    <img src="${url}" style="max-width:100%;max-height:100vh;object-contain:contain;" onload="window.print();window.close();" />
-                  </body>
-                </html>
-              `)
-              printWindow.document.close()
-            }
-          }
-
-          const handleShare = async (url: string, title: string) => {
-            if (navigator.share) {
-              try {
-                await navigator.share({ title, url })
-              } catch (err) {
-                console.log('User cancelled share')
-              }
-            } else {
-              navigator.clipboard.writeText(url)
-              alert('Link copied to clipboard!')
-            }
-          }
-
-          const handleDownloadAll = async (guest: GuestCheckin) => {
-            if (!guest.id_documents) return
-            const urls: {url: string, name: string}[] = []
-            guest.id_documents.forEach((doc: any, i: number) => {
-              const baseName = `ID_${guest.guest_name.replace(/\s+/g, '_')}_P${i+1}`
-              if (doc.frontUrl) urls.push({ url: doc.frontUrl, name: `${baseName}_Front` })
-              if (doc.backUrl) urls.push({ url: doc.backUrl, name: `${baseName}_Back` })
-            })
-
-            for (let i = 0; i < urls.length; i++) {
-              await handleDownload(urls[i].url, urls[i].name)
-              // Small delay to prevent browser download blocking
-              await new Promise(r => setTimeout(r, 300))
-            }
-          }
-
-          return null
-        })()}
-
         {/* ── Guest Detail Card ── */}
         <div className={`transition-all duration-300 ${selectedGuest ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           {selectedGuest ? (
@@ -407,35 +400,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Documents</p>
                     {selectedGuest.id_documents && selectedGuest.id_documents.length > 0 && (
                       <button 
-                        onClick={() => {
-                          const guest = selectedGuest;
-                          const internalDownload = async (url: string, filename: string) => {
-                            try {
-                              const res = await fetch(url)
-                              const blob = await res.blob()
-                              const link = document.createElement('a')
-                              link.href = URL.createObjectURL(blob)
-                              link.download = filename
-                              document.body.appendChild(link)
-                              link.click()
-                              document.body.removeChild(link)
-                            } catch (err) { window.open(url, '_blank') }
-                          };
-
-                          (async () => {
-                            const docs = guest.id_documents;
-                            const itemsToDownload: {url: string, name: string}[] = [];
-                            docs.forEach((doc: any, i: number) => {
-                              const base = `ID_${guest.guest_name.replace(/\s+/g, '_')}_P${i+1}`;
-                              if (doc.frontUrl) itemsToDownload.push({ url: doc.frontUrl, name: `${base}_Front` });
-                              if (doc.backUrl) itemsToDownload.push({ url: doc.backUrl, name: `${base}_Back` });
-                            });
-                            for (const item of itemsToDownload) {
-                              await internalDownload(item.url, item.name);
-                              await new Promise(r => setTimeout(r, 600)); // Delay to prevent browser throttling
-                            }
-                          })();
-                        }}
+                        onClick={() => handleDownloadAll(selectedGuest)}
                         className="group flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 border border-indigo-100 rounded-lg text-[10px] font-black text-indigo-600 hover:text-white transition-all shadow-sm"
                       >
                         <Download className="w-3 h-3 transition-transform group-hover:-translate-y-0.5" />
@@ -470,18 +435,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                               <button 
                                 onClick={() => {
                                   const filename = `ID_${selectedGuest.guest_name.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}`;
-                                  (async () => {
-                                    try {
-                                      const res = await fetch(url);
-                                      const blob = await res.blob();
-                                      const link = document.createElement('a');
-                                      link.href = URL.createObjectURL(blob);
-                                      link.download = filename;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                    } catch (e) { window.open(url, '_blank'); }
-                                  })();
+                                  handleDownload(url, filename);
                                 }}
                                 className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
                               >
@@ -490,19 +444,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                               </button>
                               
                               <button 
-                                onClick={() => {
-                                  const win = window.open('', '_blank');
-                                  if (win) {
-                                    win.document.write(`
-                                      <html>
-                                        <body style="margin:0;display:flex;justify-content:center;background:#000;">
-                                          <img src="${url}" style="max-height:100vh;max-width:100%;object-fit:contain;" onload="window.print();window.close();"/>
-                                        </body>
-                                      </html>
-                                    `);
-                                    win.document.close();
-                                  }
-                                }}
+                                onClick={() => handlePrint(url)}
                                 className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
                               >
                                 <Printer className="w-4 h-4 text-gray-600" />

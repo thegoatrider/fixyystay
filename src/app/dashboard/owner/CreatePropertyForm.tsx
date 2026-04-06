@@ -190,6 +190,15 @@ export default function CreatePropertyForm() {
             </label>
           ))}
         </div>
+        <div className="mt-3">
+          <Label htmlFor="otherAmenities" className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1.5 block">Other Amenities (Custom)</Label>
+          <Input 
+            name="otherAmenities" 
+            placeholder="e.g. Infinity Pool, Movie Room, Chef on call" 
+            className="bg-gray-50/50 border-dashed focus:border-solid transition-all"
+          />
+          <p className="text-[10px] text-gray-400 mt-1 italic">Separate multiple entries with commas</p>
+        </div>
       </div>
 
       <div className="space-y-2">

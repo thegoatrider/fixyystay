@@ -108,6 +108,10 @@ export async function createProperty(formData: FormData) {
   const description = formData.get('description') as string
   const houseRules = formData.get('houseRules') as string // Added houseRules extraction
   const amenities = formData.getAll('amenities') as string[]
+  const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
+  const otherAmenities = otherAmenitiesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
+  const allAmenities = Array.from(new Set([...amenities, ...otherAmenities]))
+  
   const priceBucket = formData.get('priceBucket') as string
   const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
@@ -180,7 +184,7 @@ export async function createProperty(formData: FormData) {
       type,
       description,
       house_rules: houseRules, // Save houseRules to DB
-      amenities,
+      amenities: allAmenities,
       image_urls,
       image_url: coverImageUrl || image_urls[0] || null, // Priority to coverImage
       helpdesk_number: helpdeskNumber,
