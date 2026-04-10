@@ -45,7 +45,7 @@ export default function PropertyDetailClient({
   const [roomQuantities, setRoomQuantities] = useState<Record<string, number>>({})
   const [checkin, setCheckin] = useState(initialCheckin || '')
   const [checkout, setCheckout] = useState(initialCheckout || '')
-  const [guests, setGuests] = useState(initialGuests || '2')
+  const [guests, setGuests] = useState(initialGuests || (property.type === 'villa' ? String(property.max_guests) : '2'))
   const [activeImage, setActiveImage] = useState<string | null>(null)
   
   const [success, setSuccess] = useState(false)
@@ -152,7 +152,7 @@ export default function PropertyDetailClient({
       name: r.category,
       quantity: roomQuantities[r.category],
       price: r.currentPrice || r.base_price,
-      base_capacity: r.base_capacity || 2,
+      base_capacity: r.base_capacity || (property.type === 'villa' ? property.max_guests : 2),
       extra_guest_price: r.extra_guest_price || property.extra_per_pax || 500,
       availableCount: r.availableRoomIds.length
     }))

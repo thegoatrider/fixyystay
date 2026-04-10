@@ -235,6 +235,8 @@ export async function createProperty(formData: FormData) {
         category: 'Villa',
         base_price: basePrice,
         price_bucket: priceBucket,
+        base_capacity: max_guests,
+        max_capacity: max_capacity,
       })
       if (roomError) {
         await supabaseAdmin.from('properties').delete().eq('id', property.id)

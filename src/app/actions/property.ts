@@ -27,6 +27,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const name = formData.get('name') as string
   const description = formData.get('description') as string
   const house_rules = formData.get('houseRules') as string
+  const max_guests = parseInt(formData.get('max_guests') as string) || 2
+  const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
   const amenities = formData.getAll('amenities') as string[]
   const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
   const otherAmenities = otherAmenitiesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
@@ -89,6 +91,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     house_rules,
     amenities: allAmenities,
     image_urls,
+    max_guests,
+    max_capacity,
   }
   
   if (newCoverImageUrl) {
@@ -106,6 +110,15 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   if (updateError) {
     console.error('Property update error:', updateError)
     return { error: `Update failed: ${updateError.message}` }
+  }
+
+  // 4.5 Sync villa capacity if it's a villa
+  const { data: propData } = await supabaseAdmin.from('properties').select('type').eq('id', propertyId).single()
+  if (propData?.type === 'villa') {
+    await supabaseAdmin.from('rooms').update({
+      base_capacity: max_guests,
+      max_capacity: max_capacity,
+    }).eq('property_id', propertyId).eq('category', 'Villa')
   }
 
   // 5. Revalidate paths to reflect changes

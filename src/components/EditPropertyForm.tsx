@@ -118,6 +118,19 @@ export default function EditPropertyForm({ property }: { property: any }) {
         />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label htmlFor="max_guests" className="text-gray-700 font-bold">Standard Guests (Base Capacity)</Label>
+          <Input type="number" name="max_guests" defaultValue={property.max_guests || 2} required min={1} />
+          <p className="text-[10px] text-gray-400 font-medium">Guests included in the base price.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="max_capacity" className="text-gray-700 font-bold">Total Max Capacity</Label>
+          <Input type="number" name="max_capacity" defaultValue={property.max_capacity || 20} required min={1} />
+          <p className="text-[10px] text-gray-400 font-medium">Maximum guests allowed in this property.</p>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="houseRules" className="text-gray-700 font-bold">House Rules</Label>
         <textarea 

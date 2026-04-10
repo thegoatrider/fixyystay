@@ -39,6 +39,7 @@ export default function InfluencerDashboardClient({
   const totalBookings = bookings?.length || 0
   const totalRevenue = bookings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0
   const totalCommission = totalRevenue * (commissionRate / 100)
+  const globalConversionRate = totalClicks > 0 ? (totalBookings / totalClicks) * 100 : 0
 
   // Derived logic
   const acceptedPropertyIds = new Set(my_requests?.filter(r => r.status === 'accepted').map(r => r.property_id))
@@ -98,8 +99,8 @@ export default function InfluencerDashboardClient({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-[-3rem] relative z-20 px-2 lg:px-0">
-        <StatCard icon={<MousePointerClick className="w-6 h-6" />} label="Clicks" value={totalClicks} color="blue" />
         <StatCard icon={<CalendarCheck className="w-6 h-6" />} label="Bookings" value={totalBookings} color="orange" />
+        <StatCard icon={<MousePointerClick className="w-6 h-6" />} label="Conversion" value={`${globalConversionRate.toFixed(1)}%`} color="blue" />
         <StatCard icon={<DollarSign className="w-6 h-6" />} label="Revenue" value={`₹${totalRevenue.toLocaleString()}`} color="green" />
         <StatCard icon={<Megaphone className="w-6 h-6" />} label="Earned" value={`₹${totalCommission.toLocaleString()}`} color="dark" highlight />
       </div>
@@ -168,7 +169,7 @@ export default function InfluencerDashboardClient({
                         <div className="grid grid-cols-3 gap-6">
                           <StatsMiniCard label="Clicks" value={propClicks} color="blue" />
                           <StatsMiniCard label="Bookings" value={propBookings.length} color="orange" />
-                          <StatsMiniCard label="Earnings" value={`₹${(propRev * (commissionRate / 100)).toLocaleString()}`} color="green" />
+                          <StatsMiniCard label="CR %" value={`${propClicks > 0 ? ((propBookings.length / propClicks) * 100).toFixed(1) : 0}%`} color="green" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">Affiliate Engine Link</p>
