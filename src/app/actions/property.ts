@@ -12,10 +12,10 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expired. Please log in again.' }
 
-  const isSuperAdmin = user.email === 'superadmin@fixstay.com'
+  const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'superadmin@fixstay.com'
   
   // Verify ownership if not admin
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
     if (!owner) return { error: 'Owner profile not found.' }
     
