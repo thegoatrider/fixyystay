@@ -40,7 +40,8 @@ export default function OwnerDashboardClient({
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
 
   const { properties, leads, checkins, influencer_requests, wallet, subscription } = data as any
-  const isLocked = !subscription?.is_active && !isSuperAdmin
+  const isLifetime = subscription?.plan_name?.includes('Lifetime Partner')
+  const isLocked = !subscription?.is_active && !isSuperAdmin && !isLifetime
 
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 

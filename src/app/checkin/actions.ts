@@ -93,6 +93,7 @@ export async function submitCheckin(formData: FormData) {
       num_people: numPeople,
       checkin_date: checkinDate || null,
       checkout_date: checkoutDate || null,
+      vehicle_number: formData.get('vehicleNumber') as string || null,
       id_documents: idDocuments,
       uid: uid // Added missing uid
     }

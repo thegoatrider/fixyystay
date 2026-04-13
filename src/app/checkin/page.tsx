@@ -146,6 +146,7 @@ const compressImage = async (file: File): Promise<File> => {
       formData.append('numPeople', numPeople.toString())
       formData.append('checkinDate', checkinDate)
       formData.append('checkoutDate', checkoutDate)
+      formData.append('vehicleNumber', (e.currentTarget.elements.namedItem('vehicleNumber') as HTMLInputElement)?.value || '')
 
       // Handle ID Compression and Appending
       const rawFormData = new FormData(e.currentTarget)
@@ -323,6 +324,18 @@ const compressImage = async (file: File): Promise<File> => {
                 onChange={(e) => setCheckoutDate(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="vehicleNumber" className="flex items-center gap-1">
+              Vehicle Number <span className="text-[10px] text-gray-400 font-medium ml-1">(Optional)</span>
+            </Label>
+            <Input 
+              id="vehicleNumber" 
+              name="vehicleNumber"
+              placeholder="e.g. MH-12-AB-1234" 
+              className="bg-gray-50/50 focus:bg-white transition-colors"
+            />
           </div>
 
           <div className="space-y-2">

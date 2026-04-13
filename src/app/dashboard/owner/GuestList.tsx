@@ -13,6 +13,7 @@ type GuestCheckin = {
   num_people: number
   checkin_date: string | null
   checkout_date: string | null
+  vehicle_number: string | null
   id_documents: any[]
   created_at: string
   uid: string | null
@@ -378,6 +379,10 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                     <div className="flex justify-between">
                       <span className="text-gray-500">Check-out</span>
                       <span className="font-bold text-gray-900">{selectedGuest.checkout_date || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Vehicle No.</span>
+                      <span className="font-bold text-gray-900">{selectedGuest.vehicle_number || '—'}</span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-500">Guests</span>
