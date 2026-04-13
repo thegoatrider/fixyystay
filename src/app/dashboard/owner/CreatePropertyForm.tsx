@@ -130,7 +130,7 @@ export default function CreatePropertyForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 pb-24">
       <div className="space-y-2">
         <Label htmlFor="name">Property Name</Label>
         <Input name="name" required placeholder="e.g. Beachfront Villa" />
@@ -432,8 +432,8 @@ export default function CreatePropertyForm() {
         )}
       </div>
 
-      <Button type="submit" className="w-full mt-2" disabled={isLoading}>
-        {isLoading ? 'Creating...' : 'Create Property'}
+      <Button type="submit" className="w-full mt-2 h-14 text-lg font-black" disabled={isLoading}>
+        {isLoading ? 'Processing Images & Creating...' : 'Create Property'}
       </Button>
     </form>
   )

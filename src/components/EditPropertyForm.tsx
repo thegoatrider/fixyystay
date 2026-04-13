@@ -98,7 +98,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 pb-24">
       
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-semibold">{error}</div>}
       {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Updates saved successfully!</div>}
@@ -267,8 +267,8 @@ export default function EditPropertyForm({ property }: { property: any }) {
       </div>
 
       <div className="border-t pt-6 flex justify-end">
-        <Button type="submit" disabled={isLoading} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl">
-          {isLoading ? 'Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Changes</>}
+        <Button type="submit" disabled={isLoading} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl h-14 text-lg">
+          {isLoading ? 'Processing Images & Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Changes</>}
         </Button>
       </div>
     </form>

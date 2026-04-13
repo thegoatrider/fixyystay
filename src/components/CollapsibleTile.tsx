@@ -40,7 +40,7 @@ export function CollapsibleTile({
       </button>
       
       <div className={`transition-all duration-300 ease-in-out ${open ? 'max-h-[2000px] opacity-100 border-t' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-        <div className="p-4 md:p-6 bg-gray-50/50">
+        <div className="p-4 md:p-6 bg-white relative z-10">
           {children}
         </div>
       </div>
