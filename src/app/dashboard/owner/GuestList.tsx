@@ -45,22 +45,24 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   
   const handleDownload = async (url: string, filename: string, id: string) => {
     setProcessingId(id)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    const isAndroid = /Android/i.test(navigator.userAgent)
+
     try {
-      // 1. Try Native Share (Files) - Best for Mobile
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [] })) {
+      // 1. On Android/Mobile, navigator.share is the ONLY reliable way to save to gallery
+      if (isAndroid || (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [] }))) {
         try {
           const res = await fetch(url)
           const blob = await res.blob()
           const file = new File([blob], filename + ".jpg", { type: 'image/jpeg' })
           await navigator.share({ files: [file], title: filename })
-          setProcessingId(null)
-          return
+          return 
         } catch (e) {
-          console.warn("Share failed, falling back to download", e)
+          console.warn("Native share failed", e)
         }
       }
 
-      // 2. Try Standard Download Link
+      // 2. Try Standard Download Link (Desktop fallback)
       const res = await fetch(url)
       const blob = await res.blob()
       const objUrl = URL.createObjectURL(blob)
@@ -80,8 +82,6 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   }
 
   const handlePrint = (url: string) => {
-    // Hidden iframe printing often fails on mobile. 
-    // Best practice for mobile is opening in a new tab where the OS can trigger its native print/PDF flow.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     
     if (isMobile) {
@@ -91,17 +91,37 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
           <html>
             <head>
               <title>Print ID</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
               <style>
-                body { margin: 0; display: flex; align-items: center; justify-content: center; background: #000; }
-                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+                body { margin: 0; padding: 0; display: flex; flex-direction: column; background: #000; height: 100vh; font-family: sans-serif; }
+                .header { padding: 15px; background: #111; display: flex; align-items: center; justify-content: space-between; position: fixed; top: 0; width: 100%; box-sizing: border-box; z-index: 10; }
+                .back-btn { background: #444; color: #fff; border: none; padding: 10px 20px; font-weight: bold; font-size: 14px; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+                .content { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 60px; overflow: auto; }
+                img { max-width: 95%; max-height: 80vh; object-fit: contain; }
                 @media print {
+                  .header { display: none; }
+                  .content { padding-top: 0; }
                   body { background: #fff; }
                   img { width: 100%; height: auto; }
                 }
               </style>
             </head>
             <body>
-              <img src="${url}" onload="window.print();" />
+              <div class="header">
+                <button class="back-btn" onclick="if(window.opener){window.close();}else{window.history.back();}">← BACK TO DASHBOARD</button>
+                <div style="color: #6366f1; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; opacity: 0.9;">FIXSTAY PRINT</div>
+              </div>
+              <div class="content">
+                <img src="${url}" onload="window.print();" />
+              </div>
+              <script>
+                // Fallback for physical back buttons on Android
+                window.onunload = function() {
+                  if (window.opener && !window.opener.closed) {
+                    window.opener.focus();
+                  }
+                };
+              </script>
             </body>
           </html>
         `)
