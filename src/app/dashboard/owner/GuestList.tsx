@@ -41,17 +41,26 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   const setSearchTerm = (val: string) => setSearchState(val)
   const [searchTerm, setSearchState] = useState('')
 
-  const handleDownload = async (url: string, filename: string) => {
+  const [processingId, setProcessingId] = useState<string | null>(null)
+  
+  const handleDownload = async (url: string, filename: string, id: string) => {
+    setProcessingId(id)
     try {
+      // 1. Try Native Share (Files) - Best for Mobile
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [] })) {
-        const res = await fetch(url)
-        const blob = await res.blob()
-        const file = new File([blob], filename + ".jpg", { type: blob.type })
         try {
+          const res = await fetch(url)
+          const blob = await res.blob()
+          const file = new File([blob], filename + ".jpg", { type: 'image/jpeg' })
           await navigator.share({ files: [file], title: filename })
+          setProcessingId(null)
           return
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Share failed, falling back to download", e)
+        }
       }
+
+      // 2. Try Standard Download Link
       const res = await fetch(url)
       const blob = await res.blob()
       const objUrl = URL.createObjectURL(blob)
@@ -62,10 +71,45 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
       link.click()
       document.body.removeChild(link)
       setTimeout(() => URL.revokeObjectURL(objUrl), 100)
-    } catch (err) { window.open(url, '_blank') }
+    } catch (err) { 
+      // 3. Last Resort: Open in new tab
+      window.open(url, '_blank') 
+    } finally {
+      setProcessingId(null)
+    }
   }
 
   const handlePrint = (url: string) => {
+    // Hidden iframe printing often fails on mobile. 
+    // Best practice for mobile is opening in a new tab where the OS can trigger its native print/PDF flow.
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    
+    if (isMobile) {
+      const printWin = window.open('', '_blank')
+      if (printWin) {
+        printWin.document.write(`
+          <html>
+            <head>
+              <title>Print ID</title>
+              <style>
+                body { margin: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+                @media print {
+                  body { background: #fff; }
+                  img { width: 100%; height: auto; }
+                }
+              </style>
+            </head>
+            <body>
+              <img src="${url}" onload="window.print();" />
+            </body>
+          </html>
+        `)
+        printWin.document.close()
+      }
+      return
+    }
+
     const iframeId = 'print-iframe'
     let iframe = document.getElementById(iframeId) as HTMLIFrameElement
     if (!iframe) {
@@ -83,6 +127,35 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
     }
   }
 
+  const handleShare = async (url: string, title: string, id: string) => {
+    setProcessingId(id)
+    try {
+      if (navigator.share) {
+        // Try file sharing first if possible
+        try {
+          const res = await fetch(url)
+          const blob = await res.blob()
+          const file = new File([blob], "Guest_ID.jpg", { type: 'image/jpeg' })
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title, text: `Guest ID: ${title}` })
+            setProcessingId(null)
+            return
+          }
+        } catch (e) {}
+
+        // Fallback to URL sharing
+        await navigator.share({ title, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        alert('Link copied to clipboard!')
+      }
+    } catch (e) {
+      console.error("Sharing failed", e)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
   const handleDownloadAll = async (guest: GuestCheckin) => {
     if (!guest.id_documents) return
     const items: {url: string, name: string}[] = []
@@ -92,7 +165,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
       if (doc.backUrl) items.push({ url: doc.backUrl, name: `${base}_Back` })
     })
     for (const item of items) {
-      await handleDownload(item.url, item.name)
+      await handleDownload(item.url, item.name, `bulk-${item.name}`)
       await new Promise(r => setTimeout(r, 600))
     }
   }
@@ -440,12 +513,19 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                               <button 
                                 onClick={() => {
                                   const filename = `ID_${selectedGuest.guest_name.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}`;
-                                  handleDownload(url, filename);
+                                  handleDownload(url, filename, `save-${url}`);
                                 }}
-                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
+                                disabled={processingId === `save-${url}`}
+                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
                               >
-                                <Download className="w-4 h-4 text-gray-600" />
-                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Save</span>
+                                {processingId === `save-${url}` ? (
+                                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4 text-gray-600" />
+                                )}
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">
+                                  {processingId === `save-${url}` ? 'Wait' : 'Save'}
+                                </span>
                               </button>
                               
                               <button 
@@ -455,20 +535,20 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
                                 <Printer className="w-4 h-4 text-gray-600" />
                                 <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Print</span>
                               </button>
-
+ 
                               <button 
-                                onClick={async () => {
-                                  if (navigator.share) {
-                                    try { await navigator.share({ title: `${label} - ${selectedGuest.guest_name}`, url }); } catch (e) {}
-                                  } else {
-                                    navigator.clipboard.writeText(url);
-                                    alert('Image link copied!');
-                                  }
-                                }}
-                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
+                                onClick={() => handleShare(url, `${label} - ${selectedGuest.guest_name}`, `share-${url}`)}
+                                disabled={processingId === `share-${url}`}
+                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
                               >
-                                <Share2 className="w-4 h-4 text-gray-600" />
-                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Send</span>
+                                {processingId === `share-${url}` ? (
+                                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <Share2 className="w-4 h-4 text-gray-600" />
+                                )}
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">
+                                  {processingId === `share-${url}` ? 'Wait' : 'Send'}
+                                </span>
                               </button>
                             </div>
                           </div>
