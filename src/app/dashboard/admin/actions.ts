@@ -337,11 +337,20 @@ export async function onboardPartner(formData: FormData) {
     const expiryDate = new Date()
     let months = 1
     
-    if (planName === '7-Day Free Trial') {
+    if (planName.includes('Monthly')) {
+      months = 1
+    } else if (planName.includes('Quarterly')) {
+      months = 3
+    } else if (planName.includes('6-Months') || planName.includes('6 Months')) {
+      months = 6
+    } else if (planName.includes('Yearly')) {
+      months = 12
+    } else if (planName === '7-Day Free Trial') {
       expiryDate.setDate(expiryDate.getDate() + 7)
       months = 0 // For payment record
-    } else {
-      months = planName === 'Monthly' ? 1 : (planName === 'Quarterly' ? 3 : (planName === '6-Months' ? 6 : 12))
+    }
+
+    if (months > 0) {
       expiryDate.setMonth(expiryDate.getMonth() + months)
     }
 

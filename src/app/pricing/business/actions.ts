@@ -3,15 +3,20 @@
 import { createClient } from '@/utils/supabase/server'
 import Razorpay from 'razorpay'
 
-// Razorpay Instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-})
-
 export async function createOwnerOrder(planName: string, amount: number, email: string) {
   try {
     const supabase = await createClient()
+
+    // 0. Verify Keys
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Razorpay keys are missing in environment variables.')
+      return { error: 'Payment system is currently unavailable. Please contact support.' }
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
 
     // 1. Create Razorpay Order
     const options = {

@@ -1,6 +1,9 @@
-'use client'
-
 import BasePricingClient, { PricingPlan } from '../BasePricingClient'
+
+export const metadata = {
+  title: 'Starter Pricing - FixStay',
+  description: 'Special starter plans for property owners.',
+}
 
 const SHARED_FEATURES = [
   "List Unlimited Properties",
@@ -10,11 +13,11 @@ const SHARED_FEATURES = [
   "Dedicated Support"
 ]
 
-const PLANS: PricingPlan[] = [
+const STARTER_PLANS: PricingPlan[] = [
   {
     name: "Monthly",
-    price: 399,
-    originalPrice: 399,
+    price: 299,
+    originalPrice: 299,
     discount: 0,
     features: SHARED_FEATURES,
     bestValue: false,
@@ -22,17 +25,17 @@ const PLANS: PricingPlan[] = [
   },
   {
     name: "Quarterly",
-    price: 1099,
-    originalPrice: 1197,
-    discount: 8,
+    price: 799,
+    originalPrice: 897,
+    discount: 11,
     features: SHARED_FEATURES,
     bestValue: false,
     icon: "Star"
   },
   {
     name: "6 Months",
-    price: 1999,
-    originalPrice: 2394,
+    price: 1499,
+    originalPrice: 1794,
     discount: 16,
     features: SHARED_FEATURES,
     bestValue: true,
@@ -40,8 +43,8 @@ const PLANS: PricingPlan[] = [
   },
   {
     name: "Yearly",
-    price: 3999,
-    originalPrice: 4788,
+    price: 2999,
+    originalPrice: 3588,
     discount: 16,
     features: SHARED_FEATURES,
     bestValue: false,
@@ -49,14 +52,15 @@ const PLANS: PricingPlan[] = [
   }
 ]
 
-export default function PricingClient() {
+export default function StarterPricingPage() {
   return (
     <BasePricingClient
-      tierName=""
-      title={<>Scale Your Rental <span className="text-blue-600">Business</span></>}
-      description="List your properties, manage leads, and grow with the most advanced property management tool for India."
-      plans={PLANS}
+      tierName="Starter"
+      title={<>Starter Plans for <span className="text-blue-600">Growth</span></>}
+      description="Affordable tools to help you manage your properties and capture more bookings."
+      plans={STARTER_PLANS}
       successUrl="/pricing/business/success"
+      themeColor="#059669" // Emerald green for starter
     />
   )
 }
