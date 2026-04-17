@@ -42,6 +42,7 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   const [searchTerm, setSearchState] = useState('')
 
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [printUrl, setPrintUrl] = useState<string | null>(null)
   
   const handleDownload = async (url: string, filename: string, id: string) => {
     setProcessingId(id)
@@ -49,32 +50,41 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
     const isAndroid = /Android/i.test(navigator.userAgent)
 
     try {
-      // 1. On Android/Mobile, navigator.share is the ONLY reliable way to save to gallery
-      if (isAndroid || (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [] }))) {
+      // 1. On Android/Mobile, navigator.share is the primary bridge to the gallery
+      if (isAndroid || (isMobile && typeof navigator.share !== 'undefined')) {
         try {
           const res = await fetch(url)
           const blob = await res.blob()
-          const file = new File([blob], filename + ".jpg", { type: 'image/jpeg' })
-          await navigator.share({ files: [file], title: filename })
-          return 
+          // Ensure we have a valid image mime type for the File object
+          const mimeType = blob.type || 'image/jpeg'
+          const ext = mimeType.split('/')[1] || 'jpg'
+          const file = new File([blob], `${filename}.${ext}`, { type: mimeType })
+          
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ 
+              files: [file], 
+              title: filename,
+              text: 'Save your ID document to your gallery' 
+            })
+            return 
+          }
         } catch (e) {
           console.warn("Native share failed", e)
         }
       }
 
-      // 2. Try Standard Download Link (Desktop fallback)
+      // 2. Standard Download Fallback
       const res = await fetch(url)
       const blob = await res.blob()
       const objUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = objUrl
-      link.download = filename + ".jpg"
+      link.download = `${filename}.jpg`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       setTimeout(() => URL.revokeObjectURL(objUrl), 100)
     } catch (err) { 
-      // 3. Last Resort: Open in new tab
       window.open(url, '_blank') 
     } finally {
       setProcessingId(null)
@@ -82,69 +92,8 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   }
 
   const handlePrint = (url: string) => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    
-    if (isMobile) {
-      const printWin = window.open('', '_blank')
-      if (printWin) {
-        printWin.document.write(`
-          <html>
-            <head>
-              <title>Print ID</title>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-              <style>
-                body { margin: 0; padding: 0; display: flex; flex-direction: column; background: #000; height: 100vh; font-family: sans-serif; }
-                .header { padding: 15px; background: #111; display: flex; align-items: center; justify-content: space-between; position: fixed; top: 0; width: 100%; box-sizing: border-box; z-index: 10; }
-                .back-btn { background: #444; color: #fff; border: none; padding: 10px 20px; font-weight: bold; font-size: 14px; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
-                .content { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 60px; overflow: auto; }
-                img { max-width: 95%; max-height: 80vh; object-fit: contain; }
-                @media print {
-                  .header { display: none; }
-                  .content { padding-top: 0; }
-                  body { background: #fff; }
-                  img { width: 100%; height: auto; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <button class="back-btn" onclick="if(window.opener){window.close();}else{window.history.back();}">← BACK TO DASHBOARD</button>
-                <div style="color: #6366f1; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; opacity: 0.9;">FIXSTAY PRINT</div>
-              </div>
-              <div class="content">
-                <img src="${url}" onload="window.print();" />
-              </div>
-              <script>
-                // Fallback for physical back buttons on Android
-                window.onunload = function() {
-                  if (window.opener && !window.opener.closed) {
-                    window.opener.focus();
-                  }
-                };
-              </script>
-            </body>
-          </html>
-        `)
-        printWin.document.close()
-      }
-      return
-    }
-
-    const iframeId = 'print-iframe'
-    let iframe = document.getElementById(iframeId) as HTMLIFrameElement
-    if (!iframe) {
-      iframe = document.createElement('iframe')
-      iframe.id = iframeId
-      iframe.style.position = 'fixed'
-      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0'
-      document.body.appendChild(iframe)
-    }
-    const doc = iframe.contentWindow?.document || iframe.contentDocument
-    if (doc) {
-      doc.open()
-      doc.write(`<html><body style="margin:0;display:flex;align-items:center;justify-content:center;"><img src="${url}" style="max-width:100%;max-height:100vh;object-fit:contain;" onload="window.print();" /></body></html>`)
-      doc.close()
-    }
+    // Zero-Window Strategy: Use an in-app modal instead of window.open to avoid navigation trapping
+    setPrintUrl(url)
   }
 
   const handleShare = async (url: string, title: string, id: string) => {
@@ -605,6 +554,62 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
           <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
           <p className="font-medium">No guests have checked in yet.</p>
           <p className="text-xs mt-1 opacity-60">Guests appear here after completing the ID verification form.</p>
+        </div>
+      )}
+      {/* Zero-Window Print Escape Modal */}
+      {printUrl && (
+        <div className="fixed inset-0 z-[1000] bg-black flex flex-col animate-in fade-in duration-300">
+          <div className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800">
+            <button 
+              onClick={() => setPrintUrl(null)}
+              className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-black text-sm transition-all active:scale-95 flex items-center gap-2 border border-gray-700 shadow-xl"
+            >
+              <ChevronLeft className="w-5 h-5" />
+              BACK TO DASHBOARD
+            </button>
+            <div className="text-[10px] font-black text-gray-500 tracking-[0.2em] uppercase">Print Preview</div>
+            <button 
+              onClick={() => window.print()}
+              className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg active:scale-95 transition-all"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+            <img 
+              src={printUrl} 
+              alt="ID Document" 
+              className="max-w-full max-h-[80vh] object-contain shadow-2xl rounded-lg"
+              onLoad={() => {
+                // Short delay to ensure rendering before triggering print flow
+                setTimeout(() => window.print(), 300)
+              }}
+            />
+          </div>
+
+          <div className="p-6 bg-gray-900 border-t border-gray-800 text-center">
+             <p className="text-gray-400 text-xs font-medium max-w-xs mx-auto mb-4">
+               If the print window didn't open automatically, please click the print icon above. 
+             </p>
+             <button 
+               onClick={() => setPrintUrl(null)}
+               className="w-full py-4 bg-white/5 hover:bg-white/10 text-gray-300 rounded-2xl font-bold transition-all"
+             >
+               Discard & Close
+             </button>
+          </div>
+
+          <style jsx global>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .fixed.inset-0.z-\[1000\] { visibility: visible !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; }
+              .fixed.inset-0.z-\[1000\] img { visibility: visible !important; width: 100% !important; max-height: none !important; }
+              .fixed.inset-0.z-\[1000\] .bg-gray-900, 
+              .fixed.inset-0.z-\[1000\] button,
+              .fixed.inset-0.z-\[1000\] .text-center { display: none !important; }
+            }
+          `}</style>
         </div>
       )}
     </div>
