@@ -96,8 +96,8 @@ export default async function OwnerProfilePage() {
                          <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-1">Plan Control</p>
                          <p className="text-xl font-black italic uppercase">Manage Plan</p>
                        </div>
-                       <Button variant="secondary" className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          Upgrade / Renew
+                       <Button asChild variant="secondary" className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
+                          <Link href="/pricing/starter">Upgrade / Renew</Link>
                        </Button>
                     </div>
                  </div>
