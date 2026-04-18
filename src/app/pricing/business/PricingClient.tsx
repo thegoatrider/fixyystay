@@ -13,8 +13,8 @@ const SHARED_FEATURES = [
 const PLANS: PricingPlan[] = [
   {
     name: "Monthly",
-    price: 299,
-    originalPrice: 299,
+    price: 399,
+    originalPrice: 399,
     discount: 0,
     features: SHARED_FEATURES,
     bestValue: false,
@@ -22,27 +22,27 @@ const PLANS: PricingPlan[] = [
   },
   {
     name: "Quarterly",
-    price: 799,
-    originalPrice: 897,
-    discount: 11,
+    price: 999,
+    originalPrice: 1197,
+    discount: 16,
     features: SHARED_FEATURES,
     bestValue: false,
     icon: "Star"
   },
   {
     name: "6 Months",
-    price: 1499,
-    originalPrice: 1794,
-    discount: 16,
+    price: 1799,
+    originalPrice: 2394,
+    discount: 24,
     features: SHARED_FEATURES,
     bestValue: true,
     icon: "ShieldCheck"
   },
   {
     name: "Yearly",
-    price: 2999,
-    originalPrice: 3588,
-    discount: 16,
+    price: 3399,
+    originalPrice: 4788,
+    discount: 29,
     features: SHARED_FEATURES,
     bestValue: false,
     icon: "Crown"
@@ -53,7 +53,7 @@ export default function PricingClient() {
   return (
     <BasePricingClient
       tierName=""
-      title={<>Scale Your Rental <span className="text-blue-600">Business</span></>}
+      title={<>Scale Your Property <span className="text-blue-600">Business</span></>}
       description="List your properties, manage leads, and grow with the most advanced property management tool for India."
       plans={PLANS}
       successUrl="/pricing/business/success"

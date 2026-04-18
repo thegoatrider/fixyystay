@@ -22,6 +22,12 @@ export default function CreatePropertyForm() {
     
     const formData = new FormData(e.currentTarget)
     
+    if (!coverImage && selectedFiles.length === 0) {
+      alert('Please upload a cover image or at least one property image.')
+      setIsLoading(false)
+      return
+    }
+
     // Clear the original 'image' file inputs and manually append our state-managed files
     formData.delete('image')
     

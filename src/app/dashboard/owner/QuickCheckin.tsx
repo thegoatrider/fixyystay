@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,11 +17,30 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
   const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
   const [guestName, setGuestName] = useState('')
-  const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
+
+  // Sync selectedPropertyId when properties list changes
+  useEffect(() => {
+    if (properties?.length > 0 && !selectedPropertyId) {
+      setSelectedPropertyId(properties[0].id)
+    }
+  }, [properties, selectedPropertyId])
 
   const handleSendForm = () => {
-    if (!phone || !selectedPropertyId) {
-      alert('Please enter a phone number and select a property.')
+    if (!phone) {
+      alert('Please enter a phone number.')
+      return
+    }
+
+    if (!selectedPropertyId) {
+      alert('Please select a property.')
+      return
+    }
+
+    // Basic phone validation (at least 7 digits)
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 7) {
+      alert('Please enter a valid phone number.')
       return
     }
 

@@ -108,19 +108,19 @@ export function CreatePartnerForm() {
                 } else if (val === 'Monthly') {
                   if (amountInput) amountInput.value = '399'
                 } else if (val === 'Quarterly') {
-                  if (amountInput) amountInput.value = '1099'
+                  if (amountInput) amountInput.value = '999'
                 } else if (val === '6-Months' || val === '6 Months') {
-                  if (amountInput) amountInput.value = '1999'
+                  if (amountInput) amountInput.value = '1799'
                 } else if (val === 'Yearly') {
-                  if (amountInput) amountInput.value = '3999'
+                  if (amountInput) amountInput.value = '3399'
                 } else if (val === 'Starter Monthly') {
-                  if (amountInput) amountInput.value = '299'
+                  if (amountInput) amountInput.value = '199'
                 } else if (val === 'Starter Quarterly') {
-                  if (amountInput) amountInput.value = '799'
+                  if (amountInput) amountInput.value = '499'
                 } else if (val === 'Starter 6 Months') {
-                  if (amountInput) amountInput.value = '1499'
+                  if (amountInput) amountInput.value = '899'
                 } else if (val === 'Starter Yearly') {
-                  if (amountInput) amountInput.value = '2999'
+                  if (amountInput) amountInput.value = '1699'
                 }
               }}
               className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500"
@@ -130,15 +130,15 @@ export function CreatePartnerForm() {
               </optgroup>
               <optgroup label="Standard Business Tiers">
                 <option value="Monthly">Business Monthly - ₹399</option>
-                <option value="Quarterly">Business Quarterly - ₹1099</option>
-                <option value="6 Months">Business 6 Months - ₹1999</option>
-                <option value="Yearly">Business Yearly - ₹3999</option>
+                <option value="Quarterly">Business Quarterly - ₹999</option>
+                <option value="6 Months">Business 6 Months - ₹1799</option>
+                <option value="Yearly">Business Yearly - ₹3399</option>
               </optgroup>
               <optgroup label="Starter Partner Tiers">
-                <option value="Starter Monthly">Starter Monthly - ₹299</option>
-                <option value="Starter Quarterly">Starter Quarterly - ₹799</option>
-                <option value="Starter 6 Months">Starter 6 Months - ₹1499</option>
-                <option value="Starter Yearly">Starter Yearly - ₹2999</option>
+                <option value="Starter Monthly">Starter Monthly - ₹199</option>
+                <option value="Starter Quarterly">Starter Quarterly - ₹499</option>
+                <option value="Starter 6 Months">Starter 6 Months - ₹899</option>
+                <option value="Starter Yearly">Starter Yearly - ₹1699</option>
               </optgroup>
             </select>
           </div>

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook } from 'lucide-react'
+import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook, Camera, Image as ImageIcon } from 'lucide-react'
 import { submitCheckin } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
@@ -79,46 +79,85 @@ function CheckinForm() {
     if (input) input.value = ''
   }
 
+const dataURItoBlob = (dataURI: string) => {
+  const byteString = atob(dataURI.split(',')[1]);
+  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mimeString });
+};
+
 const compressImage = async (file: File): Promise<File> => {
   return new Promise((resolve, reject) => {
+    // If it's not an image or very small, don't even try to compress
+    if (!file.type.startsWith('image/') || file.size < 50 * 1024) {
+      return resolve(file);
+    }
+
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
       img.src = event.target?.result as string;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
           } else {
-            reject(new Error('Canvas to Blob failed'));
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
           }
-        }, 'image/jpeg', 0.8); // 80% quality
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            console.warn('Canvas context unavailable, using original file');
+            return resolve(file);
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          if (!canvas.toBlob) {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const blob = dataURItoBlob(dataUrl);
+            return resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          }
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              console.error('toBlob returned null, using original');
+              resolve(file);
+            }
+          }, 'image/jpeg', 0.8);
+        } catch (err) {
+          console.error('Compression error, falling back to original:', err);
+          resolve(file);
+        }
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = () => {
+        console.error('Image load error, using original');
+        resolve(file);
+      };
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = () => {
+      console.error('FileReader error, using original');
+      resolve(file);
+    };
+    reader.readAsDataURL(file);
   });
 };
 
@@ -152,20 +191,37 @@ const compressImage = async (file: File): Promise<File> => {
       const rawFormData = new FormData(e.currentTarget)
       
       for (let i = 0; i < numPeople; i++) {
-        const frontFile = rawFormData.get(`guestID_front_${i}`) as File
-        const backFile = rawFormData.get(`guestID_back_${i}`) as File
+        // Try to get from both possible inputs (camera or gallery)
+        const frontCamera = rawFormData.get(`guestID_front_${i}_camera`) as File
+        const frontGallery = rawFormData.get(`guestID_front_${i}_gallery`) as File
+        const frontFile = (frontCamera && frontCamera.size > 0) ? frontCamera : frontGallery
+
+        const backCamera = rawFormData.get(`guestID_back_${i}_camera`) as File
+        const backGallery = rawFormData.get(`guestID_back_${i}_gallery`) as File
+        const backFile = (backCamera && backCamera.size > 0) ? backCamera : backGallery
 
         if (frontFile && frontFile.size > 0) {
-          const compressed = await compressImage(frontFile)
-          formData.append(`guestID_front_${i}`, compressed)
+          try {
+            const compressed = await compressImage(frontFile)
+            formData.append(`guestID_front_${i}`, compressed)
+          } catch (err) {
+            console.error(`Error processing front ID for guest ${i+1}:`, err)
+            formData.append(`guestID_front_${i}`, frontFile) // Fallback to raw file
+          }
         }
 
         if (backFile && backFile.size > 0) {
-          const compressed = await compressImage(backFile)
-          formData.append(`guestID_back_${i}`, compressed)
+          try {
+            const compressed = await compressImage(backFile)
+            formData.append(`guestID_back_${i}`, compressed)
+          } catch (err) {
+            console.error(`Error processing back ID for guest ${i+1}:`, err)
+            formData.append(`guestID_back_${i}`, backFile) // Fallback to raw file
+          }
         }
       }
 
+      console.log('Sending check-in payload to server...')
       const result = await submitCheckin(formData)
 
       if (result.success) {
@@ -176,11 +232,11 @@ const compressImage = async (file: File): Promise<File> => {
         setStep(2)
       } else {
         console.error('Check-in Submission Failed:', result.error)
-        alert(`Check-in failed: ${result.error}`)
+        alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
       }
     } catch (err: any) {
-      console.error('Checkin Error:', err)
-      alert('An unexpected server error occurred while archiving your check-in. Please try again.')
+      console.error('Catch-all Checkin Error:', err)
+      alert(`Unexpected Error: ${err.message || 'The server could not process your request.'}\n\nPlease check your internet connection and try again.`)
     } finally {
       setIsLoading(false)
     }
@@ -373,15 +429,22 @@ const compressImage = async (file: File): Promise<File> => {
                       <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Front Side</Label>
                       
                       <div className="relative w-full aspect-[4/3]">
+                        {/* Hidden Inputs */}
                         <input 
                           type="file" 
-                          name={`guestID_front_${i}`}
+                          id={`input_front_camera_${i}`}
+                          name={`guestID_front_${i}_camera`}
                           accept="image/*" 
-                          className={cn(
-                            "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10", 
-                            previews[`guestID_front_${i}`] ? "hidden" : "block"
-                          )}
-                          required={!previews[`guestID_front_${i}`]}
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, `guestID_front_${i}`)}
+                        />
+                        <input 
+                          type="file" 
+                          id={`input_front_gallery_${i}`}
+                          name={`guestID_front_${i}_gallery`}
+                          accept="image/*" 
+                          className="hidden"
                           onChange={(e) => handleFileChange(e, `guestID_front_${i}`)}
                         />
                         
@@ -390,16 +453,35 @@ const compressImage = async (file: File): Promise<File> => {
                             <img src={previews[`guestID_front_${i}`]} alt="Front ID Preview" className="w-full h-full object-cover" />
                             <button 
                               type="button"
-                              onClick={() => removeFile(`guestID_front_${i}`)}
+                              onClick={() => {
+                                removeFile(`guestID_front_${i}`);
+                                // Clear both inputs
+                                const cam = document.getElementById(`input_front_camera_${i}`) as HTMLInputElement;
+                                const gal = document.getElementById(`input_front_gallery_${i}`) as HTMLInputElement;
+                                if (cam) cam.value = '';
+                                if (gal) gal.value = '';
+                              }}
                               className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                           </div>
                         ) : (
-                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl transition-all flex flex-col items-center justify-center gap-1 text-center px-2 pointer-events-none">
-                            <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                            <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Front</span>
+                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 rounded-xl transition-all flex flex-col items-center justify-center p-2 gap-2">
+                             <button
+                               type="button"
+                               onClick={() => document.getElementById(`input_front_camera_${i}`)?.click()}
+                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                             >
+                               <Camera className="w-4 h-4" /> Take Photo
+                             </button>
+                             <button
+                               type="button"
+                               onClick={() => document.getElementById(`input_front_gallery_${i}`)?.click()}
+                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
+                             >
+                               <ImageIcon className="w-3.5 h-3.5" /> Upload Gallery
+                             </button>
                           </div>
                         )}
                       </div>
@@ -410,15 +492,22 @@ const compressImage = async (file: File): Promise<File> => {
                       <Label className="text-[11px] font-bold text-gray-500 uppercase ml-1">Back Side</Label>
                       
                       <div className="relative w-full aspect-[4/3]">
+                        {/* Hidden Inputs */}
                         <input 
                           type="file" 
-                          name={`guestID_back_${i}`}
+                          id={`input_back_camera_${i}`}
+                          name={`guestID_back_${i}_camera`}
                           accept="image/*" 
-                          className={cn(
-                            "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10", 
-                            previews[`guestID_back_${i}`] ? "hidden" : "block"
-                          )}
-                          required={!previews[`guestID_back_${i}`]}
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, `guestID_back_${i}`)}
+                        />
+                        <input 
+                          type="file" 
+                          id={`input_back_gallery_${i}`}
+                          name={`guestID_back_${i}_gallery`}
+                          accept="image/*" 
+                          className="hidden"
                           onChange={(e) => handleFileChange(e, `guestID_back_${i}`)}
                         />
                         
@@ -427,16 +516,35 @@ const compressImage = async (file: File): Promise<File> => {
                             <img src={previews[`guestID_back_${i}`]} alt="Back ID Preview" className="w-full h-full object-cover" />
                             <button 
                               type="button"
-                              onClick={() => removeFile(`guestID_back_${i}`)}
+                              onClick={() => {
+                                removeFile(`guestID_back_${i}`);
+                                // Clear both inputs
+                                const cam = document.getElementById(`input_back_camera_${i}`) as HTMLInputElement;
+                                const gal = document.getElementById(`input_back_gallery_${i}`) as HTMLInputElement;
+                                if (cam) cam.value = '';
+                                if (gal) gal.value = '';
+                              }}
                               className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                           </div>
                         ) : (
-                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 group-hover:border-blue-300 group-hover:bg-blue-50/50 rounded-xl transition-all flex flex-col items-center justify-center gap-1 text-center px-2 pointer-events-none">
-                            <Upload className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
-                            <span className="text-[10px] text-gray-400 group-hover:text-blue-600 font-medium">Upload Back</span>
+                          <div className="absolute inset-0 bg-white border-2 border-dashed border-gray-200 rounded-xl transition-all flex flex-col items-center justify-center p-2 gap-2">
+                             <button
+                               type="button"
+                               onClick={() => document.getElementById(`input_back_camera_${i}`)?.click()}
+                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                             >
+                               <Camera className="w-4 h-4" /> Take Photo
+                             </button>
+                             <button
+                               type="button"
+                               onClick={() => document.getElementById(`input_back_gallery_${i}`)?.click()}
+                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
+                             >
+                               <ImageIcon className="w-3.5 h-3.5" /> Upload Gallery
+                             </button>
                           </div>
                         )}
                       </div>

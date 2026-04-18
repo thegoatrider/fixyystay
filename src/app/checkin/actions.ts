@@ -4,12 +4,6 @@ import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function submitCheckin(formData: FormData) {
   try {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) {
-      console.error('CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables!')
-      return { error: 'Server configuration error. Please contact support.' }
-    }
-
     const supabaseAdmin = createAdminClient()
 
     const propertyId = formData.get('propertyId') as string
@@ -45,6 +39,8 @@ export async function submitCheckin(formData: FormData) {
         const fileExt = frontFile.name.split('.').pop() || 'jpg'
         const randomStr = Math.random().toString(36).substring(2, 7)
         const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-f${i}.${fileExt}`
+        
+        console.log(`[CHECKIN] Uploading Front ID for guest ${i+1}...`)
         const { error: uploadError } = await supabaseAdmin.storage
           .from('property_images')
           .upload(`guest_ids/${fileName}`, frontFile, {
@@ -56,14 +52,19 @@ export async function submitCheckin(formData: FormData) {
           const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
           personDocs.frontUrl = publicUrlData.publicUrl
         } else {
-          console.error(`[CHECKIN] Front ID upload error (Guest ${i+1}):`, uploadError)
+          console.error(`[CHECKIN] Front ID UPLOAD FAILED (Guest ${i+1}):`, uploadError)
+          return { error: `File upload failed for Guest ${i+1} (Front Side). Please check your connection.` }
         }
+      } else {
+        return { error: `Front ID for Guest ${i+1} is missing or empty.` }
       }
 
       if (backFile && backFile.size > 0) {
         const fileExt = backFile.name.split('.').pop() || 'jpg'
         const randomStr = Math.random().toString(36).substring(2, 7)
         const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-b${i}.${fileExt}`
+        
+        console.log(`[CHECKIN] Uploading Back ID for guest ${i+1}...`)
         const { error: uploadError } = await supabaseAdmin.storage
           .from('property_images')
           .upload(`guest_ids/${fileName}`, backFile, {
@@ -75,8 +76,11 @@ export async function submitCheckin(formData: FormData) {
           const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
           personDocs.backUrl = publicUrlData.publicUrl
         } else {
-          console.error(`[CHECKIN] Back ID upload error (Guest ${i+1}):`, uploadError)
+          console.error(`[CHECKIN] Back ID UPLOAD FAILED (Guest ${i+1}):`, uploadError)
+          return { error: `File upload failed for Guest ${i+1} (Back Side). Please check your connection.` }
         }
+      } else {
+        return { error: `Back ID for Guest ${i+1} is missing or empty.` }
       }
 
       idDocuments.push(personDocs)
@@ -95,20 +99,20 @@ export async function submitCheckin(formData: FormData) {
       checkout_date: checkoutDate || null,
       vehicle_number: formData.get('vehicleNumber') as string || null,
       id_documents: idDocuments,
-      uid: uid // Added missing uid
+      uid: uid
     }
 
-    console.log('[CHECKIN] Inserting record:', { ...checkinRecord, id_documents: `${idDocuments.length} files` })
+    console.log('[CHECKIN] Final check-in record preparation complete. Inserting into database...')
 
     // Use admin client which bypasses RLS
     const { error: insertError } = await supabaseAdmin.from('guest_checkins').insert([checkinRecord])
 
     if (insertError) {
       console.error('[CHECKIN] Insert failed:', insertError)
-      return { error: `Database error: ${insertError.message}` }
+      return { error: `Database error: ${insertError.message}. Please contact the property owner.` }
     }
 
-    console.log(`[CHECKIN] Success: ${uid}`)
+    console.log(`[CHECKIN] Successfully completed check-in: ${uid}`)
 
     return { 
       success: true, 
@@ -116,8 +120,8 @@ export async function submitCheckin(formData: FormData) {
       helpdeskNumber: property.helpdesk_number || 'No helpdesk set'
     }
   } catch (err: any) {
-    console.error('[CHECKIN] Uncaught exception:', err)
-    return { error: `System error: ${err.message || 'Unknown error occurred'}` }
+    console.error('[CHECKIN] CRcritical uncaught exception during check-in:', err)
+    return { error: `System Error: ${err.message || 'The server encountered an unexpected issue.'}` }
   }
 }
 

@@ -141,6 +141,7 @@ export async function createProperty(formData: FormData) {
       coverImageUrl = urlData.publicUrl
     } else {
       console.error('Cover Image upload failed:', uploadError)
+      return { error: `Cover image upload failed: ${uploadError.message}` }
     }
   }
 
@@ -162,8 +163,13 @@ export async function createProperty(formData: FormData) {
         image_urls.push(urlData.publicUrl)
       } else {
         console.error('Image upload failed:', uploadError)
+        return { error: `Failed to upload gallery image: ${uploadError.message}` }
       }
     }
+  }
+
+  if (!coverImageUrl && image_urls.length === 0) {
+    return { error: 'Please upload at least one image of the property.' }
   }
 
   // 4.5 Generate custom UID

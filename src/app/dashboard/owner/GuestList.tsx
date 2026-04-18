@@ -36,10 +36,10 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
+  const [searchTerm, setSearchState] = useState('')
+  const [showRecent, setShowRecent] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
-  const setSearchTerm = (val: string) => setSearchState(val)
-  const [searchTerm, setSearchState] = useState('')
 
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [printUrl, setPrintUrl] = useState<string | null>(null)
@@ -152,6 +152,11 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
     return map
   }, [checkins])
 
+  // Recent Activity memo
+  const recentCheckins = useMemo(() => {
+    return [...checkins].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30)
+  }, [checkins])
+
   // When searching, show ALL matching guests regardless of date
   const allSearchResults = useMemo(() => {
     if (!searchTerm) return []
@@ -190,88 +195,144 @@ export default React.memo(function GuestList({ checkins }: { checkins: GuestChec
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Guest Check-in Calendar</h2>
-          <p className="text-sm text-gray-400 mt-0.5">{checkins.length} registered guests · click a date to view</p>
+          <h2 className="text-xl font-bold text-gray-900">Guest Check-in Records</h2>
+          <p className="text-sm text-gray-400 mt-0.5">{checkins.length} total registered guests</p>
         </div>
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search guests..."
-            className="pl-9 h-9 text-sm"
-            value={searchTerm}
-            onChange={e => { setSearchTerm(e.target.value) }}
-          />
+        
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* Toggle View */}
+          <div className="flex p-1 bg-gray-100 rounded-xl w-full sm:w-auto">
+            <button 
+              onClick={() => { setShowRecent(false); setSearchState(''); }}
+              className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!showRecent ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Calendar View
+            </button>
+            <button 
+              onClick={() => { setShowRecent(true); setSearchState(''); }}
+              className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${showRecent ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Recent Activity
+            </button>
+          </div>
+
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search guests..."
+              className="pl-9 h-9 text-sm"
+              value={searchTerm}
+              onChange={e => { setSearchState(e.target.value); if (e.target.value) setShowRecent(false); }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Three-column layout: calendar | guest list | guest detail */}
+      {/* Three-column layout: calendar/recent | guest list | guest detail */}
       <div className="grid lg:grid-cols-[1fr_280px_340px] gap-5 items-start">
 
-        {/* ── Calendar ── */}
-        <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
-            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-              <ChevronLeft className="w-5 h-5 text-gray-600" />
-            </button>
-            <span className="font-bold text-gray-900 text-base">{monthLabel}</span>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-              <ChevronRight className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
+        {/* ── Left Column: Calendar or Recent Activity ── */}
+        {!showRecent ? (
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+              <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <span className="font-bold text-gray-900 text-base">{monthLabel}</span>
+              <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
 
-          <div className="p-4">
-            {/* Day headers */}
-            <div className="grid grid-cols-7 mb-2">
-              {DAYS_OF_WEEK.map((d, i) => (
-                <div key={i} className="text-center text-[11px] font-bold text-gray-400 uppercase py-1">{d}</div>
+            <div className="p-4">
+              <div className="grid grid-cols-7 mb-2">
+                {DAYS_OF_WEEK.map((d, i) => (
+                  <div key={i} className="text-center text-[11px] font-bold text-gray-400 uppercase py-1">{d}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-1">
+                {calendarDays.map((day, i) => {
+                  if (!day) return <div key={`pad-${i}`} />
+                  const key = format(day, 'yyyy-MM-dd')
+                  const dayGuests = checkinsByDate[key] || []
+                  const hasGuests = dayGuests.length > 0
+                  const isToday = isSameDay(day, today)
+                  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false
+
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        if (!hasGuests) return
+                        setSelectedDate(isSelected ? null : day)
+                        setSelectedGuest(null)
+                      }}
+                      className={[
+                        'relative flex flex-col items-center justify-start pt-1.5 pb-1 rounded-xl h-14 transition-all duration-150',
+                        hasGuests ? 'cursor-pointer hover:bg-indigo-50' : 'cursor-default',
+                        isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300' : '',
+                        isToday && !isSelected ? 'bg-indigo-50 font-bold text-indigo-700' : '',
+                        !isSelected && !isToday ? 'text-gray-700' : '',
+                      ].join(' ')}
+                    >
+                      <span className="text-sm font-semibold leading-none">{day.getDate()}</span>
+                      {hasGuests && (
+                        <div className="flex items-center gap-0.5 mt-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                            {dayGuests.length}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="px-4 pb-4 flex items-center gap-2 text-[11px] text-gray-400">
+              <span className="bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full text-[10px]">N</span>
+              = check-ins by date
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
+            <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
+              <span className="font-bold text-gray-900 text-base">Recent Activity</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last 30 Check-ins</span>
+            </div>
+            <div className="flex flex-col divide-y max-h-[600px] overflow-y-auto">
+              {recentCheckins.length === 0 && (
+                <div className="p-10 text-center text-gray-400 italic text-sm">No recent activity.</div>
+              )}
+              {recentCheckins.map(guest => (
+                <button
+                  key={`rec-${guest.id}`}
+                  onClick={() => {
+                    setSelectedGuest(selectedGuest?.id === guest.id ? null : guest)
+                    setSelectedDate(null)
+                  }}
+                  className={`w-full text-left px-6 py-4 transition-colors hover:bg-indigo-50/50 ${selectedGuest?.id === guest.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900 leading-tight">{guest.guest_name}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {guest.properties?.name} · {format(new Date(guest.created_at), 'MMM d, h:mm a')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                        {guest.num_people} PAX
+                      </span>
+                      {guest.uid && <p className="text-[9px] font-mono text-indigo-400 mt-1 uppercase">{guest.uid}</p>}
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
-
-            {/* Day cells */}
-            <div className="grid grid-cols-7 gap-y-1">
-              {calendarDays.map((day, i) => {
-                if (!day) return <div key={`pad-${i}`} />
-                const key = format(day, 'yyyy-MM-dd')
-                const dayGuests = checkinsByDate[key] || []
-                const hasGuests = dayGuests.length > 0
-                const isToday = isSameDay(day, today)
-                const isSelected = selectedDate ? isSameDay(day, selectedDate) : false
-
-                return (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      if (!hasGuests) return
-                      setSelectedDate(isSelected ? null : day)
-                      setSelectedGuest(null)
-                    }}
-                    className={[
-                      'relative flex flex-col items-center justify-start pt-1.5 pb-1 rounded-xl h-14 transition-all duration-150',
-                      hasGuests ? 'cursor-pointer hover:bg-indigo-50' : 'cursor-default',
-                      isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300' : '',
-                      isToday && !isSelected ? 'bg-indigo-50 font-bold text-indigo-700' : '',
-                      !isSelected && !isToday ? 'text-gray-700' : '',
-                    ].join(' ')}
-                  >
-                    <span className="text-sm font-semibold leading-none">{day.getDate()}</span>
-                    {hasGuests && (
-                      <div className="flex items-center gap-0.5 mt-1.5">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
-                          {dayGuests.length}
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
           </div>
-
-          <div className="px-4 pb-4 flex items-center gap-2 text-[11px] text-gray-400">
-            <span className="bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full text-[10px]">N</span>
-            = number of check-ins on that date
-          </div>
-        </div>
+        )}
 
         {/* ── Guest List ── */}
         <div className="transition-all duration-300">

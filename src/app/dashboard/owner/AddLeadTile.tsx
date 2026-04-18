@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +13,14 @@ type Property = { id: string; name: string }
 
 export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: string, properties: Property[] }) {
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id || '')
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
+
+  // Sync selectedPropertyId when properties list changes
+  useEffect(() => {
+    if (properties?.length > 0 && !selectedPropertyId) {
+      setSelectedPropertyId(properties[0].id)
+    }
+  }, [properties, selectedPropertyId])
   const [countryCode, setCountryCode] = useState('91')
   const [phone, setPhone] = useState('')
   const [guestName, setGuestName] = useState('')
