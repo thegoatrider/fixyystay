@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import EditPropertyForm from '@/components/EditPropertyForm'
+import GuestCheckinQR from '@/components/GuestCheckinQR'
 
 export default async function ManagePropertyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = await params
@@ -20,21 +21,46 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-8">
+    <div className="max-w-6xl mx-auto flex flex-col gap-8">
       <div className="flex items-center gap-4">
         <Link href="/dashboard/admin" className="text-gray-500 hover:text-gray-900 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-3xl font-bold">Manage Property</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Manage Property</h1>
       </div>
 
-      <div className="bg-white rounded-lg border shadow-sm p-6 md:p-8">
-        <div className="mb-6 pb-6 border-b flex flex-col gap-1">
-          <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Owner Details</div>
-          <div className="text-lg">{property.owners?.name || 'Unknown Owner'}</div>
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white rounded-3xl border shadow-sm p-6 md:p-8">
+            <div className="mb-6 pb-6 border-b flex justify-between items-center">
+              <div className="flex flex-col gap-1">
+                <div className="text-xs font-black text-gray-400 uppercase tracking-widest">Business Partner</div>
+                <div className="text-xl font-bold text-blue-600">{property.owners?.name || 'Unknown Owner'}</div>
+              </div>
+              <div className="text-right">
+                 <div className="text-xs font-black text-gray-400 uppercase tracking-widest">Property ID</div>
+                 <div className="text-sm font-mono font-bold bg-gray-100 px-2 py-1 rounded mt-1">{property.uid}</div>
+              </div>
+            </div>
+
+            <EditPropertyForm property={property} />
+          </div>
         </div>
 
-        <EditPropertyForm property={property} />
+        <div className="lg:col-span-1 border-l lg:pl-8 space-y-8">
+          <GuestCheckinQR propertyId={property.id} propertyName={property.name} />
+          
+          <div className="bg-indigo-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+             <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12 font-black text-9xl">FIX</div>
+             <h3 className="text-xl font-black mb-2 relative z-10">Admin Control</h3>
+             <p className="text-indigo-100 text-sm relative z-10 leading-relaxed font-medium mb-4">
+               The QR code on the left is property-specific. Once printed and placed at the reception, guests can check-in without manual entry by the owner.
+             </p>
+             <div className="text-xs font-bold bg-white/10 px-3 py-2 rounded-lg border border-white/10 relative z-10 italic">
+               Security Note: Fixy Stays handles ID encryption.
+             </div>
+          </div>
+        </div>
       </div>
     </div>
   )

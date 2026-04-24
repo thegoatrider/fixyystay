@@ -125,3 +125,20 @@ export async function submitCheckin(formData: FormData) {
   }
 }
 
+export async function getPropertyInfo(propertyId: string) {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { data: property, error } = await supabaseAdmin
+      .from('properties')
+      .select('name, helpdesk_number')
+      .eq('id', propertyId)
+      .single()
+
+    if (error || !property) return null
+    return property
+  } catch (err) {
+    console.error('Error fetching property info:', err)
+    return null
+  }
+}
+

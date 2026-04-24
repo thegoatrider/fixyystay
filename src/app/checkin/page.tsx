@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook, Camera, Image as ImageIcon } from 'lucide-react'
-import { submitCheckin } from './actions'
+import { submitCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
 
@@ -39,6 +39,16 @@ function CheckinForm() {
   const [checkoutDate, setCheckoutDate] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
+  const [propertyInfo, setPropertyInfo] = useState<{ name: string, helpdesk_number: string } | null>(null)
+
+  // Fetch Property Info
+  useEffect(() => {
+    if (propertyId) {
+      getPropertyInfo(propertyId).then(info => {
+        if (info) setPropertyInfo(info)
+      })
+    }
+  }, [propertyId])
 
   // Pre-fill from URL
   useEffect(() => {
@@ -315,8 +325,11 @@ const compressImage = async (file: File): Promise<File> => {
           <Link href="/" className="font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition">
             Fixy Stays
           </Link>
-          <h1 className="text-4xl font-extrabold text-gray-900">Guest Check-in</h1>
-          <p className="text-gray-500 mt-2">Please provide your details and ID for a smooth entry.</p>
+          <h1 className="text-4xl font-extrabold text-gray-900 leading-tight">
+            Welcome to <br/>
+            <span className="text-blue-600 drop-shadow-sm">{propertyInfo?.name || 'Guest Check-in'}</span>
+          </h1>
+          <p className="text-gray-500 mt-3 font-medium">Please provide your details and ID proof for a smooth entry.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">

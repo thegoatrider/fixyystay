@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addRoom } from './actions'
 import BookingCalendar from './Calendar'
-import { ArrowLeft, CheckCircle, Clock } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, QrCode } from 'lucide-react'
 import ManageCategories from './ManageCategories'
+import GuestCheckinQR from '@/components/GuestCheckinQR'
 
 export default async function PropertyDetailPage(
   props: {
@@ -80,43 +81,49 @@ export default async function PropertyDetailPage(
       <div className="flex flex-col gap-6 items-stretch w-full overflow-hidden">
         
         {/* Top: Configuration */}
-        <div className="flex flex-col gap-6">
-          {property.type === 'villa' ? (
-            <div className="bg-white border rounded-lg p-5 shadow-sm">
-              <h2 className="text-xl font-bold mb-4">Villa Configuration</h2>
-              <div className="flex flex-col gap-3">
-                {rooms?.map(room => (
-                  <div key={room.id} className="border p-3 flex justify-between rounded-md bg-gray-50 items-center gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0">
-                        {room.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={room.image_url} alt={room.name} className="object-cover w-full h-full" />
-                        ) : (
-                          <div className="flex w-full h-full items-center justify-center">
-                            <span className="text-xs font-bold text-blue-400">V</span>
-                          </div>
-                        )}
+        <div className="grid lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-2">
+            {property.type === 'villa' ? (
+              <div className="bg-white border rounded-lg p-5 shadow-sm">
+                <h2 className="text-xl font-bold mb-4">Villa Configuration</h2>
+                <div className="flex flex-col gap-3">
+                  {rooms?.map(room => (
+                    <div key={room.id} className="border p-3 flex justify-between rounded-md bg-gray-50 items-center gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0">
+                          {room.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={room.image_url} alt={room.name} className="object-cover w-full h-full" />
+                          ) : (
+                            <div className="flex w-full h-full items-center justify-center">
+                              <span className="text-xs font-bold text-blue-400">V</span>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">{room.name}</h3>
+                          <p className="text-xs text-gray-500">{room.category}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{room.name}</h3>
-                        <p className="text-xs text-gray-500">{room.category}</p>
+                      <div className="text-right">
+                        <span className="font-bold text-green-600">₹{room.base_price}</span>
+                        <p className="text-[10px] text-gray-400 capitalize">{room.price_bucket} bucket</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-green-600">₹{room.base_price}</span>
-                      <p className="text-[10px] text-gray-400 capitalize">{room.price_bucket} bucket</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <ManageCategories
-              propertyId={propertyId}
-              initialCategories={property.room_categories || []}
-            />
-          )}
+            ) : (
+              <ManageCategories
+                propertyId={propertyId}
+                initialCategories={property.room_categories || []}
+              />
+            )}
+          </div>
+
+          <div className="lg:col-span-1">
+            <GuestCheckinQR propertyId={property.id} propertyName={property.name} />
+          </div>
 
           {/* Legacy individual room list removed for multi-room properties as requested */}
         </div>
