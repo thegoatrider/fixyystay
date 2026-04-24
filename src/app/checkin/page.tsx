@@ -484,16 +484,17 @@ const compressImage = async (file: File): Promise<File> => {
                              <button
                                type="button"
                                onClick={() => document.getElementById(`input_front_camera_${i}`)?.click()}
-                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                               className="w-full h-[60%] flex flex-col items-center justify-center gap-1 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all group"
                              >
-                               <Camera className="w-4 h-4" /> Take Photo
+                               <Camera className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                               <span>Take Physical Photo</span>
                              </button>
                              <button
                                type="button"
                                onClick={() => document.getElementById(`input_front_gallery_${i}`)?.click()}
-                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
+                               className="w-full h-[40%] flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
                              >
-                               <ImageIcon className="w-3.5 h-3.5" /> Upload Gallery
+                               <ImageIcon className="w-3.5 h-3.5" /> Upload gallery
                              </button>
                           </div>
                         )}
@@ -547,16 +548,17 @@ const compressImage = async (file: File): Promise<File> => {
                              <button
                                type="button"
                                onClick={() => document.getElementById(`input_back_camera_${i}`)?.click()}
-                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+                               className="w-full h-[60%] flex flex-col items-center justify-center gap-1 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all group"
                              >
-                               <Camera className="w-4 h-4" /> Take Photo
+                               <Camera className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                               <span>Take Physical Photo</span>
                              </button>
                              <button
                                type="button"
                                onClick={() => document.getElementById(`input_back_gallery_${i}`)?.click()}
-                               className="w-full h-1/2 flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
+                               className="w-full h-[40%] flex items-center justify-center gap-2 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold hover:bg-gray-200 active:scale-95 transition-all"
                              >
-                               <ImageIcon className="w-3.5 h-3.5" /> Upload Gallery
+                               <ImageIcon className="w-3.5 h-3.5" /> Upload gallery
                              </button>
                           </div>
                         )}
