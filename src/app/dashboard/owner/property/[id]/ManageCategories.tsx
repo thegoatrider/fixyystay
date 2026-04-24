@@ -12,6 +12,8 @@ interface Category {
   count: number
   base_price: number
   price_bucket: string
+  base_capacity?: number
+  extra_guest_price?: number
 }
 
 interface ManageCategoriesProps {
@@ -32,7 +34,9 @@ export default function ManageCategories({ propertyId, initialCategories }: Mana
     name: 'Standard',
     count: 1,
     base_price: 2000,
-    price_bucket: '₹1999'
+    price_bucket: '₹1999',
+    base_capacity: 2,
+    extra_guest_price: 500
   })
 
   const handleUpdate = async (updated: Category[]) => {
@@ -95,7 +99,12 @@ export default function ManageCategories({ propertyId, initialCategories }: Mana
                   {cat.name} Room
                   <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black">{cat.count}</span>
                 </h3>
-                <p className="text-xs text-gray-500 font-medium">₹{cat.base_price} • {cat.price_bucket} bucket</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 font-medium text-[10px] sm:text-xs">
+                   <p className="text-gray-500 font-bold uppercase tracking-widest bg-white border px-1.5 py-0.5 rounded shadow-sm">₹{cat.base_price} <span className="opacity-50">Base</span></p>
+                   <p className="text-gray-400 capitalize">{cat.price_bucket} bucket</p>
+                   <p className="text-blue-500 font-bold uppercase">Base: {cat.base_capacity || 2} Pax</p>
+                   <p className="text-orange-500 font-bold uppercase">Extra: ₹{cat.extra_guest_price || 0}/Pax</p>
+                </div>
               </div>
             </div>
 
@@ -183,6 +192,24 @@ export default function ManageCategories({ propertyId, initialCategories }: Mana
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-blue-400">Base Guests (Included)</Label>
+              <Input 
+                type="number" 
+                value={newCat.base_capacity}
+                onChange={e => setNewCat({...newCat, base_capacity: parseInt(e.target.value)})}
+                className="h-10 border-2 border-blue-100 rounded-lg font-bold"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-blue-400">Extra Cost Per Pax (₹)</Label>
+              <Input 
+                type="number" 
+                value={newCat.extra_guest_price}
+                onChange={e => setNewCat({...newCat, extra_guest_price: parseInt(e.target.value)})}
+                className="h-10 border-2 border-blue-100 rounded-lg font-bold text-orange-600"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-blue-400">Initial Count</Label>

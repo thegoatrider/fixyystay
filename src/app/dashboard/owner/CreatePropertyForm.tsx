@@ -402,45 +402,66 @@ export default function CreatePropertyForm() {
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="image" className="font-bold text-gray-900">Property Images (Gallery)</Label>
+      <div className="space-y-4">
+        <Label htmlFor="image" className="font-bold text-gray-900 flex items-center gap-2">
+          Property Images (Gallery)
+          <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase tracking-widest">Mandatory</span>
+        </Label>
         <Input 
           name="image" 
           type="file" 
           accept="image/*" 
           multiple 
           onChange={handleFileChange}
-          className="cursor-pointer"
+          className="cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:rounded-md file:px-4 file:py-1 hover:file:bg-blue-700 transition-all"
         />
         
         {previews.length > 0 && (
-          <div className="flex flex-wrap gap-3 mt-2 max-h-64 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <div className="flex flex-wrap gap-3 mt-4 max-h-[500px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 shadow-inner">
             {previews.map((url, index) => (
-              <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 bg-white group shadow-sm">
+              <div key={index} className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden border-2 bg-white group shadow-sm ring-1 ring-black/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(index)}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
+                  className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg z-10"
                   title="Remove image"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
-                  {index + 1}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
+                <div className="absolute bottom-1.5 left-1.5 bg-black/60 text-[10px] font-black text-white px-2 py-0.5 rounded backdrop-blur-md border border-white/20">
+                  #{index + 1}
                 </div>
               </div>
             ))}
           </div>
         )}
+        {previews.length > 5 && (
+          <p className="text-[10px] text-gray-400 italic text-center font-medium">Scroll down to see all {previews.length} selected images</p>
+        )}
       </div>
 
-      <Button type="submit" className="w-full mt-2 h-14 text-lg font-black" disabled={isLoading}>
-        {isLoading ? 'Processing Images & Creating...' : 'Create Property'}
-      </Button>
+      <div className="mt-8 pb-12 border-t pt-8">
+        <Button 
+          type="submit" 
+          className="w-full h-16 text-xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-[0.98] rounded-2xl" 
+          disabled={isLoading}
+        >
+          {isLoading ? (
+             <div className="flex items-center gap-3">
+               <span className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+               Processing...
+             </div>
+          ) : '🚀 Create Property Listing'}
+        </Button>
+        <p className="text-center text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-widest italic">
+          * Your property will go live after admin approval
+        </p>
+      </div>
     </form>
   )
 }

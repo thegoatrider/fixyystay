@@ -228,7 +228,15 @@ export async function updateRoomCategories(propertyId: string, categories: any[]
 
     // After updating categories metadata, sync the rooms table
     for (const cat of categories) {
-      await syncCategoryRooms(propertyId, cat.name, cat.count, cat.base_price, cat.price_bucket)
+      await syncCategoryRooms(
+        propertyId, 
+        cat.name, 
+        cat.count, 
+        cat.base_price, 
+        cat.price_bucket,
+        cat.base_capacity,
+        cat.extra_guest_price
+      )
     }
 
     revalidatePath(`/dashboard/owner/property/${propertyId}`)
@@ -243,7 +251,9 @@ export async function syncCategoryRooms(
   categoryName: string, 
   targetCount: number, 
   basePrice: number, 
-  priceBucket: string
+  priceBucket: string,
+  baseCapacity?: number,
+  extraGuestPrice?: number
 ) {
   try {
     const supabaseAdmin = createAdminClient()
@@ -266,7 +276,9 @@ export async function syncCategoryRooms(
         category: categoryName,
         base_price: basePrice,
         price_bucket: priceBucket,
-        is_ac: true // Default
+        is_ac: true, // Default
+        base_capacity: baseCapacity || 2,
+        extra_guest_price: extraGuestPrice || 0
       }))
       await supabaseAdmin.from('rooms').insert(newRooms)
     } else if (currentCount > targetCount) {
