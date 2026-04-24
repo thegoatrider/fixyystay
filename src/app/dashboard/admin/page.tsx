@@ -11,6 +11,7 @@ import InfluencerApprovalActions from './InfluencerApprovalActions'
 import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
 import { assignInfluencerFromForm } from './actions'
+import WebsiteQR from '@/components/WebsiteQR'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -229,14 +230,18 @@ export default async function AdminDashboard() {
           </div>
         </section>
 
-        {/* SECTION 0.3: Partner Onboarding */}
+        {/* SECTION 0.3: Partner Onboarding & Marketing */}
         <div className="mt-12 grid lg:grid-cols-2 gap-8 items-start">
-          <CreatePartnerForm />
-          <div className="bg-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-center h-full min-h-[300px]">
+          <div className="space-y-8">
+            <CreatePartnerForm />
+            <WebsiteQR />
+          </div>
+          
+          <div className="bg-blue-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-center h-full min-h-[400px]">
              <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12"><Users className="w-64 h-64" /></div>
-             <h3 className="text-3xl font-black mb-4 relative z-10">Growth Center</h3>
+             <h3 className="text-4xl font-black mb-4 relative z-10">Fixy Stays <br/>Growth Hub</h3>
              <p className="text-blue-100 text-lg mb-8 relative z-10 leading-relaxed font-medium">
-               Onboard verified property owners to expand Fixy Stays inventory. Every new partner increases our platform's reach and revenue potential.
+               Onboard verified property owners and market the platform. Use the marketing QR to spread the word about Alibag's premier booking software.
              </p>
              <div className="flex flex-wrap gap-4 relative z-10">
                 <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/20">
