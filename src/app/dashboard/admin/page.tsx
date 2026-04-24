@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -12,6 +12,7 @@ import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
 import { assignInfluencerFromForm } from './actions'
 import WebsiteQR from '@/components/WebsiteQR'
+import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -230,31 +231,43 @@ export default async function AdminDashboard() {
           </div>
         </section>
 
-        {/* SECTION 0.3: Partner Onboarding & Marketing */}
-        <div className="mt-12 grid lg:grid-cols-2 gap-8 items-start">
-          <div className="space-y-8">
-            <CreatePartnerForm />
-            <WebsiteQR />
+        {/* SECTION 0.3: Partner Onboarding & Marketing (Wrapped in Collapsible) */}
+        <GrowthHubWrapper stats={{
+          totalProperties: approvedProperties?.length || 0,
+          pendingProperties: pendingProperties?.length || 0,
+          totalInfluencers: influencers?.length || 0,
+          activePromotions: promotions?.filter(p => p.bookingsCount > 0).length || 0
+        }}>
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
+            <div className="space-y-8">
+              <CreatePartnerForm />
+              <WebsiteQR />
+            </div>
+            
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden flex flex-col justify-center h-full min-h-[450px]">
+               <div className="absolute -right-16 -bottom-16 opacity-10 rotate-12"><TrendingUp className="w-96 h-96" /></div>
+               <h3 className="text-5xl font-black mb-6 relative z-10 leading-[1.1]">Fixy Stays <br/>Command Center</h3>
+               <p className="text-blue-100 text-xl mb-10 relative z-10 leading-relaxed font-medium">
+                 This is your strategic growth portal. Use these tools to onboard verified partners and deploy marketing assets to scale the Alibag hospitality network.
+               </p>
+               
+               <div className="grid grid-cols-2 gap-6 relative z-10">
+                  <div className="bg-white/10 p-6 rounded-2xl backdrop-blur-xl border border-white/20 transform hover:scale-105 transition-transform cursor-default">
+                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-tighter mb-1">Growth Index</p>
+                    <p className="text-3xl font-black">+{((approvedProperties?.length || 0) * 1.5).toFixed(1)}%</p>
+                    <div className="w-full bg-white/20 h-1.5 rounded-full mt-3 overflow-hidden">
+                       <div className="bg-white h-full w-[65%]"></div>
+                    </div>
+                  </div>
+                  <div className="bg-white/10 p-6 rounded-2xl backdrop-blur-xl border border-white/20 transform hover:scale-105 transition-transform cursor-default">
+                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-tighter mb-1">Market Reach</p>
+                    <p className="text-3xl font-black">{influencers?.length ? (influencers.length * 2400).toLocaleString() : 0}</p>
+                    <p className="text-[9px] font-bold text-blue-100 mt-2 italic">Est. Monthly Impressions</p>
+                  </div>
+               </div>
+            </div>
           </div>
-          
-          <div className="bg-blue-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-center h-full min-h-[400px]">
-             <div className="absolute -right-10 -bottom-10 opacity-10 rotate-12"><Users className="w-64 h-64" /></div>
-             <h3 className="text-4xl font-black mb-4 relative z-10">Fixy Stays <br/>Growth Hub</h3>
-             <p className="text-blue-100 text-lg mb-8 relative z-10 leading-relaxed font-medium">
-               Onboard verified property owners and market the platform. Use the marketing QR to spread the word about Alibag's premier booking software.
-             </p>
-             <div className="flex flex-wrap gap-4 relative z-10">
-                <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/20">
-                  <p className="text-[10px] font-black uppercase text-blue-200">Total Owners</p>
-                  <p className="text-2xl font-black">{totalRevenueGenerated > 0 ? (Math.floor(totalRevenueGenerated / 5000) + 12) : 12}</p>
-                </div>
-                <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/20">
-                  <p className="text-[10px] font-black uppercase text-blue-200">Active Plans</p>
-                  <p className="text-2xl font-black">100%</p>
-                </div>
-             </div>
-          </div>
-        </div>
+        </GrowthHubWrapper>
       </section>
 
       {/* SECTION 0.5: Payout Queue */}
