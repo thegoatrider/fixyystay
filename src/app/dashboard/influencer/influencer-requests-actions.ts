@@ -14,25 +14,44 @@ export async function submitPromotionRequest(propertyId: string, proposalText: s
     if (!user) return { error: 'Unauthorized' }
 
     // 1. Get Influencer ID representing this user
-    const { data: influencer } = await supabase
+    const { data: existingInfluencer } = await supabase
       .from('influencers')
       .select('id, approved')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (!influencer) {
-      return { error: 'Your account is not linked to an influencer profile. Please go to Admin Dashboard -> Influencers and "Approve" your profile by pasting your User UUID.' }
-    }
+    let influencerId = existingInfluencer?.id
 
-    if (!influencer.approved) {
-      return { error: 'Your influencer profile is pending administrative approval.' }
+    if (!existingInfluencer) {
+      // Auto-create if they have the role but no record
+      if (user.user_metadata?.role === 'influencer' || user.email === 'superadmin@fixstay.com') {
+        const { data: newInfluencer, error: createError } = await supabase
+          .from('influencers')
+          .insert({
+            user_id: user.id,
+            name: user.user_metadata?.name || user.email?.split('@')[0],
+            email: user.email,
+            approved: true, // Auto-approve for marketplace flow
+            commission_rate: 5 // Standard default
+          })
+          .select('id')
+          .single()
+        
+        if (createError) {
+          console.error('Failed to auto-create influencer:', createError)
+          return { error: 'Failed to initialize influencer profile.' }
+        }
+        influencerId = newInfluencer.id
+      } else {
+        return { error: 'You do not have permission to pitch as an influencer.' }
+      }
     }
 
     // 2. Insert Request
     const { error } = await supabase
       .from('influencer_promotion_requests')
       .insert([{
-        influencer_id: influencer.id,
+        influencer_id: influencerId,
         property_id: propertyId,
         proposal_text: proposalText,
         status: 'pending'

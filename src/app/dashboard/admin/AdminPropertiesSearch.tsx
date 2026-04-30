@@ -24,12 +24,10 @@ type Influencer = {
 
 export default function AdminPropertiesSearch({ 
   properties, 
-  influencers,
-  assignInfluencerAction
+  influencers
 }: { 
   properties: Property[],
-  influencers: Influencer[],
-  assignInfluencerAction: (formData: FormData) => Promise<any>
+  influencers: Influencer[]
 }) {
   const [query, setQuery] = useState('')
 
@@ -92,17 +90,6 @@ export default function AdminPropertiesSearch({
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-3">
-                    <form action={assignInfluencerAction} className="flex-shrink-0 flex items-center gap-2">
-                      <input type="hidden" name="propertyId" value={prop.id} />
-                      <select name="influencerId" className="border rounded px-2 py-1 bg-gray-50 text-sm" required defaultValue="">
-                        <option value="" disabled>Select Influencer...</option>
-                        {influencers?.map(inf => (
-                          <option key={inf.id} value={inf.id}>{inf.name}</option>
-                        ))}
-                      </select>
-                      <button type="submit" className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-8 px-3 rounded-md text-xs font-bold flex-shrink-0 transition-colors">Assign</button>
-                    </form>
-                    <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
                     <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
                     <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
                       <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
@@ -130,20 +117,6 @@ export default function AdminPropertiesSearch({
                 )}
               </div>
               <FeaturedToggle propertyId={prop.id} featured={!!prop.featured} />
-            </div>
-
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Assign Influencer</p>
-              <form action={assignInfluencerAction} className="flex gap-2">
-                <input type="hidden" name="propertyId" value={prop.id} />
-                <select name="influencerId" className="flex-1 border rounded-md px-2 py-1.5 bg-white text-xs" required defaultValue="">
-                  <option value="" disabled>Select...</option>
-                  {influencers?.map(inf => (
-                    <option key={inf.id} value={inf.id}>{inf.name}</option>
-                  ))}
-                </select>
-                <button type="submit" className="bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-md text-xs font-bold transition-all active:scale-95">Assign</button>
-              </form>
             </div>
 
             <div className="flex items-center gap-2 pt-2 border-t border-gray-100">

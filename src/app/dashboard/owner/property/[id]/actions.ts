@@ -8,13 +8,13 @@ export async function addRoom(propertyId: string, formData: FormData) {
   try {
     const supabase = await createClient()
     const supabaseAdmin = createAdminClient()
-    
+
     const name = formData.get('name') as string
     const acType = formData.get('acType') as string
     const roomCategory = formData.get('category') as string
     const category = `${acType} ${roomCategory}`
     const basePrice = Number(formData.get('basePrice'))
-    
+
     const priceBucket = formData.get('priceBucket') as string
     if (!priceBucket) {
       return { error: 'Price Bucket must be selected.' }
@@ -23,21 +23,21 @@ export async function addRoom(propertyId: string, formData: FormData) {
     // Handle Multiple Image Uploads
     const imageFiles = formData.getAll('image') as File[]
     const image_urls: string[] = []
-    
+
     for (const imageFile of imageFiles) {
       if (imageFile && imageFile.size > 0) {
         const fileExt = imageFile.name.split('.').pop()
         const fileName = `room-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
-        
+
         const { error: uploadError } = await supabaseAdmin.storage
           .from('property_images')
           .upload(fileName, imageFile)
-          
+
         if (!uploadError) {
           const { data: publicUrlData } = supabaseAdmin.storage
             .from('property_images')
             .getPublicUrl(fileName)
-            
+
           image_urls.push(publicUrlData.publicUrl)
         } else {
           console.error('Failed to upload room image:', uploadError)
@@ -120,7 +120,7 @@ export async function setMultipleRoomAvailability(propertyId: string, roomId: st
         room_id: roomId,
         date,
         available
-      })), 
+      })),
       { onConflict: 'room_id, date' }
     )
 
@@ -145,7 +145,7 @@ export async function setMultipleRoomRates(propertyId: string, roomId: string, d
         room_id: roomId,
         date,
         price
-      })), 
+      })),
       { onConflict: 'room_id, date' }
     )
 
@@ -162,10 +162,10 @@ export async function setMultipleRoomRates(propertyId: string, roomId: string, d
 }
 
 export async function saveMultipleChanges(
-  propertyId: string, 
-  roomId: string, 
-  dateStrings: string[], 
-  available: boolean | null, 
+  propertyId: string,
+  roomId: string,
+  dateStrings: string[],
+  available: boolean | null,
   price: number | null
 ) {
   try {
@@ -180,7 +180,7 @@ export async function saveMultipleChanges(
             room_id: roomId,
             date,
             available
-          })), 
+          })),
           { onConflict: 'room_id, date' }
         )
       )
@@ -193,7 +193,7 @@ export async function saveMultipleChanges(
             room_id: roomId,
             date,
             price
-          })), 
+          })),
           { onConflict: 'room_id, date' }
         )
       )
@@ -229,10 +229,10 @@ export async function updateRoomCategories(propertyId: string, categories: any[]
     // After updating categories metadata, sync the rooms table
     for (const cat of categories) {
       await syncCategoryRooms(
-        propertyId, 
-        cat.name, 
-        cat.count, 
-        cat.base_price, 
+        propertyId,
+        cat.name,
+        cat.count,
+        cat.base_price,
         cat.price_bucket,
         cat.base_capacity,
         cat.extra_guest_price
@@ -247,17 +247,17 @@ export async function updateRoomCategories(propertyId: string, categories: any[]
 }
 
 export async function syncCategoryRooms(
-  propertyId: string, 
-  categoryName: string, 
-  targetCount: number, 
-  basePrice: number, 
+  propertyId: string,
+  categoryName: string,
+  targetCount: number,
+  basePrice: number,
   priceBucket: string,
   baseCapacity?: number,
   extraGuestPrice?: number
 ) {
   try {
     const supabaseAdmin = createAdminClient()
-    
+
     // Get current rooms in this category
     const { data: currentRooms } = await supabaseAdmin
       .from('rooms')
@@ -306,7 +306,7 @@ export async function saveCategoryChanges(
 ) {
   try {
     const supabaseAdmin = createAdminClient()
-    
+
     // 1. Get all room IDs for this category
     const { data: rooms } = await supabaseAdmin
       .from('rooms')
@@ -328,12 +328,12 @@ export async function saveCategoryChanges(
         .eq('date', date)
 
       const blockedRoomIds = new Set(availabilityInfo?.filter(a => !a.available).map(a => a.room_id) || [])
-      
+
       // If we are blocking, we want to block 'roomsToUpdateCount' rooms.
       // If we are pricing, we apply to 'roomsToUpdateCount' rooms? 
       // User said "select a subset of number of rooms to edit". 
       // Usually this means "I want to block 2 rooms today".
-      
+
       let targetRoomIds: string[] = []
 
       if (available === false) {
