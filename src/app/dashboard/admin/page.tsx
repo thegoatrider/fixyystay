@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -151,9 +151,9 @@ export default async function AdminDashboard() {
     console.warn('Detailed usage views missing, falling back to basic fetching.')
   }
 
-  // Basic counts for top-level cards
-  const leadFormOwnersCount = leadUsageBreakdown.length
-  const guestFormOwnersCount = checkinUsageBreakdown.length
+  // Basic counts for top-level cards (actual users vs total)
+  const leadFormOwnersCount = leadUsageBreakdown.filter(i => i.total_leads > 0).length
+  const guestFormOwnersCount = checkinUsageBreakdown.filter(i => i.total_checkins > 0).length
 
   return (
     <div className="flex flex-col gap-10">
@@ -481,22 +481,32 @@ export default async function AdminDashboard() {
                 <tbody className="divide-y divide-gray-50">
                   {leadUsageBreakdown.map((item) => (
                     <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4 font-bold text-gray-900">{item.owner_name}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900">{item.owner_name}</span>
+                          <a 
+                            href={`mailto:${item.owner_email}?subject=Feedback on FixyStays Lead ID Features`}
+                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title={`Email ${item.owner_email}`}
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md font-black text-xs">
-                          {item.total_leads}
-                        </span>
+                        {item.total_leads > 0 ? (
+                          <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md font-black text-xs">
+                            {item.total_leads}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tighter">Never Used</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right text-xs text-gray-400">
-                        {new Date(item.last_activity).toLocaleDateString()}
+                        {item.last_activity ? new Date(item.last_activity).toLocaleDateString() : '—'}
                       </td>
                     </tr>
                   ))}
-                  {leadUsageBreakdown.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-gray-400 italic">No Lead ID activity logged.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -509,7 +519,7 @@ export default async function AdminDashboard() {
                 <div className="p-2 bg-green-100 rounded-lg text-green-600"><CheckCircle className="w-5 h-5" /></div>
                 <div>
                   <h3 className="font-bold text-gray-900">Guest ID Form Adoption</h3>
-                  <p className="text-xs text-gray-500">{guestFormOwnersCount} unique owners active</p>
+                  <p className="text-xs text-gray-500">{guestFormOwnersCount} of {checkinUsageBreakdown.length} owners active</p>
                 </div>
               </div>
               <div className="text-right">
@@ -520,7 +530,7 @@ export default async function AdminDashboard() {
               </div>
             </div>
             
-            <div className="max-h-[300px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-y-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 tracking-widest sticky top-0 backdrop-blur-sm">
                   <tr>
@@ -532,22 +542,32 @@ export default async function AdminDashboard() {
                 <tbody className="divide-y divide-gray-50">
                   {checkinUsageBreakdown.map((item) => (
                     <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4 font-bold text-gray-900">{item.owner_name}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900">{item.owner_name}</span>
+                          <a 
+                            href={`mailto:${item.owner_email}?subject=Feedback on FixyStays Guest ID Features`}
+                            className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                            title={`Email ${item.owner_email}`}
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="px-2 py-1 bg-green-50 text-green-600 rounded-md font-black text-xs">
-                          {item.total_checkins}
-                        </span>
+                        {item.total_checkins > 0 ? (
+                          <span className="px-2 py-1 bg-green-50 text-green-600 rounded-md font-black text-xs">
+                            {item.total_checkins}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tighter">Never Used</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right text-xs text-gray-400">
-                        {new Date(item.last_activity).toLocaleDateString()}
+                        {item.last_activity ? new Date(item.last_activity).toLocaleDateString() : '—'}
                       </td>
                     </tr>
                   ))}
-                  {checkinUsageBreakdown.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-gray-400 italic">No Guest ID activity logged.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
