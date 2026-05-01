@@ -482,15 +482,9 @@ export default async function AdminDashboard() {
                   {leadUsageBreakdown.map((item) => (
                     <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
                           <span className="font-bold text-gray-900">{item.owner_name}</span>
-                          <a 
-                            href={`mailto:${item.owner_email}?subject=Feedback on FixyStays Lead ID Features`}
-                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                            title={`Email ${item.owner_email}`}
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                          </a>
+                          <span className="text-[10px] text-blue-600 font-medium select-all">{item.owner_email}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -543,15 +537,9 @@ export default async function AdminDashboard() {
                   {checkinUsageBreakdown.map((item) => (
                     <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
                           <span className="font-bold text-gray-900">{item.owner_name}</span>
-                          <a 
-                            href={`mailto:${item.owner_email}?subject=Feedback on FixyStays Guest ID Features`}
-                            className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                            title={`Email ${item.owner_email}`}
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                          </a>
+                          <span className="text-[10px] text-green-600 font-medium select-all">{item.owner_email}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
