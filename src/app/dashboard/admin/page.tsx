@@ -138,32 +138,22 @@ export default async function AdminDashboard() {
     .order('created_at', { ascending: false })
 
   // 8. Feature Usage Metrics (SQL View Fallback to JS)
-  let leadFormOwnersCount = 0
-  let guestFormOwnersCount = 0
+  let leadUsageBreakdown: any[] = []
+  let checkinUsageBreakdown: any[] = []
+  
   try {
-    const { data: usageData, error: usageError } = await supabase
-      .from('feature_usage_metrics')
-      .select('*')
-      .single()
-
-    if (!usageError && usageData) {
-      leadFormOwnersCount = Number(usageData.owners_using_lead_form || 0)
-      guestFormOwnersCount = Number(usageData.owners_using_guest_form || 0)
-    } else {
-      throw new Error('View not found')
-    }
-  } catch (e) {
-    // Fallback if view doesn't exist yet
-    const { data: leadsData } = await supabase.from('leads').select('owner_id')
-    const { data: checkinData } = await supabase.from('guest_checkins').select('owner_id')
+    const { data: leadUsage } = await supabase.from('owner_lead_usage').select('*').order('total_leads', { ascending: false })
+    const { data: checkinUsage } = await supabase.from('owner_checkin_usage').select('*').order('total_checkins', { ascending: false })
     
-    if (leadsData) {
-      leadFormOwnersCount = new Set(leadsData.map(l => l.owner_id)).size
-    }
-    if (checkinData) {
-      guestFormOwnersCount = new Set(checkinData.map(c => c.owner_id)).size
-    }
+    leadUsageBreakdown = leadUsage || []
+    checkinUsageBreakdown = checkinUsage || []
+  } catch (e) {
+    console.warn('Detailed usage views missing, falling back to basic fetching.')
   }
+
+  // Basic counts for top-level cards
+  const leadFormOwnersCount = leadUsageBreakdown.length
+  const guestFormOwnersCount = checkinUsageBreakdown.length
 
   return (
     <div className="flex flex-col gap-10">
@@ -457,31 +447,109 @@ export default async function AdminDashboard() {
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
           <div className="p-2 bg-pink-50 rounded-xl"><BarChart3 className="text-pink-600 w-6 h-6" /></div>
           Platform Feature Adoption
+          <span className="text-sm font-normal text-gray-400 ml-2">Real-time owner engagement</span>
         </h2>
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div className="bg-white border p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 opacity-5"><Users className="w-32 h-32" /></div>
-            <p className="text-sm font-black text-gray-500 uppercase tracking-widest mb-2 relative z-10">Owners Using Lead ID Forms</p>
-            <div className="flex items-end gap-3 relative z-10">
-              <p className="text-5xl font-black text-gray-900">{leadFormOwnersCount}</p>
-              <p className="text-sm font-bold text-gray-400 mb-1">Unique Properties</p>
+        
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Lead ID Form Usage */}
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm flex flex-col">
+            <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><Users className="w-5 h-5" /></div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Lead ID Form Adoption</h3>
+                  <p className="text-xs text-gray-500">{leadFormOwnersCount} unique owners active</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black text-indigo-600">
+                  {leadUsageBreakdown.reduce((sum, item) => sum + Number(item.total_leads), 0)}
+                </p>
+                <p className="text-[10px] uppercase font-black text-gray-400 tracking-tighter">Total Leads</p>
+              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${leadFormOwnersCount > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <p className="text-xs font-semibold text-gray-500">Active Tracking</p>
+            
+            <div className="max-h-[300px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 tracking-widest sticky top-0 backdrop-blur-sm">
+                  <tr>
+                    <th className="px-6 py-3">Owner</th>
+                    <th className="px-6 py-3 text-center">Volume</th>
+                    <th className="px-6 py-3 text-right">Last Used</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {leadUsageBreakdown.map((item) => (
+                    <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-gray-900">{item.owner_name}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md font-black text-xs">
+                          {item.total_leads}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-xs text-gray-400">
+                        {new Date(item.last_activity).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {leadUsageBreakdown.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-gray-400 italic">No Lead ID activity logged.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-          
-          <div className="bg-white border p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 opacity-5"><CheckCircle className="w-32 h-32" /></div>
-            <p className="text-sm font-black text-gray-500 uppercase tracking-widest mb-2 relative z-10">Owners Using Guest ID Forms</p>
-            <div className="flex items-end gap-3 relative z-10">
-              <p className="text-5xl font-black text-gray-900">{guestFormOwnersCount}</p>
-              <p className="text-sm font-bold text-gray-400 mb-1">Unique Properties</p>
+
+          {/* Guest ID Form Usage */}
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm flex flex-col">
+            <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg text-green-600"><CheckCircle className="w-5 h-5" /></div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Guest ID Form Adoption</h3>
+                  <p className="text-xs text-gray-500">{guestFormOwnersCount} unique owners active</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black text-green-600">
+                  {checkinUsageBreakdown.reduce((sum, item) => sum + Number(item.total_checkins), 0)}
+                </p>
+                <p className="text-[10px] uppercase font-black text-gray-400 tracking-tighter">Total Check-ins</p>
+              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${guestFormOwnersCount > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <p className="text-xs font-semibold text-gray-500">Active Tracking</p>
+            
+            <div className="max-h-[300px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 tracking-widest sticky top-0 backdrop-blur-sm">
+                  <tr>
+                    <th className="px-6 py-3">Owner</th>
+                    <th className="px-6 py-3 text-center">Volume</th>
+                    <th className="px-6 py-3 text-right">Last Used</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {checkinUsageBreakdown.map((item) => (
+                    <tr key={item.owner_id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-gray-900">{item.owner_name}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-2 py-1 bg-green-50 text-green-600 rounded-md font-black text-xs">
+                          {item.total_checkins}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-xs text-gray-400">
+                        {new Date(item.last_activity).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {checkinUsageBreakdown.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-gray-400 italic">No Guest ID activity logged.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
