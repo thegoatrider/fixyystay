@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone, Lock } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { claimFreeTrial } from './actions'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
@@ -39,9 +39,15 @@ export default function OwnerDashboardClient({
   if (isLoading) return <DashboardSkeleton />
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
 
-  const { properties, leads, checkins, influencer_requests, wallet, subscription } = data as any
+  const { properties, leads, checkins, influencer_requests, wallet, subscription, owner } = data as any
   const isLifetime = subscription?.plan_name?.includes('Lifetime Partner')
-  const isLocked = !subscription?.is_active && !isSuperAdmin && !isLifetime
+  const isPaid = (subscription?.is_active || isSuperAdmin || isLifetime)
+  
+  // Free Tier is now explicitly enabled by Admin
+  const isFreeTier = !isPaid && owner?.free_tier_enabled
+  
+  // If not paid and not enabled for free tier, they are locked out
+  const isLocked = !isPaid && !owner?.free_tier_enabled
 
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
@@ -94,55 +100,70 @@ export default function OwnerDashboardClient({
           ownerId={ownerId} 
           properties={properties || []} 
           initialLeads={leads as any || []} 
+          isFreeTier={isFreeTier}
         />
       ) : activeTab === 'influencers' ? (
         <InfluencerRequestsInbox 
           requests={influencer_requests || []} 
         />
       ) : (
-        <GuestList checkins={checkins as any || []} />
+        <GuestList 
+          checkins={checkins as any || []} 
+          isFreeTier={isFreeTier}
+        />
       )}
 
-      {/* Lockout Overlay */}
+      {/* Subscription Banner for Free Tier */}
+      {isFreeTier && (
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 rounded-2xl text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-lg animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-xl">
+              <Zap className="w-6 h-6 fill-current text-yellow-300" />
+            </div>
+            <div>
+              <p className="font-black italic uppercase text-xs tracking-widest text-blue-100">Standard Partner Plan</p>
+              <h3 className="text-xl font-bold">You are on the <span className="text-yellow-300 italic underline">Free Tier</span></h3>
+              <p className="text-sm text-blue-50 opacity-90">Upgrade to unlock guest records, lead management, and detailed analytics.</p>
+            </div>
+          </div>
+          <Button asChild className="bg-white text-blue-600 hover:bg-blue-50 font-black uppercase tracking-widest px-8 rounded-xl h-12 shadow-md">
+            <Link href="/pricing/starter">Upgrade Now</Link>
+          </Button>
+        </div>
+      )}
+
+      {/* Lockout Overlay - Fallback for owners when Free Tier is not enabled */}
       {isLocked && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-white/20 backdrop-blur-xl animate-in fade-in duration-500">
-          <div className="bg-white border-2 border-red-100 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
-              <Wallet className="w-10 h-10" />
+          <div className="bg-white border-2 border-orange-100 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6">
+            <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Lock className="w-10 h-10" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-3xl font-black text-gray-900 italic">Access Locked</h2>
+              <h2 className="text-3xl font-black text-gray-900 italic uppercase">Access Locked</h2>
               <p className="text-gray-500 font-medium leading-relaxed">
-                Your partner subscription has expired or hasn't started yet. Please renew to access your property management tools.
+                Your partner dashboard is currently restricted. Please contact support to enable your free tier or purchase a premium plan to continue.
               </p>
             </div>
             
             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col items-center gap-1">
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Support Line</p>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Partner Support</p>
               <p className="text-xl font-bold text-blue-600">+91 75062 88907</p>
             </div>
 
             <div className="grid gap-3">
-              {subscription?.status === 'none' && (
-                <Button 
-                  onClick={async () => {
-                    if (confirm('Start your 7-day free trial?')) {
-                      const res = await claimFreeTrial()
-                      if (res.success) window.location.reload()
-                      else alert(res.error)
-                    }
-                  }} 
-                  className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-black rounded-xl shadow-lg flex items-center justify-center gap-2"
-                >
-                  <Zap className="w-5 h-5 fill-current" />
-                  Start 7-Day Free Trial
-                </Button>
-              )}
+              <Button 
+                onClick={() => window.location.href = '/pricing/starter'} 
+                className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest text-white mt-2"
+              >
+                <Zap className="w-5 h-5 fill-current" />
+                Unlock Premium Plans
+              </Button>
               
               <Button 
                 onClick={() => window.location.href = '/dashboard/owner/profile'} 
                 variant="outline"
-                className="w-full h-14 text-lg font-black rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                className="w-full h-14 text-sm font-black rounded-xl border-2 border-gray-200 text-gray-400 hover:bg-gray-50 uppercase tracking-widest"
               >
                 View My Account
               </Button>

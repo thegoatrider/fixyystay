@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail, Zap } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -12,6 +12,7 @@ import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
+import FreeTierToggle from './FreeTierToggle'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -108,11 +109,16 @@ export default async function AdminDashboard() {
   })
   
   const platformCommission = totalRevenueGenerated - paidToOwners - paidToInfluencers
-  const { data: allOwners } = await supabase.from('owners').select('id, name')
+  
+  // 5b. Detailed Owner List for Account Management
+  const { data: allOwnersDetailed } = await supabase
+    .from('owners')
+    .select('*, owner_subscriptions(plan_name, status, end_date)')
+    .order('created_at', { ascending: false })
   
   const pendingPayouts = pendingPayoutsRaw?.map(req => {
     const isInf = influencers?.find(i => i.id === req.user_id)
-    const isOwner = allOwners?.find(o => o.id === req.user_id)
+    const isOwner = allOwnersDetailed?.find(o => o.id === req.user_id)
     
     return {
       ...req,
@@ -647,6 +653,63 @@ export default async function AdminDashboard() {
           Influencer Performance Center
         </h2>
         <InfluencerPerformanceHub promotions={promotions} />
+      </section>
+
+      {/* SECTION 4: Partner Management (FREE TIER CONTROL) */}
+      <section>
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+          <div className="p-2 bg-blue-50 rounded-xl"><Users className="text-blue-600 w-6 h-6" /></div>
+          Partner Account Management
+          <span className="text-sm font-normal text-gray-400 ml-2">{allOwnersDetailed?.length || 0} partners</span>
+        </h2>
+        
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Partner / Email</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Admin Control</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {allOwnersDetailed?.map((owner: any) => {
+                const sub = owner.owner_subscriptions?.[0]
+                const isActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+                
+                return (
+                  <tr key={owner.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{owner.name}</p>
+                      <p className="text-[10px] text-gray-400 font-medium">{owner.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {isActive ? (
+                        <div className="flex flex-col">
+                           <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider w-fit">
+                             <Zap className="w-3 h-3 fill-current" /> {sub.plan_name}
+                           </span>
+                           <span className="text-[9px] text-gray-400 mt-1">Exp: {new Date(sub.end_date).toLocaleDateString()}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                           No Active Plan
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <FreeTierToggle ownerId={owner.id} isEnabled={owner.free_tier_enabled} />
+                    </td>
+                    <td className="px-6 py-4 text-right text-gray-400 text-xs font-medium">
+                      {new Date(owner.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
     </div>

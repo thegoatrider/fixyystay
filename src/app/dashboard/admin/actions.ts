@@ -381,3 +381,30 @@ export async function onboardPartner(formData: FormData) {
     return { error: err.message || 'An unexpected error occurred' }
   }
 }
+
+export async function toggleFreeTier(ownerId: string, currentValue: boolean) {
+  try {
+    const supabase = await createClient()
+    
+    // Verify admin role
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+      return { error: 'Unauthorized' }
+    }
+
+    const { error } = await supabase
+      .from('owners')
+      .update({ free_tier_enabled: !currentValue })
+      .eq('id', ownerId)
+
+    if (error) {
+      console.error('Failed to toggle free tier', error)
+      return { error: 'Failed to update free tier status' }
+    }
+
+    revalidatePath('/dashboard/admin')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}

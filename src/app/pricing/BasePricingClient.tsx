@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Check, Zap, Star, ShieldCheck, Crown, LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createOwnerOrder } from './business/actions'
+import { createOwnerOrder, verifyAndUpgrade } from './business/actions'
 import Script from 'next/script'
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -71,9 +71,16 @@ export default function BasePricingClient({
         theme: {
           color: themeColor,
         },
-        handler: function (response: any) {
-          alert(`Payment Successful! Order ID: ${response.razorpay_order_id}. Please email support@fixstay.com to activate your login.`)
-          window.location.href = successUrl
+        handler: async function (response: any) {
+          setLoading('Processing...')
+          const res = await verifyAndUpgrade(response.razorpay_order_id)
+          if (res.success) {
+            alert(`Payment Successful! Your account has been upgraded automatically.`)
+            window.location.href = successUrl
+          } else {
+            alert(`Payment Successful, but automatic upgrade failed: ${res.error}. Please contact support with Order ID: ${response.razorpay_order_id}`)
+            window.location.href = successUrl
+          }
         },
       }
 

@@ -5,7 +5,8 @@ import { format, isSameDay } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User, Download, CheckSquare, Square } from 'lucide-react'
+import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User, Download, CheckSquare, Square, Lock } from 'lucide-react'
+import Link from 'next/link'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
@@ -56,10 +57,12 @@ export default React.memo(function LeadsSection({
   ownerId,
   properties,
   initialLeads,
+  isFreeTier = false,
 }: {
   ownerId: string
   properties: Property[]
   initialLeads: Lead[]
+  isFreeTier?: boolean
 }) {
   const queryClient = useQueryClient()
   const [localLeads, setLocalLeads] = useState<Lead[]>(initialLeads)
@@ -329,7 +332,24 @@ export default React.memo(function LeadsSection({
       </div>
 
       {/* Two-column layout: calendar + panel */}
-      <div className="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
+      <div className="grid lg:grid-cols-[1fr_380px] gap-6 items-start relative">
+        {/* Blur Overlay */}
+        {isFreeTier && (
+          <div className="absolute inset-0 z-10 backdrop-blur-md bg-white/30 flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed border-gray-100 shadow-inner">
+            <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-sm gap-6 border border-gray-50 scale-105">
+               <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center shadow-inner">
+                  <Lock className="w-8 h-8" />
+               </div>
+               <div>
+                 <h4 className="text-2xl font-extrabold text-gray-900 leading-tight italic uppercase">Lead Data Locked</h4>
+                 <p className="text-gray-500 text-sm mt-2 font-medium">Upgrade your partner plan to view guest enquiries and manage lead data.</p>
+               </div>
+               <Button asChild className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg shadow-blue-600/20 uppercase tracking-widest">
+                  <Link href="/pricing/starter">Upgrade to View</Link>
+               </Button>
+            </div>
+          </div>
+        )}
 
         {/* ── Calendar ── */}
         <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">

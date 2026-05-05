@@ -16,6 +16,10 @@ export type DashboardData = {
     status: string
     is_active: boolean
   }
+  owner?: {
+    id: string
+    free_tier_enabled: boolean
+  }
 }
 
 export function useDashboardData(ownerId: string | undefined, isSuperAdmin: boolean) {
