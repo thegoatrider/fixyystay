@@ -669,7 +669,6 @@ export default async function AdminDashboard() {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Partner / Email</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Admin Control</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
               </tr>
             </thead>
@@ -697,9 +696,6 @@ export default async function AdminDashboard() {
                            No Active Plan
                         </span>
                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <FreeTierToggle ownerId={owner.id} isEnabled={owner.free_tier_enabled} />
                     </td>
                     <td className="px-6 py-4 text-right text-gray-400 text-xs font-medium">
                       {new Date(owner.created_at).toLocaleDateString()}

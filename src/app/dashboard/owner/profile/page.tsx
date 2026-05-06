@@ -18,7 +18,7 @@ export default async function OwnerProfilePage() {
 
   const { data: owner } = await supabase
     .from('owners')
-    .select('id, name, email')
+    .select('id, name, email, created_at')
     .eq('user_id', user.id)
     .single()
 
@@ -36,7 +36,13 @@ export default async function OwnerProfilePage() {
     .eq('owner_id', owner.id)
     .order('payment_date', { ascending: false })
 
-  const isActive = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
+  const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
+  
+  // 7-day Trial Logic from Owner Creation Date
+  const ownerCreatedAt = owner?.created_at ? new Date(owner.created_at) : null
+  const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
+  const isTrial = !isPaid && trialEndDate ? trialEndDate > new Date() : false
+  const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
 
   return (
     <main className="min-h-screen bg-gray-50/50 pb-12">
@@ -68,27 +74,29 @@ export default async function OwnerProfilePage() {
           {/* Left: Subscription Status */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white border-2 border-white ring-1 ring-gray-100 rounded-[32px] p-8 shadow-xl shadow-blue-900/5 relative overflow-hidden">
-               {isActive && <div className="absolute top-0 right-0 p-8 opacity-5"><Zap className="w-32 h-32 text-blue-600" /></div>}
+               {(isPaid || isTrial) && <div className="absolute top-0 right-0 p-8 opacity-5"><Zap className="w-32 h-32 text-blue-600" /></div>}
                
                 <div className="flex items-center gap-4 mb-8">
-                  <div className={cn("p-4 rounded-2xl", isActive ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600")}>
-                    {subscription?.plan_name === '7-Day Free Trial' ? <History className="w-6 h-6 border-2 rounded-full p-0.5" /> : isActive ? <Zap className="w-6 h-6 font-black" /> : <Zap className="w-6 h-6" />}
+                  <div className={cn("p-4 rounded-2xl", isPaid ? "bg-green-100 text-green-600" : isTrial ? "bg-yellow-100 text-yellow-600" : "bg-blue-100 text-blue-600")}>
+                    {isTrial ? <History className="w-6 h-6 border-2 rounded-full p-0.5" /> : isPaid ? <Zap className="w-6 h-6 font-black" /> : <Zap className="w-6 h-6" />}
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-gray-900 tracking-tight">
-                      {subscription?.plan_name === '7-Day Free Trial' ? 'Free Trial Active' : isActive ? 'Active Subscription' : 'Free Tier'}
+                      {isPaid ? 'Active Subscription' : isTrial ? 'Free Trial Active' : 'Free Tier'}
                     </h3>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{subscription?.plan_name || 'Standard Free Plan'}</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                      {isPaid ? (subscription?.plan_name || 'Premium Plan') : isTrial ? '7-Day Free Trial' : 'Trial Expired / Restricted'}
+                    </p>
                   </div>
                </div>
 
-               {subscription && isActive ? (
+               {isPaid ? (
                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Expiry Date</p>
-                       <p className="text-2xl font-black text-gray-900">{format(new Date(subscription.end_date), 'MMMM dd, yyyy')}</p>
+                       <p className="text-2xl font-black text-gray-900">{subscription?.end_date ? format(new Date(subscription.end_date), 'MMMM dd, yyyy') : 'N/A'}</p>
                        <p className={cn("text-xs font-bold mt-1", "text-green-600")}>
-                          Expires in {Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                          Expires in {subscription?.end_date ? Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} days
                        </p>
                     </div>
                     <div className="p-6 bg-blue-600 text-white rounded-2xl border border-blue-500 shadow-lg shadow-blue-600/20 flex flex-col justify-between">
@@ -101,12 +109,31 @@ export default async function OwnerProfilePage() {
                        </Button>
                     </div>
                  </div>
+               ) : isTrial ? (
+                <div className="grid sm:grid-cols-2 gap-6">
+                   <div className="p-6 bg-yellow-50 rounded-2xl border border-yellow-100">
+                      <p className="text-[10px] font-black uppercase text-yellow-600 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Trial Ends</p>
+                      <p className="text-2xl font-black text-gray-900">{trialEndDate ? format(trialEndDate, 'MMMM dd, yyyy') : 'N/A'}</p>
+                      <p className="text-xs font-bold mt-1 text-yellow-600">
+                         Ends in {trialEndDate ? Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} days
+                      </p>
+                   </div>
+                   <div className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl border border-blue-500 shadow-lg shadow-blue-600/20 flex flex-col justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-1">Current Status</p>
+                        <p className="text-xl font-black italic uppercase">Enjoy All Features</p>
+                      </div>
+                      <Button asChild className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
+                         <Link href="/pricing/starter">Upgrade Now</Link>
+                      </Button>
+                   </div>
+                </div>
                ) : (
                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
                        <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2">Access Status</p>
                        <p className="text-2xl font-black text-blue-900 italic">LIMITED FREE ACCESS</p>
-                       <p className="text-xs font-medium text-blue-600 mt-1">Upgrade To View Leads & Guests</p>
+                       <p className="text-xs font-medium text-blue-600 mt-1">Trial Expired. Upgrade To View Leads & Guests.</p>
                     </div>
                     <div className="p-6 bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-2xl border border-indigo-500 shadow-lg shadow-indigo-600/20 flex flex-col justify-between">
                        <div>

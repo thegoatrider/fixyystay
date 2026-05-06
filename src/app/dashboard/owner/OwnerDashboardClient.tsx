@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ import AddLeadTile from './AddLeadTile'
 import QuickCheckin from './QuickCheckin'
 import { requestPayout } from '@/app/actions/wallet'
 import React, { useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 // Lazy load heavy tab sections
 const LeadsSection = dynamic(() => import('./LeadsSection'), { loading: () => <DashboardSkeleton /> })
@@ -24,32 +25,50 @@ const InfluencerRequestsInbox = dynamic(() => import('./InfluencerRequestsInbox'
 
 export default function OwnerDashboardClient({ 
   userId, 
+  email,
   ownerId, 
   isSuperAdmin 
 }: { 
-  userId: string, 
-  ownerId: string, 
-  isSuperAdmin: boolean 
+  userId: string; 
+  email: string;
+  ownerId: string; 
+  isSuperAdmin: boolean; 
 }) {
+  console.log('OwnerDashboardClient Rendered:', { userId, email, ownerId, isSuperAdmin })
+  
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'properties'
-  
-  const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
+  const router = useRouter()
+  const queryClient = useQueryClient()
+
+  const { data, isLoading } = useDashboardData(ownerId, isSuperAdmin)
+
+  // Use useMemo for trial calculation to avoid redundant calculations
+  const { isTrial, isFreeTier, isPaid } = useMemo(() => {
+    if (!data) return { isTrial: false, isFreeTier: false, isPaid: false }
+    
+    const { subscription, owner } = data as any
+    const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
+    
+    // 7-day Trial Logic from Owner Creation Date
+    const ownerCreatedAt = owner?.created_at ? new Date(owner.created_at) : null
+    const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
+    const isTrial = !isPaid && trialEndDate ? trialEndDate > new Date() : false
+    const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
+    
+    console.log('Trial Status:', { isPaid, isTrial, isExpired, ownerCreatedAt, trialEndDate })
+    
+    return { isTrial, isFreeTier: isExpired, isPaid }
+  }, [data])
 
   if (isLoading) return <DashboardSkeleton />
-  if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
+  if (!data) return <div className="p-8 text-center bg-white rounded-3xl border shadow-sm m-4">Failed to load dashboard data. Please try refreshing.</div>
 
-  const { properties, leads, checkins, influencer_requests, wallet, subscription, owner } = data as any
-  const isLifetime = subscription?.plan_name?.includes('Lifetime Partner')
-  const isPaid = (subscription?.is_active || isSuperAdmin || isLifetime)
-  
-  // Free Tier is now explicitly enabled by Admin
-  const isFreeTier = !isPaid && owner?.free_tier_enabled
-  
-  // If not paid and not enabled for free tier, they are locked out
-  const isLocked = !isPaid && !owner?.free_tier_enabled
-
+  const { properties, leads, checkins, influencer_requests, wallet } = data as any
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
+
+  // We no longer lock them out completely; they always see the dashboard with restricted features
+  const isLocked = false 
 
   return (
     <div className="flex flex-col gap-8">
@@ -95,23 +114,12 @@ export default function OwnerDashboardClient({
             )}
           </div>
         </div>
-      ) : activeTab === 'leads' ? (
-        <LeadsSection 
-          ownerId={ownerId} 
-          properties={properties || []} 
-          initialLeads={leads as any || []} 
-          isFreeTier={isFreeTier}
-        />
-      ) : activeTab === 'influencers' ? (
-        <InfluencerRequestsInbox 
-          requests={influencer_requests || []} 
-        />
-      ) : (
-        <GuestList 
-          checkins={checkins as any || []} 
-          isFreeTier={isFreeTier}
-        />
       )}
+      {activeTab === 'leads' && <LeadsSection ownerId={ownerId} properties={properties || []} initialLeads={leads || []} isFreeTier={isFreeTier} />}
+      {activeTab === 'guests' && <GuestList checkins={checkins || []} isFreeTier={isFreeTier} />}
+      {activeTab === 'influencers' && <InfluencerRequestsInbox requests={influencer_requests || []} properties={properties || []} />}
+      {activeTab === 'wallet' && <WalletSection wallet={wallet || { balance: 0, currency: 'INR' }} transactions={[]} ownerId={ownerId} />}
+      {activeTab === 'profile' && <div className="p-8 text-center bg-white rounded-3xl border shadow-sm">Please use the Navigation bar to go to Profile Settings.</div>}
 
       {/* Subscription Banner for Free Tier */}
       {isFreeTier && (

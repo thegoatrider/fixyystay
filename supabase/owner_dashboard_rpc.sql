@@ -28,6 +28,15 @@ DECLARE
   v_subscription JSON;
   v_influencer_requests JSON;
 BEGIN
+  -- 0. Get owner metadata (Including created_at for trial logic)
+  SELECT json_build_object(
+    'id', o.id,
+    'free_tier_enabled', COALESCE(o.free_tier_enabled, false),
+    'created_at', o.created_at
+  ) INTO v_owner_meta
+  FROM public.owners o
+  WHERE o.id = p_owner_id;
+
   -- 1. Get properties
   IF p_is_superadmin THEN
     SELECT json_agg(p.*) INTO v_properties FROM public.properties p;
@@ -101,6 +110,7 @@ BEGIN
   LIMIT 1;
 
   RETURN json_build_object(
+    'owner', COALESCE(v_owner_meta, json_build_object('free_tier_enabled', false, 'created_at', null)),
     'properties', COALESCE(v_properties, '[]'::json),
     'leads', COALESCE(v_leads, '[]'::json),
     'checkins', COALESCE(v_checkins, '[]'::json),
