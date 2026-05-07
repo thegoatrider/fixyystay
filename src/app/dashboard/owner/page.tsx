@@ -11,10 +11,22 @@ export default async function OwnerDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = user?.email === 'superadmin@fixstay.com' || user?.user_metadata?.role === 'admin'
   
   // 2. Initial owner lookup (fast)
-  const { data: owner } = await supabase.from('owners').select('id, created_at').eq('user_id', user?.id).single()
+  let { data: owner } = await supabase.from('owners').select('id, created_at').eq('user_id', user?.id).maybeSingle()
+  
+  if (!owner && user?.email) {
+    // Self-healing: if role is owner but not linked to user_id, link by email
+    const { data: updatedOwner } = await supabase
+      .from('owners')
+      .update({ user_id: user.id })
+      .eq('email', user.email)
+      .select('id, created_at')
+      .maybeSingle()
+    
+    if (updatedOwner) owner = updatedOwner
+  }
   
   // 3. Render the Client Dashboard
   return (
