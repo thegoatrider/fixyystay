@@ -40,7 +40,7 @@ export default function OwnerDashboardClient({
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useDashboardData(ownerId, isSuperAdmin)
+  const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
   // Use useMemo for trial calculation to avoid redundant calculations
   const { isTrial, isFreeTier, isPaid } = useMemo(() => {
@@ -73,9 +73,13 @@ export default function OwnerDashboardClient({
   }
 
   if (isLoading) return <DashboardSkeleton />
-  if (!data) return (
+  if (error || !data) return (
     <div className="p-8 text-center bg-white rounded-3xl border shadow-sm m-4">
-      <p className="text-gray-500 mb-4">Failed to load dashboard data. Please try refreshing.</p>
+      <p className="text-gray-500 mb-2">Failed to load dashboard data.</p>
+      <p className="text-xs text-red-500 font-mono mb-4 break-all">
+        {error ? (error as any).message : (ownerId ? `Owner ID: ${ownerId}` : 'Missing Owner ID')}<br/>
+        {isSuperAdmin ? 'Admin Mode: ON' : 'Admin Mode: OFF'}
+      </p>
       <Button onClick={() => window.location.reload()}>Refresh Page</Button>
     </div>
   )
