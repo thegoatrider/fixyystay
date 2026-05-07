@@ -12,6 +12,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='guest_checkins' AND column_name='owner_id') THEN
     ALTER TABLE public.guest_checkins ADD COLUMN owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='owners' AND column_name='free_tier_enabled') THEN
+    ALTER TABLE public.owners ADD COLUMN free_tier_enabled BOOLEAN DEFAULT false;
+  END IF;
 END $$;
 
 CREATE OR REPLACE FUNCTION public.get_owner_dashboard_data(
@@ -122,10 +125,8 @@ BEGIN
     'leads', COALESCE(v_leads, '[]'::json),
     'checkins', COALESCE(v_checkins, '[]'::json),
     'influencer_requests', COALESCE(v_influencer_requests, '[]'::json),
-    'wallet', json_build_object(
-      'transactions', COALESCE(v_wallet_transactions, '[]'::json),
-      'payout_requests', COALESCE(v_payout_requests, '[]'::json)
-    ),
+    'wallet_transactions', COALESCE(v_wallet_transactions, '[]'::json),
+    'payout_requests', COALESCE(v_payout_requests, '[]'::json),
     'subscription', COALESCE(v_subscription, json_build_object('status', 'none', 'is_active', false))
   );
 END;

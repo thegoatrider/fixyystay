@@ -130,10 +130,8 @@ BEGIN
     'leads', COALESCE(v_leads, '[]'::json),
     'checkins', COALESCE(v_checkins, '[]'::json),
     'influencer_requests', COALESCE(v_influencer_requests, '[]'::json),
-    'wallet', json_build_object(
-      'transactions', COALESCE(v_wallet_transactions, '[]'::json),
-      'payout_requests', COALESCE(v_payout_requests, '[]'::json)
-    ),
+    'wallet_transactions', COALESCE(v_wallet_transactions, '[]'::json),
+    'payout_requests', COALESCE(v_payout_requests, '[]'::json),
     'subscription', COALESCE(v_subscription, json_build_object('status', 'none', 'is_active', false))
   );
 END;

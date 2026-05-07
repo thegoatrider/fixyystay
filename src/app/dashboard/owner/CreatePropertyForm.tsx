@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProperty } from './actions'
 import { useRouter } from 'next/navigation'
+import { CollapsibleTile } from '@/components/CollapsibleTile'
+import { PlusCircle } from 'lucide-react'
 
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
@@ -136,7 +138,8 @@ export default function CreatePropertyForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 pb-24">
+    <CollapsibleTile title="Add New Property" icon={PlusCircle}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 pb-12 text-left">
       <div className="space-y-2">
         <Label htmlFor="name">Property Name</Label>
         <Input name="name" required placeholder="e.g. Beachfront Villa" />
@@ -463,5 +466,6 @@ export default function CreatePropertyForm() {
         </p>
       </div>
     </form>
+    </CollapsibleTile>
   )
 }
