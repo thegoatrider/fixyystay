@@ -20,6 +20,7 @@ CREATE OR REPLACE FUNCTION public.get_owner_dashboard_data(
 )
 RETURNS JSON AS $$
 DECLARE
+  v_user_id UUID;
   v_properties JSON;
   v_leads JSON;
   v_checkins JSON;
@@ -27,6 +28,7 @@ DECLARE
   v_payout_requests JSON;
   v_subscription JSON;
   v_influencer_requests JSON;
+  v_owner_meta JSON;
 BEGIN
   -- 0. Get owner metadata (Including created_at for trial logic)
   SELECT json_build_object(
@@ -37,39 +39,42 @@ BEGIN
   FROM public.owners o
   WHERE o.id = p_owner_id;
 
+  -- Fetch the owner's user_id once to avoid repeated subqueries below
+  SELECT o.user_id INTO v_user_id FROM public.owners o WHERE o.id = p_owner_id;
+
   -- 1. Get properties
   IF p_is_superadmin THEN
-    SELECT json_agg(p.*) INTO v_properties FROM public.properties p;
+    SELECT json_agg(p.*) INTO v_properties FROM public.properties p LIMIT 100; -- Safety limit for admin
   ELSE
     SELECT json_agg(p.*) INTO v_properties FROM public.properties p WHERE p.owner_id = p_owner_id;
   END IF;
 
   -- 2. Get leads
   IF p_is_superadmin THEN
-    SELECT json_agg(l.*) INTO v_leads FROM public.leads l;
+    SELECT json_agg(l.* ORDER BY l.created_at DESC) INTO v_leads FROM public.leads l LIMIT 200;
   ELSE
-    SELECT json_agg(l.*) INTO v_leads FROM public.leads l WHERE l.owner_id = p_owner_id;
+    SELECT json_agg(l.* ORDER BY l.created_at DESC) INTO v_leads FROM public.leads l WHERE l.owner_id = p_owner_id;
   END IF;
 
   -- 3. Get checkins
   IF p_is_superadmin THEN
-    SELECT json_agg(gc.*) INTO v_checkins FROM public.guest_checkins gc;
+    SELECT json_agg(gc.* ORDER BY gc.created_at DESC) INTO v_checkins FROM public.guest_checkins gc LIMIT 200;
   ELSE
-    SELECT json_agg(gc.*) INTO v_checkins FROM public.guest_checkins gc WHERE gc.owner_id = p_owner_id;
+    SELECT json_agg(gc.* ORDER BY gc.created_at DESC) INTO v_checkins FROM public.guest_checkins gc WHERE gc.owner_id = p_owner_id;
   END IF;
 
-  -- 4. Get wallet (based on owner.user_id)
+  -- 4. Get wallet (using the v_user_id we fetched earlier)
   IF p_is_superadmin THEN
-    SELECT json_agg(t.* ORDER BY t.created_at DESC) INTO v_wallet_transactions FROM public.wallet_transactions t;
-    SELECT json_agg(pr.* ORDER BY pr.created_at DESC) INTO v_payout_requests FROM public.payout_requests pr;
+    SELECT json_agg(t.* ORDER BY t.created_at DESC) INTO v_wallet_transactions FROM public.wallet_transactions t LIMIT 100;
+    SELECT json_agg(pr.* ORDER BY pr.created_at DESC) INTO v_payout_requests FROM public.payout_requests pr LIMIT 100;
   ELSE
     SELECT json_agg(t.* ORDER BY t.created_at DESC) INTO v_wallet_transactions 
     FROM public.wallet_transactions t 
-    WHERE t.user_id = (SELECT user_id FROM public.owners WHERE id = p_owner_id);
+    WHERE t.user_id = v_user_id;
     
     SELECT json_agg(pr.* ORDER BY pr.created_at DESC) INTO v_payout_requests 
     FROM public.payout_requests pr 
-    WHERE pr.user_id = (SELECT user_id FROM public.owners WHERE id = p_owner_id);
+    WHERE pr.user_id = v_user_id;
   END IF;
 
   -- 5. Get influencer requests
@@ -83,6 +88,7 @@ BEGIN
       JOIN public.influencers i ON ir.influencer_id = i.id
       JOIN public.properties pr ON ir.property_id = pr.id
       ORDER BY ir.created_at DESC
+      LIMIT 100
     ) ir_complex;
   ELSE
     SELECT json_agg(ir_complex) INTO v_influencer_requests
@@ -107,6 +113,7 @@ BEGIN
   ) INTO v_subscription
   FROM public.owner_subscriptions s
   WHERE s.owner_id = p_owner_id
+  ORDER BY s.created_at DESC -- Ensure we get the latest one
   LIMIT 1;
 
   RETURN json_build_object(

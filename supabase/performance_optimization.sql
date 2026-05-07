@@ -37,8 +37,17 @@ DECLARE
   v_payout_requests JSON;
   v_subscription JSON;
   v_influencer_requests JSON;
+  v_owner_meta JSON;
 BEGIN
-  -- Fetch the owner's user_id once to avoid repeated subqueries below
+  -- Fetch the owner's user_id and metadata
+  SELECT json_build_object(
+    'id', o.id,
+    'free_tier_enabled', COALESCE(o.free_tier_enabled, false),
+    'created_at', o.created_at
+  ) INTO v_owner_meta
+  FROM public.owners o
+  WHERE o.id = p_owner_id;
+
   SELECT o.user_id INTO v_user_id FROM public.owners o WHERE o.id = p_owner_id;
 
   -- 1. Get properties
@@ -116,6 +125,7 @@ BEGIN
   LIMIT 1;
 
   RETURN json_build_object(
+    'owner', COALESCE(v_owner_meta, json_build_object('free_tier_enabled', false, 'created_at', null)),
     'properties', COALESCE(v_properties, '[]'::json),
     'leads', COALESCE(v_leads, '[]'::json),
     'checkins', COALESCE(v_checkins, '[]'::json),

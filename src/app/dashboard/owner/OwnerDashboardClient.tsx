@@ -4,9 +4,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone, Lock } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
-import { claimFreeTrial } from './actions'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
@@ -56,32 +55,59 @@ export default function OwnerDashboardClient({
     const isTrial = !isPaid && trialEndDate ? trialEndDate > new Date() : false
     const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
     
-    console.log('Trial Status:', { isPaid, isTrial, isExpired, ownerCreatedAt, trialEndDate })
-    
     return { isTrial, isFreeTier: isExpired, isPaid }
   }, [data])
 
-  if (isLoading) return <DashboardSkeleton />
-  if (!data) return <div className="p-8 text-center bg-white rounded-3xl border shadow-sm m-4">Failed to load dashboard data. Please try refreshing.</div>
+  const handleRequestPayout = async (amount: number, bankDetails: string) => {
+    try {
+      const result = await requestPayout(ownerId, amount, bankDetails) as any
+      if (result.success) {
+        queryClient.invalidateQueries(['dashboard_data', ownerId] as any)
+        alert('Payout request submitted successfully!')
+      } else {
+        alert(result.error || 'Failed to request payout')
+      }
+    } catch (err) {
+      alert('An error occurred while requesting payout')
+    }
+  }
 
-  const { properties, leads, checkins, influencer_requests, wallet } = data as any
+  if (isLoading) return <DashboardSkeleton />
+  if (!data) return (
+    <div className="p-8 text-center bg-white rounded-3xl border shadow-sm m-4">
+      <p className="text-gray-500 mb-4">Failed to load dashboard data. Please try refreshing.</p>
+      <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+    </div>
+  )
+
+  const { properties, leads, checkins, influencer_requests, wallet_transactions, payout_requests } = data as any
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
-  // We no longer lock them out completely; they always see the dashboard with restricted features
-  const isLocked = false 
-
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Owner Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage listings and track incoming enquiries.</p>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900 drop-shadow-sm">
+            Partner Dashboard
+          </h1>
+          <p className="text-gray-500 font-medium">Manage your properties, guests, and leads</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {isFreeTier && (
+            <Link href="/pricing/starter">
+              <Button className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold border-none shadow-lg hover:shadow-orange-200/50 transition-all hover:scale-105 rounded-xl px-6">
+                <Zap className="w-4 h-4 mr-2" />
+                Upgrade to Pro
+              </Button>
+            </Link>
+          )}
+          <CreatePropertyForm />
         </div>
       </div>
 
-      {/* Tabs Design */}
+      {/* Tabs / Navigation */}
       <div className="flex border-b border-gray-100 w-full mb-2 overflow-x-auto no-scrollbar scroll-smooth">
-        <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<List className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
+        <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<Home className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
         <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
         <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
         <TabLink href="/dashboard/owner?tab=influencers" active={activeTab === 'influencers'} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Influencers" count={pendingInfluencerRequestCount} />
@@ -89,97 +115,139 @@ export default function OwnerDashboardClient({
         <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
       </div>
 
-      {activeTab === 'wallet' ? (
-        <WalletSection 
-          transactions={wallet.transactions || []} 
-          payouts={wallet.payouts || []} 
-          onRequestPayout={requestPayout.bind(null, userId || '')} 
+      {/* Stats Quick View */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatsCard 
+          title="Properties" 
+          value={properties?.length || 0} 
+          icon={<Home className="w-5 h-5 text-blue-600" />}
+          active={activeTab === 'properties'}
+          onClick={() => router.push(`?tab=properties`)}
         />
-      ) : activeTab === 'properties' ? (
-        <div className="flex flex-col gap-6 items-start w-full">
-          <div className="flex flex-col w-full gap-2 lg:bg-white lg:border lg:p-4 lg:shadow-sm lg:rounded-xl">
-            <AddLeadTile ownerId={ownerId} properties={properties || []} />
-            <QuickCheckin properties={properties || []} />
-            <CollapsibleTile title="Add New Property">
-              <CreatePropertyForm />
-            </CollapsibleTile>
-          </div>
+        <StatsCard 
+          title="Guests" 
+          value={checkins?.length || 0} 
+          icon={<Users className="w-5 h-5 text-purple-600" />}
+          active={activeTab === 'guests'}
+          onClick={() => router.push(`?tab=guests`)}
+        />
+        <StatsCard 
+          title="Leads" 
+          value={leads?.length || 0} 
+          icon={<List className="w-5 h-5 text-green-600" />}
+          active={activeTab === 'leads'}
+          onClick={() => router.push(`?tab=leads`)}
+        />
+        <StatsCard 
+          title="Earnings" 
+          value={`₹${wallet_transactions?.filter((t:any) => t.transaction_type === 'earning').reduce((acc:any, t:any) => acc + Number(t.amount), 0).toLocaleString()}`} 
+          icon={<Wallet className="w-5 h-5 text-amber-600" />}
+          active={activeTab === 'wallet'}
+          onClick={() => router.push(`?tab=wallet`)}
+        />
+      </div>
 
-          <div className="flex flex-col gap-4 w-full">
-            <h2 className="text-xl font-bold mt-4 lg:mt-2 px-1">Your Properties Database</h2>
-            {properties && properties.length > 0 ? (
-              properties.map((prop: any) => <PropertyCard key={prop.id} prop={prop} />)
-            ) : (
-              <EmptyState message="You haven't added any properties yet." icon={<Home className="w-12 h-12 mx-auto text-gray-300 mb-4" />} />
-            )}
+      {/* Dynamic Tab Content */}
+      <div className="space-y-6">
+        {activeTab === 'properties' && (
+          <div className="flex flex-col gap-6 items-start w-full">
+            <div className="flex flex-col w-full gap-2 lg:bg-white lg:border lg:p-4 lg:shadow-sm lg:rounded-xl">
+              <AddLeadTile ownerId={ownerId} properties={properties || []} />
+              <QuickCheckin properties={properties || []} />
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+              {properties?.map((property: any) => (
+                <PropertyCard key={property.id} prop={property} />
+              ))}
+              {properties?.length === 0 && (
+                <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 w-full">
+                  <Home className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-900">No properties yet</h3>
+                  <p className="text-gray-500 mb-6 max-w-xs mx-auto">Start by adding your first property to get leads and manage guests.</p>
+                  <CreatePropertyForm />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-      {activeTab === 'leads' && <LeadsSection ownerId={ownerId} properties={properties || []} initialLeads={leads || []} isFreeTier={isFreeTier} />}
-      {activeTab === 'guests' && <GuestList checkins={checkins || []} isFreeTier={isFreeTier} />}
-      {activeTab === 'influencers' && <InfluencerRequestsInbox requests={influencer_requests || []} properties={properties || []} />}
-      {activeTab === 'wallet' && <WalletSection wallet={wallet || { balance: 0, currency: 'INR' }} transactions={[]} ownerId={ownerId} />}
-      {activeTab === 'profile' && <div className="p-8 text-center bg-white rounded-3xl border shadow-sm">Please use the Navigation bar to go to Profile Settings.</div>}
+        )}
+
+        {activeTab === 'leads' && (
+          <LeadsSection 
+            ownerId={ownerId} 
+            properties={properties || []} 
+            initialLeads={leads || []} 
+            isFreeTier={isFreeTier} 
+          />
+        )}
+
+        {activeTab === 'guests' && (
+          <GuestList 
+            checkins={checkins || []} 
+            isFreeTier={isFreeTier} 
+          />
+        )}
+
+        {activeTab === 'influencers' && (
+          <InfluencerRequestsInbox 
+            requests={influencer_requests || []} 
+          />
+        )}
+
+        {activeTab === 'wallet' && (
+          <WalletSection 
+            transactions={wallet_transactions || []} 
+            payouts={payout_requests || []} 
+            onRequestPayout={handleRequestPayout}
+          />
+        )}
+      </div>
 
       {/* Subscription Banner for Free Tier */}
       {isFreeTier && (
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 rounded-2xl text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-lg animate-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-white/20 rounded-xl">
-              <Zap className="w-6 h-6 fill-current text-yellow-300" />
+        <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 md:w-96 bg-gray-900 text-white p-6 rounded-3xl shadow-2xl border border-gray-800 animate-in slide-in-from-bottom-10 z-50">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <Zap className="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <p className="font-black italic uppercase text-xs tracking-widest text-blue-100">Standard Partner Plan</p>
-              <h3 className="text-xl font-bold">You are on the <span className="text-yellow-300 italic underline">Free Tier</span></h3>
-              <p className="text-sm text-blue-50 opacity-90">Upgrade to unlock guest records, lead management, and detailed analytics.</p>
-            </div>
-          </div>
-          <Button asChild className="bg-white text-blue-600 hover:bg-blue-50 font-black uppercase tracking-widest px-8 rounded-xl h-12 shadow-md">
-            <Link href="/pricing/starter">Upgrade Now</Link>
-          </Button>
-        </div>
-      )}
-
-      {/* Lockout Overlay - Fallback for owners when Free Tier is not enabled */}
-      {isLocked && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-white/20 backdrop-blur-xl animate-in fade-in duration-500">
-          <div className="bg-white border-2 border-orange-100 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6">
-            <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2">
-              <Lock className="w-10 h-10" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-black text-gray-900 italic uppercase">Access Locked</h2>
-              <p className="text-gray-500 font-medium leading-relaxed">
-                Your partner dashboard is currently restricted. Please contact support to enable your free tier or purchase a premium plan to continue.
-              </p>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col items-center gap-1">
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Partner Support</p>
-              <p className="text-xl font-bold text-blue-600">+91 75062 88907</p>
-            </div>
-
-            <div className="grid gap-3">
-              <Button 
-                onClick={() => window.location.href = '/pricing/starter'} 
-                className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest text-white mt-2"
-              >
-                <Zap className="w-5 h-5 fill-current" />
-                Unlock Premium Plans
-              </Button>
-              
-              <Button 
-                onClick={() => window.location.href = '/dashboard/owner/profile'} 
-                variant="outline"
-                className="w-full h-14 text-sm font-black rounded-xl border-2 border-gray-200 text-gray-400 hover:bg-gray-50 uppercase tracking-widest"
-              >
-                View My Account
-              </Button>
+              <h4 className="font-bold text-lg">Trial Expired</h4>
+              <p className="text-gray-400 text-sm mb-4">Your 7-day free trial has ended. Upgrade to Pro to unlock lead and guest details.</p>
+              <Link href="/pricing/starter">
+                <Button className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold rounded-xl h-11">
+                  View Pricing Plans
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function StatsCard({ title, value, icon, active, onClick }: { 
+  title: string, 
+  value: string | number, 
+  icon: React.ReactNode, 
+  active?: boolean, 
+  onClick: () => void 
+}) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`p-4 rounded-2xl border text-left transition-all hover:shadow-md ${
+        active 
+          ? 'bg-white border-blue-100 shadow-sm ring-1 ring-blue-50' 
+          : 'bg-white border-gray-100'
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-2 text-gray-500">
+        {icon}
+        <span className="text-xs font-bold uppercase tracking-wider">{title}</span>
+      </div>
+      <div className="text-2xl font-black text-gray-900">{value}</div>
+    </button>
   )
 }
 
@@ -202,11 +270,33 @@ function TabLink({ href, active, icon, label, count }: { href: string, active: b
   )
 }
 
-function EmptyState({ message, icon }: { message: string, icon: React.ReactNode }) {
+function NavIconButton({ icon, label, active, onClick, badge }: { 
+  icon: React.ReactNode, 
+  label: string, 
+  active?: boolean, 
+  onClick: () => void,
+  badge?: number 
+}) {
   return (
-    <div className="text-center p-12 border-2 border-dashed bg-white rounded-lg text-gray-500 w-full">
-      {icon}
-      <p>{message}</p>
-    </div>
+    <button 
+      onClick={onClick}
+      className={`group relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-300 ${
+        active 
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+          : 'text-gray-400 hover:bg-gray-100'
+      }`}
+    >
+      {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5 font-bold' })}
+      
+      {badge !== undefined && badge > 0 && (
+        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+          {badge}
+        </span>
+      )}
+
+      <span className="absolute left-full ml-4 px-3 py-1 bg-gray-900 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+        {label}
+      </span>
+    </button>
   )
 }
