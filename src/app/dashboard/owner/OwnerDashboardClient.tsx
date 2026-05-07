@@ -119,37 +119,7 @@ export default function OwnerDashboardClient({
         <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
       </div>
 
-      {/* Stats Quick View */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatsCard 
-          title="Properties" 
-          value={properties?.length || 0} 
-          icon={<Home className="w-5 h-5 text-blue-600" />}
-          active={activeTab === 'properties'}
-          onClick={() => router.push(`?tab=properties`)}
-        />
-        <StatsCard 
-          title="Guests" 
-          value={checkins?.length || 0} 
-          icon={<Users className="w-5 h-5 text-purple-600" />}
-          active={activeTab === 'guests'}
-          onClick={() => router.push(`?tab=guests`)}
-        />
-        <StatsCard 
-          title="Leads" 
-          value={leads?.length || 0} 
-          icon={<List className="w-5 h-5 text-green-600" />}
-          active={activeTab === 'leads'}
-          onClick={() => router.push(`?tab=leads`)}
-        />
-        <StatsCard 
-          title="Earnings" 
-          value={`₹${wallet_transactions?.filter((t:any) => t.transaction_type === 'earning').reduce((acc:any, t:any) => acc + Number(t.amount), 0).toLocaleString()}`} 
-          icon={<Wallet className="w-5 h-5 text-amber-600" />}
-          active={activeTab === 'wallet'}
-          onClick={() => router.push(`?tab=wallet`)}
-        />
-      </div>
+
 
       {/* Dynamic Tab Content */}
       <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CreditCard, ShieldCheck, Zap, History, ExternalLink, Calendar, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CreditCard, ShieldCheck, Zap, History, ExternalLink, Calendar, CheckCircle2, Home, Users, List, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +36,13 @@ export default async function OwnerProfilePage() {
     .eq('owner_id', owner.id)
     .order('payment_date', { ascending: false })
 
+  const { count: propertiesCount } = await supabase.from('properties').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
+  const { count: leadsCount } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
+  const { count: guestsCount } = await supabase.from('guest_checkins').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
+  
+  const { data: earningsData } = await supabase.from('wallet_transactions').select('amount').eq('user_id', user.id).eq('transaction_type', 'earning')
+  const earnings = earningsData?.reduce((acc, t) => acc + Number(t.amount), 0) || 0
+
   const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
   
   // 7-day Trial Logic from Owner Creation Date
@@ -68,6 +75,38 @@ export default async function OwnerProfilePage() {
                 <p className="text-lg font-black text-blue-600 leading-none">Verified Partner</p>
              </div>
           </div>
+        </div>
+
+        {/* Stats Quick View */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Link href="/dashboard/owner?tab=properties" className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all text-left group">
+            <div className="flex items-center gap-3 mb-2 text-gray-500 group-hover:text-blue-600 transition-colors">
+              <Home className="w-5 h-5 text-blue-600" />
+              <span className="text-xs font-bold uppercase tracking-wider">Properties</span>
+            </div>
+            <div className="text-2xl font-black text-gray-900">{propertiesCount || 0}</div>
+          </Link>
+          <Link href="/dashboard/owner?tab=guests" className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-100 transition-all text-left group">
+            <div className="flex items-center gap-3 mb-2 text-gray-500 group-hover:text-purple-600 transition-colors">
+              <Users className="w-5 h-5 text-purple-600" />
+              <span className="text-xs font-bold uppercase tracking-wider">Guests</span>
+            </div>
+            <div className="text-2xl font-black text-gray-900">{guestsCount || 0}</div>
+          </Link>
+          <Link href="/dashboard/owner?tab=leads" className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-100 transition-all text-left group">
+            <div className="flex items-center gap-3 mb-2 text-gray-500 group-hover:text-green-600 transition-colors">
+              <List className="w-5 h-5 text-green-600" />
+              <span className="text-xs font-bold uppercase tracking-wider">Leads</span>
+            </div>
+            <div className="text-2xl font-black text-gray-900">{leadsCount || 0}</div>
+          </Link>
+          <Link href="/dashboard/owner?tab=wallet" className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-100 transition-all text-left group">
+            <div className="flex items-center gap-3 mb-2 text-gray-500 group-hover:text-amber-600 transition-colors">
+              <Wallet className="w-5 h-5 text-amber-600" />
+              <span className="text-xs font-bold uppercase tracking-wider">Earnings</span>
+            </div>
+            <div className="text-2xl font-black text-gray-900">₹{earnings.toLocaleString()}</div>
+          </Link>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
