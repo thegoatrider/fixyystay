@@ -48,3 +48,31 @@ export async function getLocationDetails(slug: string) {
   const { data } = await supabase.from('seo_locations').select('*').eq('slug', slug).maybeSingle()
   return data
 }
+
+export async function getPropertyBySlug(slugOrId: string) {
+  const supabase = await createClient()
+  // Try finding by slug first, fallback to ID if it looks like a UUID
+  let query = supabase.from('properties').select(`
+    *,
+    rooms (*),
+    owners (name, email)
+  `)
+  
+  // Basic UUID check
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId)
+  
+  if (isUUID) {
+    query = query.eq('id', slugOrId)
+  } else {
+    query = query.eq('slug', slugOrId)
+  }
+  
+  const { data } = await query.maybeSingle()
+  return data
+}
+
+export async function getTopProperties() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('properties').select('id, slug').eq('approved', true).limit(500)
+  return data || []
+}
