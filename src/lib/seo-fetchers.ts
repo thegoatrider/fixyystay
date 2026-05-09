@@ -1,22 +1,31 @@
-import { createClient } from '@/utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+// Use a static client for SEO fetchers since they run at build time (generateStaticParams)
+// where cookies() are not available.
+const createStaticClient = () => {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 // Fetch top locations for generateStaticParams
 export async function getTopLocations() {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   const { data } = await supabase.from('seo_locations').select('slug').limit(50)
   return data || []
 }
 
 // Fetch top property types for generateStaticParams
 export async function getTopPropertyTypes() {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   const { data } = await supabase.from('seo_property_types').select('slug').limit(20)
   return data || []
 }
 
 // Fetch properties for a specific city and optional type
 export async function getPropertiesForSEO(citySlug: string, propertyTypeSlug?: string) {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   
   let query = supabase.from('properties').select('id, name, slug, type, image_url, amenities, base_price, city_area, approved').eq('approved', true)
   
@@ -44,13 +53,13 @@ export async function getPropertiesForSEO(citySlug: string, propertyTypeSlug?: s
 }
 
 export async function getLocationDetails(slug: string) {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   const { data } = await supabase.from('seo_locations').select('*').eq('slug', slug).maybeSingle()
   return data
 }
 
 export async function getPropertyBySlug(slugOrId: string) {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   // Try finding by slug first, fallback to ID if it looks like a UUID
   let query = supabase.from('properties').select(`
     *,
@@ -72,7 +81,7 @@ export async function getPropertyBySlug(slugOrId: string) {
 }
 
 export async function getTopProperties() {
-  const supabase = await createClient()
+  const supabase = createStaticClient()
   const { data } = await supabase.from('properties').select('id, slug').eq('approved', true).limit(500)
   return data || []
 }
