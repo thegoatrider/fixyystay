@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { updatePassword } from '../actions'
 import { format } from 'date-fns'
 import ChangePasswordForm from './ChangePasswordForm'
+import CreatePropertyForm from '../CreatePropertyForm'
 import { cn } from '@/lib/utils'
 
 export default async function OwnerProfilePage() {
@@ -231,6 +232,11 @@ export default async function OwnerProfilePage() {
 
           {/* Right: Profile & Security */}
           <div className="space-y-8">
+            <div className="space-y-4">
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">Property Management</h3>
+              <CreatePropertyForm />
+            </div>
+
             <ChangePasswordForm />
 
             <div className="bg-blue-50 p-8 rounded-[32px] border border-blue-100 flex flex-col gap-4">

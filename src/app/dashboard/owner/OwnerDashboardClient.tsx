@@ -10,7 +10,6 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import WalletSection from '@/components/WalletSection'
-import CreatePropertyForm from './CreatePropertyForm'
 import AddLeadTile from './AddLeadTile'
 import QuickCheckin from './QuickCheckin'
 import { requestPayout } from '@/app/actions/wallet'
@@ -105,7 +104,6 @@ export default function OwnerDashboardClient({
               </Button>
             </Link>
           )}
-          <CreatePropertyForm />
         </div>
       </div>
 
@@ -138,8 +136,10 @@ export default function OwnerDashboardClient({
                 <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 w-full">
                   <Home className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-gray-900">No properties yet</h3>
-                  <p className="text-gray-500 mb-6 max-w-xs mx-auto">Start by adding your first property to get leads and manage guests.</p>
-                  <CreatePropertyForm />
+                  <p className="text-gray-500 mb-6 max-w-xs mx-auto">Go to Profile & Plan to add your first property.</p>
+                  <Link href="/dashboard/owner/profile">
+                    <Button>Go to Profile & Plan</Button>
+                  </Link>
                 </div>
               )}
             </div>

@@ -37,13 +37,13 @@ export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base sm:text-xl font-bold group-hover:text-blue-600 transition truncate">{prop.name}</h2>
-            <span className="text-[10px] sm:text-xs font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">
+          <div className="flex items-center gap-2 w-full min-w-0">
+            <h2 className="text-base sm:text-xl font-bold group-hover:text-blue-600 transition truncate flex-1 min-w-0">{prop.name}</h2>
+            <span className="text-[10px] sm:text-xs font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter shrink-0">
               {prop.uid || 'NO-ID'}
             </span>
           </div>
-          <p className="text-[10px] sm:text-sm text-gray-400 capitalize truncate font-medium">{prop.type} • {prop.room_count || 0} Rooms</p>
+          <p className="text-[10px] sm:text-sm text-gray-400 capitalize truncate font-medium w-full min-w-0">{prop.type} • {prop.room_count || 0} Rooms</p>
           <div className="mt-1 sm:mt-2">
             <div className="flex items-center gap-1 text-[9px] sm:text-xs font-bold uppercase tracking-wider">
               {prop.approved ? (
