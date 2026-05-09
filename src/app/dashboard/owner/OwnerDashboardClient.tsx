@@ -87,7 +87,7 @@ export default function OwnerDashboardClient({
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
   return (
-    <div className="flex flex-col gap-8 pb-32">
+    <div className="flex flex-col gap-8 pb-32 w-full min-w-0 overflow-x-hidden md:overflow-visible">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-gray-900 drop-shadow-sm">
@@ -108,7 +108,7 @@ export default function OwnerDashboardClient({
       </div>
 
       {/* Tabs / Navigation */}
-      <div className="flex border-b border-gray-100 w-full mb-2 overflow-x-auto no-scrollbar scroll-smooth">
+      <div className="flex flex-wrap border-b border-gray-100 w-full mb-2">
         <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<Home className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
         <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
         <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
@@ -229,7 +229,7 @@ function TabLink({ href, active, icon, label, count }: { href: string, active: b
   return (
     <Link 
       href={href}
-      className={`flex-none md:flex-1 min-w-[90px] justify-center px-4 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center gap-1.5 sm:gap-2 ${
+      className={`flex-auto text-center px-2 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center justify-center gap-1 sm:gap-2 min-w-[30%] sm:min-w-[120px] ${
         active 
           ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
           : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
