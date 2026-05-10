@@ -18,7 +18,7 @@ type Property = {
 
 export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
   return (
-    <div className="bg-white border rounded-xl p-3 sm:p-5 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 group w-full">
+    <div className="bg-white border rounded-xl p-3 sm:p-5 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 group w-full overflow-hidden">
       <div className="flex items-start gap-3 sm:gap-4 w-full md:w-auto overflow-hidden">
         <div className="bg-blue-100 text-blue-600 rounded-lg overflow-hidden flex-shrink-0 relative w-14 h-14 sm:w-20 sm:h-20">
           {prop.image_url ? (
