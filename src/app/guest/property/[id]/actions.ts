@@ -16,12 +16,17 @@ export async function logClick(propertyId: string, influencerId: string) {
   const supabase = await createClient()
 
   // First check if it's an influencer_links record
-  const { data: linkRecord } = await supabase
-    .from('influencer_links')
-    .select('id, influencer_id')
-    .eq('id', influencerId)
-    .maybeSingle()
-    .catch(() => ({ data: null })) // catch UUID parse errors
+  let linkRecord = null
+  try {
+    const { data } = await supabase
+      .from('influencer_links')
+      .select('id, influencer_id')
+      .eq('id', influencerId)
+      .maybeSingle()
+    linkRecord = data
+  } catch (e) {
+    console.error('UUID parse or query error:', e)
+  }
 
   const actualInfluencerId = linkRecord ? linkRecord.influencer_id : influencerId
 
@@ -190,12 +195,17 @@ export async function confirmBooking(
         let actualInfluencerId = infId;
         let linkId = null;
 
-        const { data: linkData } = await supabaseAdmin
-          .from('influencer_links')
-          .select('influencer_id, id')
-          .eq('id', infId)
-          .maybeSingle()
-          .catch(() => ({ data: null }));
+        let linkData = null;
+        try {
+          const { data } = await supabaseAdmin
+            .from('influencer_links')
+            .select('influencer_id, id')
+            .eq('id', infId)
+            .maybeSingle();
+          linkData = data;
+        } catch (e) {
+          console.error('UUID parse or query error in booking:', e)
+        }
 
         if (linkData) {
           actualInfluencerId = linkData.influencer_id;
