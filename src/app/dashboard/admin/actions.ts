@@ -409,7 +409,7 @@ export async function toggleFreeTier(ownerId: string, currentValue: boolean) {
   }
 }
 
-export async function onboardAutowala(formData: FormData) {
+export async function onboardAgent(formData: FormData) {
   try {
     const supabase = await createClient()
     const supabaseAdmin = createAdminClient()
@@ -422,7 +422,7 @@ export async function onboardAutowala(formData: FormData) {
 
     const name = formData.get('name') as string
     const email = formData.get('email') as string
-    const password = formData.get('password') as string || 'AutoWala@2026'
+    const password = formData.get('password') as string || 'Agent@2026'
 
     if (!name || !email) return { error: 'Name and Email are required.' }
 
@@ -431,7 +431,7 @@ export async function onboardAutowala(formData: FormData) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: 'autowala', name: name }
+      user_metadata: { role: 'agent', name: name }
     })
 
     if (authError) {
@@ -448,7 +448,7 @@ export async function onboardAutowala(formData: FormData) {
         user_id: userId, 
         name, 
         email, 
-        type: 'autowala', 
+        type: 'agent', 
         commission_rate: 10, 
         approved: true 
       })
@@ -456,7 +456,7 @@ export async function onboardAutowala(formData: FormData) {
     if (influencerError) {
       console.error('Influencer creation failed:', influencerError)
       await supabaseAdmin.auth.admin.deleteUser(userId)
-      return { error: 'Failed to create autowala record.' }
+      return { error: 'Failed to create agent record.' }
     }
 
     revalidatePath('/dashboard/admin')

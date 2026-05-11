@@ -1,7 +1,7 @@
--- Autowala Affiliate System Migration
+-- Travel Agent Affiliate System Migration
 
 -- 1. Extend Influencers Table
-ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'standard';
+ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'standard'; -- 'standard', 'agent'
 
 -- 2. Create the tracking table
 CREATE TABLE IF NOT EXISTS public.influencer_links (

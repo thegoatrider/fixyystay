@@ -1,10 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
-import AutowalaDashboardClient from './AutowalaDashboardClient'
+import AgentDashboardClient from './AgentDashboardClient'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AutowalaDashboard() {
+export default async function AgentDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -45,7 +45,7 @@ export default async function AutowalaDashboard() {
   const walletBalance = earnings - payouts
 
   return (
-    <AutowalaDashboardClient 
+    <AgentDashboardClient 
       influencer={influencer}
       properties={properties || []}
       links={links || []}

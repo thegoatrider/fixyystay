@@ -10,7 +10,7 @@ import PropertyApprovalActions from './PropertyApprovalActions'
 import InfluencerApprovalActions from './InfluencerApprovalActions'
 import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
-import { CreateAutowalaForm } from './CreateAutowalaForm'
+import { CreateAgentForm } from './CreateAgentForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 import FreeTierToggle from './FreeTierToggle'
@@ -167,20 +167,17 @@ export default async function AdminDashboard() {
 
       {/* SECTION 0: Global Ledger */}
       <section>
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Wallet className="text-blue-600" /> Platform Financial Ledger
-        </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border p-6 rounded-xl shadow-sm">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-1">Total Booking Value</p>
+          <div className="bg-white border p-6 rounded-2xl shadow-sm">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Booking Value</p>
             <p className="text-3xl font-bold text-gray-900">₹{totalRevenueGenerated.toLocaleString()}</p>
           </div>
-          <div className="bg-white border-2 border-green-100 p-6 rounded-2xl shadow-sm">
-            <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Owner Earnings (80%)</p>
+          <div className="bg-white border p-6 rounded-2xl shadow-sm">
+            <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Owner Payouts (80%)</p>
             <p className="text-3xl font-black text-gray-900">₹{paidToOwners.toLocaleString()}</p>
           </div>
-          <div className="bg-white border-2 border-indigo-100 p-6 rounded-2xl shadow-sm">
-            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Influencer Commissions</p>
+          <div className="bg-white border p-6 rounded-2xl shadow-sm">
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Agent Commissions</p>
             <p className="text-3xl font-black text-gray-900">₹{paidToInfluencers.toLocaleString()}</p>
           </div>
           <div className="bg-gradient-to-br from-blue-600 to-indigo-800 p-6 rounded-2xl shadow-xl text-white relative overflow-hidden">
@@ -189,266 +186,178 @@ export default async function AdminDashboard() {
             <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
           </div>
         </div>
+      </section>
 
-        {/* SECTION 0.2: Promotion Requests & Communications (NEW) */}
-        <section className="mt-12">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-xl"><Megaphone className="text-indigo-600 w-6 h-6" /></div>
-            Partner Communications Log
-            <span className="text-sm font-normal text-gray-400 ml-2">{promotionRequests?.length || 0} pitche(s) logged</span>
+      {/* HORIZONTAL GRID: Growth & Communications */}
+      <div className="grid lg:grid-cols-3 gap-8 items-start">
+        {/* Left 2/3: Communications & Marketing Hub */}
+        <div className="lg:col-span-2 space-y-10">
+          <section>
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 rounded-xl"><Megaphone className="text-indigo-600 w-6 h-6" /></div>
+              Communications Log
+              <span className="text-sm font-normal text-gray-400 ml-2">{promotionRequests?.length || 0} pitche(s)</span>
+            </h2>
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Influencer</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Property</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {promotionRequests?.slice(0, 5).map((req: any) => (
+                      <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-gray-900">{req.influencers?.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">{req.influencers?.email}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] font-black uppercase text-indigo-600">
+                            {req.properties?.name}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {req.status === 'accepted' ? (
+                            <span className="text-[10px] font-black text-green-600 uppercase">Approved</span>
+                          ) : (
+                            <span className="text-[10px] font-black text-orange-500 uppercase">{req.status}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {(!promotionRequests || promotionRequests.length === 0) && (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-12 text-center text-gray-400">No recent requests.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <GrowthHubWrapper stats={{
+            totalProperties: approvedProperties?.length || 0,
+            pendingProperties: pendingProperties?.length || 0,
+            totalInfluencers: influencers?.length || 0,
+            activePromotions: promotions?.filter(p => p.bookingsCount > 0).length || 0
+          }}>
+            <div className="grid sm:grid-cols-2 gap-6">
+              <CreatePartnerForm />
+              <CreateAgentForm />
+            </div>
+          </GrowthHubWrapper>
+        </div>
+
+        {/* Right 1/3: Command Center & QR */}
+        <div className="space-y-8">
+          <div className="bg-gradient-to-br from-blue-700 to-indigo-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[400px]">
+             <div className="absolute -right-12 -bottom-12 opacity-10 rotate-12"><TrendingUp className="w-64 h-64" /></div>
+             <div>
+                <h3 className="text-4xl font-black mb-4 relative z-10 leading-tight">Command <br/>Center</h3>
+                <p className="text-blue-100 text-sm relative z-10 leading-relaxed font-medium">
+                  Strategic growth portal for the Alibag hospitality network.
+                </p>
+             </div>
+             
+             <div className="space-y-4 relative z-10">
+                <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/10">
+                  <p className="text-[9px] font-black uppercase text-blue-200 tracking-wider mb-1">Growth Index</p>
+                  <p className="text-2xl font-black">+{((approvedProperties?.length || 0) * 1.5).toFixed(1)}%</p>
+                </div>
+                <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/10">
+                  <p className="text-[9px] font-black uppercase text-blue-200 tracking-wider mb-1">Market Reach</p>
+                  <p className="text-2xl font-black">{influencers?.length ? (influencers.length * 2400).toLocaleString() : 0}</p>
+                </div>
+             </div>
+          </div>
+          <WebsiteQR />
+        </div>
+      </div>
+
+      {/* HORIZONTAL GRID: Payouts & Leads */}
+      <div className="grid lg:grid-cols-2 gap-8">
+        <section>
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <Banknote className="text-green-600" /> Payout Queue
           </h2>
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Influencer</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Property</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Pitch Message</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Decision Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Owner Feedback</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {promotionRequests?.map((req: any) => (
-                  <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-gray-900">{req.influencers?.name}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">{req.influencers?.email}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-[11px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                        {req.properties?.name}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="max-w-xs overflow-hidden text-ellipsis whitespace-nowrap text-gray-600 font-medium italic" title={req.proposal_text}>
-                        "{req.proposal_text}"
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {req.status === 'accepted' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider">
-                          <CheckCircle className="w-3 h-3" /> Approved
-                        </span>
-                      ) : req.status === 'rejected' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded-md uppercase tracking-wider">
-                          <XCircle className="w-3 h-3" /> Declined
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-1 rounded-md uppercase tracking-wider">
-                          <Clock className="w-3 h-3" /> Awaiting Owner
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium text-gray-500">
-                      {req.rejection_reason || <span className="opacity-20">—</span>}
-                    </td>
-                  </tr>
-                ))}
-                {(!promotionRequests || promotionRequests.length === 0) && (
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">No promotion requests logged in the system yet.</td>
+                    <th className="px-6 py-3">User</th>
+                    <th className="px-6 py-3">Amount</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {pendingPayouts.map((req) => (
+                    <tr key={req.id}>
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">{req.userName}</p>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">{req.userType}</span>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-orange-600">₹{Number(req.amount).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <PayoutActions requestId={req.id} />
+                      </td>
+                    </tr>
+                  ))}
+                  {pendingPayouts.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-20 text-center text-gray-400">All caught up!</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
-        {/* SECTION 0.3: Partner Onboarding & Marketing (Wrapped in Collapsible) */}
-        <GrowthHubWrapper stats={{
-          totalProperties: approvedProperties?.length || 0,
-          pendingProperties: pendingProperties?.length || 0,
-          totalInfluencers: influencers?.length || 0,
-          activePromotions: promotions?.filter(p => p.bookingsCount > 0).length || 0
-        }}>
-          <div className="grid lg:grid-cols-2 gap-8 items-start">
-            <div className="space-y-8">
-              <CreatePartnerForm />
-              <CreateAutowalaForm />
-              <WebsiteQR />
-            </div>
-            
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden flex flex-col justify-center h-full min-h-[450px]">
-               <div className="absolute -right-16 -bottom-16 opacity-10 rotate-12"><TrendingUp className="w-96 h-96" /></div>
-               <h3 className="text-5xl font-black mb-6 relative z-10 leading-[1.1]">Fixy Stays <br/>Command Center</h3>
-               <p className="text-blue-100 text-xl mb-10 relative z-10 leading-relaxed font-medium">
-                 This is your strategic growth portal. Use these tools to onboard verified partners and deploy marketing assets to scale the Alibag hospitality network.
-               </p>
-               
-               <div className="grid grid-cols-2 gap-6 relative z-10">
-                  <div className="bg-white/10 p-6 rounded-2xl backdrop-blur-xl border border-white/20 transform hover:scale-105 transition-transform cursor-default">
-                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-tighter mb-1">Growth Index</p>
-                    <p className="text-3xl font-black">+{((approvedProperties?.length || 0) * 1.5).toFixed(1)}%</p>
-                    <div className="w-full bg-white/20 h-1.5 rounded-full mt-3 overflow-hidden">
-                       <div className="bg-white h-full w-[65%]"></div>
-                    </div>
-                  </div>
-                  <div className="bg-white/10 p-6 rounded-2xl backdrop-blur-xl border border-white/20 transform hover:scale-105 transition-transform cursor-default">
-                    <p className="text-[10px] font-black uppercase text-blue-200 tracking-tighter mb-1">Market Reach</p>
-                    <p className="text-3xl font-black">{influencers?.length ? (influencers.length * 2400).toLocaleString() : 0}</p>
-                    <p className="text-[9px] font-bold text-blue-100 mt-2 italic">Est. Monthly Impressions</p>
-                  </div>
-               </div>
-            </div>
-          </div>
-        </GrowthHubWrapper>
-      </section>
-
-      {/* SECTION 0.5: Payout Queue */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Banknote className="text-green-600" /> Payout Requests
-        </h2>
-        <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3">User</th>
-                  <th className="px-6 py-3">Role</th>
-                  <th className="px-6 py-3">Amount Requested</th>
-                  <th className="px-6 py-3">Bank Details / UPI</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {pendingPayouts.map((req) => (
-                  <tr key={req.id}>
-                    <td className="px-6 py-4 font-bold text-gray-900">{req.userName}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs rounded-md font-bold ${req.userType === 'Owner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                        {req.userType}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-orange-600">₹{Number(req.amount).toLocaleString()}</td>
-                    <td className="px-6 py-4 font-mono text-gray-600">{req.bank_details}</td>
-                    <td className="px-6 py-4">
-                      <PayoutActions requestId={req.id} />
-                    </td>
+        <section>
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+            <div className="p-2 bg-purple-50 rounded-xl"><Building2 className="text-purple-600 w-6 h-6" /></div>
+            Business Leads
+          </h2>
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 border-b sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3">Lead</th>
+                    <th className="px-6 py-3">Location</th>
+                    <th className="px-6 py-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {inboundLeads?.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-gray-900">{lead.full_name}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs text-gray-600">{lead.area}</p>
+                        <p className="text-[9px] text-gray-400 font-black uppercase">{lead.city}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <a href={lead.google_link} target="_blank" className="text-blue-600 font-black text-[10px] uppercase">Map</a>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!inboundLeads || inboundLeads.length === 0) && (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-20 text-center text-gray-400">No leads.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden flex flex-col divide-y">
-            {pendingPayouts.map((req) => (
-              <div key={req.id} className="p-4 flex flex-col gap-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-bold text-gray-900">{req.userName}</div>
-                    <span className={`inline-block px-1.5 py-0.5 text-[10px] rounded font-bold uppercase tracking-wider mt-1 ${req.userType === 'Owner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                      {req.userType}
-                    </span>
-                  </div>
-                  <div className="text-lg font-black text-orange-600">₹{Number(req.amount).toLocaleString()}</div>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded border border-gray-100 font-mono text-xs text-gray-600 break-all">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Settlement Details</p>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter mr-2 ${req.bank_details.includes('UPI:') ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {req.bank_details.includes('UPI:') ? 'UPI' : 'Bank'}
-                  </span>
-                  {req.bank_details.replace('UPI: ', '').replace('Bank: ', '')}
-                </div>
-                <div className="pt-2 flex justify-end">
-                  <PayoutActions requestId={req.id} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {pendingPayouts.length === 0 && (
-            <div className="px-6 py-12 text-center text-gray-500">No pending payout requests. All caught up!</div>
-          )}
-        </div>
-      </section>
-      
-      {/* SECTION 0.7: Inbound Business Leads */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
-          <div className="p-2 bg-purple-50 rounded-xl"><Building2 className="text-purple-600 w-6 h-6" /></div>
-          Inbound Business Leads
-          <span className="text-sm font-normal text-gray-400 ml-2">{inboundLeads?.length || 0} total enquiries</span>
-        </h2>
-        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3">Owner Name</th>
-                  <th className="px-6 py-3">Location</th>
-                  <th className="px-6 py-3">Phone</th>
-                  <th className="px-6 py-3">Property Map Link</th>
-                  <th className="px-6 py-3">Submitted</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {inboundLeads?.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-900">{lead.full_name}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-gray-700">{lead.area}</span>
-                        <span className="text-xs text-gray-400 uppercase font-black tracking-tighter">{lead.city}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-blue-600 font-bold">{lead.phone}</td>
-                    <td className="px-6 py-4">
-                      <a 
-                        href={lead.google_link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-black text-[10px] uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                      >
-                        <MapPin className="w-3 h-3" /> View on Map
-                      </a>
-                    </td>
-                    <td className="px-6 py-4 text-gray-400 text-xs text-right whitespace-nowrap">
-                      {new Date(lead.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="md:hidden divide-y">
-            {inboundLeads?.map((lead) => (
-              <div key={lead.id} className="p-4 flex flex-col gap-3">
-                <div className="flex justify-between items-start">
-                   <div className="font-bold text-gray-900">{lead.full_name}</div>
-                   <div className="text-xs text-gray-400">{new Date(lead.created_at).toLocaleDateString()}</div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                   <div>
-                      <p className="font-black text-gray-400 uppercase tracking-tighter mb-1">Phone</p>
-                      <p className="font-bold text-blue-600">{lead.phone}</p>
-                   </div>
-                   <div>
-                      <p className="font-black text-gray-400 uppercase tracking-tighter mb-1">Location</p>
-                      <p className="text-gray-700">{lead.area}, {lead.city}</p>
-                   </div>
-                </div>
-                <a 
-                  href={lead.google_link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-full py-2.5 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
-                >
-                  <MapPin className="w-3.5 h-3.5" /> Open Google Maps
-                </a>
-              </div>
-            ))}
-          </div>
-
-          {(!inboundLeads || inboundLeads.length === 0) && (
-            <div className="px-6 py-12 text-center text-gray-500">No new inbound leads yet.</div>
-          )}
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/* SECTION 0.8: Platform Feature Adoption */}
       <section>

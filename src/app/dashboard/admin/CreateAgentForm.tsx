@@ -4,10 +4,10 @@ import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, Copy, CarFront, AlertCircle } from 'lucide-react'
-import { onboardAutowala } from './actions'
+import { CheckCircle, Copy, Briefcase, AlertCircle } from 'lucide-react'
+import { onboardAgent } from './actions'
 
-export function CreateAutowalaForm() {
+export function CreateAgentForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [successData, setSuccessData] = useState<{ email: string, pass: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -19,16 +19,16 @@ export function CreateAutowalaForm() {
     setSuccessData(null)
 
     const formData = new FormData(e.currentTarget)
-    const result = await onboardAutowala(formData)
+    const result = await onboardAgent(formData)
 
     if (result.success) {
       setSuccessData({
         email: formData.get('email') as string,
-        pass: result.tempPassword || 'AutoWala@2026'
+        pass: result.tempPassword || 'Agent@2026'
       })
       e.currentTarget.reset()
     } else {
-      setError(result.error || 'Failed to create autowala account.')
+      setError(result.error || 'Failed to create agent account.')
     }
     setIsLoading(false)
   }
@@ -43,7 +43,7 @@ export function CreateAutowalaForm() {
       <div className="p-6 bg-green-50 border-2 border-green-200 rounded-2xl animate-in zoom-in-95">
         <div className="flex items-center gap-3 mb-4 text-green-700">
           <CheckCircle className="w-6 h-6 font-black" />
-          <h3 className="text-lg font-black uppercase tracking-tight">Auto Waala Onboarded Successfully!</h3>
+          <h3 className="text-lg font-black uppercase tracking-tight">Travel Agent Onboarded Successfully!</h3>
         </div>
         <div className="space-y-4">
           <div className="p-4 bg-white rounded-xl border border-green-100">
@@ -58,7 +58,7 @@ export function CreateAutowalaForm() {
             </div>
           </div>
           <Button type="button" onClick={() => setSuccessData(null)} className="w-full bg-green-600 hover:bg-green-700">
-            Add Another Auto Waala
+            Add Another Travel Agent
           </Button>
         </div>
       </div>
@@ -68,12 +68,12 @@ export function CreateAutowalaForm() {
   return (
     <div className="bg-white border rounded-2xl p-6 shadow-sm">
       <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-yellow-50 text-yellow-600 rounded-xl">
-          <CarFront className="w-6 h-6" />
+        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+          <Briefcase className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-gray-900 leading-tight">Create Auto Waala</h2>
-          <p className="text-xs text-gray-500 font-medium">Onboard a new auto driver as an affiliate.</p>
+          <h2 className="text-xl font-bold text-gray-900 leading-tight">Create Travel Agent</h2>
+          <p className="text-xs text-gray-500 font-medium">Onboard a new travel partner as an affiliate.</p>
         </div>
       </div>
 
@@ -84,11 +84,11 @@ export function CreateAutowalaForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="email_aw" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Email Address</Label>
-          <Input id="email_aw" name="email" type="email" placeholder="ramesh@autowala.com" required className="rounded-xl h-12" />
+          <Input id="email_aw" name="email" type="email" placeholder="partner@fixystays.com" required className="rounded-xl h-12" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password_aw" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Password (Optional)</Label>
-          <Input id="password_aw" name="password" placeholder="Defaults to AutoWala@2026" className="rounded-xl h-12" />
+          <Input id="password_aw" name="password" placeholder="Defaults to Agent@2026" className="rounded-xl h-12" />
         </div>
 
         {error && (
@@ -97,8 +97,8 @@ export function CreateAutowalaForm() {
           </div>
         )}
 
-        <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-black text-lg font-black shadow-md">
-          {isLoading ? 'Creating...' : 'Register Auto Waala'}
+        <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-lg font-black shadow-md">
+          {isLoading ? 'Creating...' : 'Register Travel Agent'}
         </Button>
       </form>
     </div>

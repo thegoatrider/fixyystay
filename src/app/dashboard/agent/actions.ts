@@ -36,7 +36,7 @@ export async function generateTrackingLink(formData: FormData) {
       return { error: 'Failed to generate tracking link' }
     }
 
-    revalidatePath('/dashboard/autowala')
+    revalidatePath('/dashboard/agent')
     return { success: true, linkId: data.id }
   } catch (err: any) {
     return { error: err.message || 'An unexpected error occurred' }

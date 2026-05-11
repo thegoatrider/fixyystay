@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { generateTrackingLink } from './actions'
 import { Send, CheckCircle, Clock, Wallet, Banknote, Share2 } from 'lucide-react'
 
-export default function AutowalaDashboardClient({ influencer, properties, links, walletBalance, earnings }: any) {
+export default function AgentDashboardClient({ influencer, properties, links, walletBalance, earnings }: any) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,14 +43,14 @@ export default function AutowalaDashboardClient({ influencer, properties, links,
 
   return (
     <>
-      <div className="bg-yellow-500 rounded-3xl p-6 text-black shadow-lg relative overflow-hidden">
-        <div className="absolute right-0 top-0 p-4 opacity-20"><Wallet className="w-24 h-24" /></div>
+      <div className="bg-blue-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute right-0 top-0 p-4 opacity-10"><Wallet className="w-24 h-24" /></div>
         <div className="relative z-10">
           <p className="text-xs font-black uppercase tracking-widest mb-1 opacity-80">Available Earnings</p>
           <p className="text-4xl font-black mb-6">₹{walletBalance.toLocaleString()}</p>
           <div className="flex gap-4">
-            <div className="bg-black/10 px-4 py-2 rounded-xl flex-1 backdrop-blur-sm">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Earned</p>
+            <div className="bg-white/10 px-4 py-2 rounded-xl flex-1 backdrop-blur-sm border border-white/10">
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Total Earned</p>
               <p className="text-lg font-black">₹{earnings.toLocaleString()}</p>
             </div>
           </div>
