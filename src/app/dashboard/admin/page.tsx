@@ -10,6 +10,7 @@ import PropertyApprovalActions from './PropertyApprovalActions'
 import InfluencerApprovalActions from './InfluencerApprovalActions'
 import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
+import { CreateAutowalaForm } from './CreateAutowalaForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 import FreeTierToggle from './FreeTierToggle'
@@ -264,6 +265,7 @@ export default async function AdminDashboard() {
           <div className="grid lg:grid-cols-2 gap-8 items-start">
             <div className="space-y-8">
               <CreatePartnerForm />
+              <CreateAutowalaForm />
               <WebsiteQR />
             </div>
             

@@ -15,9 +15,28 @@ const razorpay = new Razorpay({
 export async function logClick(propertyId: string, influencerId: string) {
   const supabase = await createClient()
 
+  // First check if it's an influencer_links record
+  const { data: linkRecord } = await supabase
+    .from('influencer_links')
+    .select('id, influencer_id')
+    .eq('id', influencerId)
+    .maybeSingle()
+    .catch(() => ({ data: null })) // catch UUID parse errors
+
+  const actualInfluencerId = linkRecord ? linkRecord.influencer_id : influencerId
+
+  if (linkRecord) {
+    // Update link status to clicked
+    await supabase
+      .from('influencer_links')
+      .update({ status: 'clicked' })
+      .eq('id', linkRecord.id)
+      .eq('status', 'sent') // only update if it was just 'sent'
+  }
+
   const { error } = await supabase.from('influencer_clicks').insert([{
     property_id: propertyId,
-    influencer_id: influencerId
+    influencer_id: actualInfluencerId
   }])
 
   if (error) {
@@ -168,16 +187,40 @@ export async function confirmBooking(
 
       const infId = guestData.influencerId
       if (infId) {
-        const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate, user_id').eq('id', infId).single()
+        let actualInfluencerId = infId;
+        let linkId = null;
+
+        const { data: linkData } = await supabaseAdmin
+          .from('influencer_links')
+          .select('influencer_id, id')
+          .eq('id', infId)
+          .maybeSingle()
+          .catch(() => ({ data: null }));
+
+        if (linkData) {
+          actualInfluencerId = linkData.influencer_id;
+          linkId = linkData.id;
+        }
+
+        const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate, user_id').eq('id', actualInfluencerId).single()
         const rate = Math.min(Number(inf?.commission_rate || 0), 20)
         if (rate > 0 && inf?.user_id) {
+          const commissionAmount = amount * (rate / 100);
           await supabaseAdmin.from('wallet_transactions').insert({
             user_id: inf.user_id,
-            amount: amount * (rate / 100),
+            amount: commissionAmount,
             transaction_type: 'earning',
             booking_id: insertedBooking.id,
             description: `Referral commission (${rate}%) for ${guestData.name}`
           })
+          
+          if (linkId) {
+            await supabaseAdmin.from('influencer_links').update({
+              status: 'booked',
+              booking_id: insertedBooking.id,
+              commission_earned: commissionAmount
+            }).eq('id', linkId)
+          }
         }
       }
     } catch (e) { console.error('Side logic failed:', e) }

@@ -29,7 +29,7 @@ export async function login(formData: FormData) {
     const { data: influencer } = await supabase.from('influencers').select('id').eq('email', user.email).maybeSingle()
 
     let role = user.user_metadata?.role
-    if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer' && role !== 'owner')) {
+    if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer' && role !== 'owner' && role !== 'autowala')) {
       role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
       await supabase.auth.updateUser({
         data: { role }
@@ -41,6 +41,7 @@ export async function login(formData: FormData) {
       if (role === 'owner') return redirect('/dashboard/owner')
       if (role === 'influencer') return redirect('/dashboard/influencer')
       if (role === 'admin') return redirect('/dashboard/admin')
+      if (role === 'autowala') return redirect('/dashboard/autowala')
     }
   }
 

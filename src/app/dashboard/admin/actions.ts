@@ -408,3 +408,60 @@ export async function toggleFreeTier(ownerId: string, currentValue: boolean) {
     return { error: err.message || 'An unexpected error occurred' }
   }
 }
+
+export async function onboardAutowala(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
+    
+    // Verify admin
+    const { data: { user: admin } } = await supabase.auth.getUser()
+    if (admin?.user_metadata?.role !== 'admin' && admin?.email !== 'superadmin@fixstay.com') {
+      return { error: 'Unauthorized' }
+    }
+
+    const name = formData.get('name') as string
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string || 'AutoWala@2026'
+
+    if (!name || !email) return { error: 'Name and Email are required.' }
+
+    // 1. Create Auth User
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'autowala', name: name }
+    })
+
+    if (authError) {
+      console.error('Auth creation failed:', authError)
+      return { error: `Signup failed: ${authError.message}` }
+    }
+
+    const userId = authData.user.id
+
+    // 2. Create Influencer Record
+    const { error: influencerError } = await supabaseAdmin
+      .from('influencers')
+      .insert({ 
+        user_id: userId, 
+        name, 
+        email, 
+        type: 'autowala', 
+        commission_rate: 10, 
+        approved: true 
+      })
+
+    if (influencerError) {
+      console.error('Influencer creation failed:', influencerError)
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return { error: 'Failed to create autowala record.' }
+    }
+
+    revalidatePath('/dashboard/admin')
+    return { success: true, tempPassword: password }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}
