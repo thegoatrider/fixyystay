@@ -186,30 +186,58 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
                 <p className="text-gray-500 font-medium">Verification for <span className="text-blue-900 font-bold">{selectedCheckin.guest_name}</span> staying at {selectedCheckin.properties?.name}</p>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-8 grid sm:grid-cols-2 gap-6 bg-gray-50/30">
-                {selectedCheckin.id_documents && selectedCheckin.id_documents.length > 0 ? (
-                  selectedCheckin.id_documents.map((doc: any, idx: number) => (
-                    <div key={idx} className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-video">
-                       <img 
-                        src={doc.url} 
-                        alt={`ID Document ${idx + 1}`} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                       />
-                       <a 
-                        href={doc.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
-                       >
-                         <ExternalLink className="w-5 h-5" /> Open Full Image
-                       </a>
+             <div className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+                <div className="grid sm:grid-cols-2 gap-8">
+                  {selectedCheckin.id_documents && selectedCheckin.id_documents.length > 0 ? (
+                    selectedCheckin.id_documents.map((person: any, idx: number) => (
+                      <React.Fragment key={idx}>
+                        {/* Front ID */}
+                        <div className="space-y-3">
+                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Front Side</p>
+                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
+                            <img 
+                              src={person.frontUrl} 
+                              alt="Front ID" 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <a 
+                              href={person.frontUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
+                            >
+                              <ExternalLink className="w-5 h-5" /> Open Full Image
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Back ID */}
+                        <div className="space-y-3">
+                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Back Side</p>
+                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
+                            <img 
+                              src={person.backUrl} 
+                              alt="Back ID" 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <a 
+                              href={person.backUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
+                            >
+                              <ExternalLink className="w-5 h-5" /> Open Full Image
+                            </a>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <div className="col-span-full py-20 text-center text-gray-400 italic bg-white rounded-3xl border-2 border-dashed">
+                      No documents uploaded for this check-in.
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center text-gray-400 italic bg-white rounded-3xl border-2 border-dashed">
-                    No documents uploaded for this check-in.
-                  </div>
-                )}
+                  )}
+                </div>
              </div>
              
              <div className="p-8 border-t bg-white flex justify-end">
