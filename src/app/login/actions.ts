@@ -42,6 +42,7 @@ export async function login(formData: FormData) {
       if (role === 'influencer') return redirect('/dashboard/influencer')
       if (role === 'admin') return redirect('/dashboard/admin')
       if (role === 'autowala' || role === 'agent') return redirect('/dashboard/agent')
+      if (role === 'police') return redirect('/dashboard/police')
     }
   }
 
