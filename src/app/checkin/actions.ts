@@ -26,64 +26,26 @@ export async function submitCheckin(formData: FormData) {
       return { error: 'Property not found. Please verify the check-in link.' }
     }
 
-    // Handle ID Uploads
+    // Collect verified ID references
     const idDocuments = []
+    const allIdentityIds: string[] = []
     
     for (let i = 0; i < numPeople; i++) {
-      const frontFile = formData.get(`guestID_front_${i}`) as File
-      const backFile = formData.get(`guestID_back_${i}`) as File
+      const frontId = formData.get(`guestIdentityId_front_${i}`) as string
+      const backId = formData.get(`guestIdentityId_back_${i}`) as string
       
-      const personDocs: any = { personIndex: i + 1 }
-
-      if (frontFile && frontFile.size > 0) {
-        const fileExt = frontFile.name.split('.').pop() || 'jpg'
-        const randomStr = Math.random().toString(36).substring(2, 7)
-        const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-f${i}.${fileExt}`
-        
-        console.log(`[CHECKIN] Uploading Front ID for guest ${i+1}...`)
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('property_images')
-          .upload(`guest_ids/${fileName}`, frontFile, {
-            contentType: frontFile.type,
-            cacheControl: '3600'
-          })
-
-        if (!uploadError) {
-          const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
-          personDocs.frontUrl = publicUrlData.publicUrl
-        } else {
-          console.error(`[CHECKIN] Front ID UPLOAD FAILED (Guest ${i+1}):`, uploadError)
-          return { error: `File upload failed for Guest ${i+1} (Front Side). Please check your connection.` }
-        }
-      } else {
-        return { error: `Front ID for Guest ${i+1} is missing or empty.` }
+      if (!frontId || !backId) {
+        return { error: `Missing verified IDs for Guest ${i+1}. Please ensure all IDs are uploaded and verified.` }
       }
 
-      if (backFile && backFile.size > 0) {
-        const fileExt = backFile.name.split('.').pop() || 'jpg'
-        const randomStr = Math.random().toString(36).substring(2, 7)
-        const fileName = `ch-${propertyId}-${Date.now()}-${randomStr}-b${i}.${fileExt}`
-        
-        console.log(`[CHECKIN] Uploading Back ID for guest ${i+1}...`)
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('property_images')
-          .upload(`guest_ids/${fileName}`, backFile, {
-            contentType: backFile.type,
-            cacheControl: '3600'
-          })
+      allIdentityIds.push(frontId, backId)
 
-        if (!uploadError) {
-          const { data: publicUrlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(`guest_ids/${fileName}`)
-          personDocs.backUrl = publicUrlData.publicUrl
-        } else {
-          console.error(`[CHECKIN] Back ID UPLOAD FAILED (Guest ${i+1}):`, uploadError)
-          return { error: `File upload failed for Guest ${i+1} (Back Side). Please check your connection.` }
-        }
-      } else {
-        return { error: `Back ID for Guest ${i+1} is missing or empty.` }
-      }
-
-      idDocuments.push(personDocs)
+      // We still store some basic structured format in guest_checkins.id_documents for legacy compatibility or quick access
+      idDocuments.push({
+        personIndex: i + 1,
+        frontIdentityId: frontId,
+        backIdentityId: backId
+      })
     }
 
     // Generate and include UID
@@ -104,12 +66,31 @@ export async function submitCheckin(formData: FormData) {
 
     console.log('[CHECKIN] Final check-in record preparation complete. Inserting into database...')
 
-    // Use admin client which bypasses RLS
-    const { error: insertError } = await supabaseAdmin.from('guest_checkins').insert([checkinRecord])
+    // Insert Checkin Record
+    const { data: insertedCheckin, error: insertError } = await supabaseAdmin
+      .from('guest_checkins')
+      .insert([checkinRecord])
+      .select('id')
+      .single()
 
     if (insertError) {
       console.error('[CHECKIN] Insert failed:', insertError)
       return { error: `Database error: ${insertError.message}. Please contact the property owner.` }
+    }
+
+    const newCheckinId = insertedCheckin.id
+
+    // Link Guest Identities to Checkin Record
+    console.log(`[CHECKIN] Linking ${allIdentityIds.length} identities to checkin ${newCheckinId}...`)
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('guest_identity')
+      .update({ checkin_id: newCheckinId })
+      .in('id', allIdentityIds)
+
+    if (updateError) {
+      console.error('[CHECKIN] Failed to link identities:', updateError)
+      // We don't fail the whole request if linking fails, but log it aggressively
     }
 
     console.log(`[CHECKIN] Successfully completed check-in: ${uid}`)
