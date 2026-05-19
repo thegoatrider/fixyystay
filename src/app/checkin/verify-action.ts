@@ -23,9 +23,9 @@ Rules for abuse detection (set suspicious: true if any are met):
 - It only contains random numbers without the structural layout of a real ID.
 
 Calculate confidence score (0.0 to 1.0) based on:
-- 0.95-1.0: Perfect clarity, clear holographic elements, standard format perfectly matched.
-- 0.70-0.90: Minor blur, slight glare, or missing borders, but fields are readable.
-- Below 0.70: Heavy blur, unrecognizable format, missing critical fields, or suspicious.
+- 0.80-1.0: Good clarity, standard format matches.
+- 0.50-0.79: Blurry, low light, or lower quality camera, but still looks like a real ID and main text is somewhat discernible.
+- Below 0.50: Completely unrecognizable, totally blank, or obviously fake.
 
 Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
 {
@@ -147,16 +147,16 @@ export async function uploadAndVerifyDocument(formData: FormData) {
         if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false;
       }
       
-      if (!validFormat && result.confidence > 0.5) {
+      if (!validFormat && result.confidence > 0.40) {
         // If AI is confident but format fails, maybe OCR missed a digit. Downgrade to manual review.
         status = 'MANUAL_REVIEW';
         finalReason = 'Format validation failed. Document number does not match expected pattern.';
       } else if (validFormat) {
-        if (result.confidence > 0.90) {
+        if (result.confidence >= 0.50) {
           status = 'VERIFIED';
-        } else if (result.confidence >= 0.70) {
+        } else if (result.confidence >= 0.30) {
           status = 'MANUAL_REVIEW';
-          finalReason = 'Confidence below threshold. Requires manual verification.';
+          finalReason = 'Image quality too poor for automatic verification. Requires manual review.';
         } else {
           status = 'FAILED';
           finalReason = 'Confidence too low. Please upload a clearer image.';
