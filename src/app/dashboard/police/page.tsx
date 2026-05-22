@@ -25,7 +25,8 @@ export default async function PoliceDashboard() {
           name,
           email
         )
-      )
+      ),
+      identities:guest_identity(*)
     `)
     .order('created_at', { ascending: false })
 

@@ -56,14 +56,39 @@ BEGIN
   IF p_is_superadmin THEN
     SELECT json_agg(l.* ORDER BY l.created_at DESC) INTO v_leads FROM public.leads l LIMIT 200;
   ELSE
-    SELECT json_agg(l.* ORDER BY l.created_at DESC) INTO v_leads FROM public.leads l WHERE l.owner_id = p_owner_id;
+    SELECT json_agg(l.* ORDER BY l.created_at DESC) INTO v_leads 
+    FROM public.leads l 
+    LEFT JOIN public.properties pr ON l.property_id = pr.id
+    WHERE l.owner_id = p_owner_id OR pr.owner_id = p_owner_id;
   END IF;
 
   -- 3. Get checkins
   IF p_is_superadmin THEN
-    SELECT json_agg(gc.* ORDER BY gc.created_at DESC) INTO v_checkins FROM public.guest_checkins gc LIMIT 200;
+    SELECT json_agg(
+      (row_to_json(gc.*)::jsonb || 
+       jsonb_build_object(
+         'properties', (SELECT json_build_object('name', pr.name) FROM public.properties pr WHERE pr.id = gc.property_id),
+         'identities', (SELECT COALESCE(json_agg(gi.*), '[]'::json) FROM public.guest_identity gi WHERE gi.checkin_id = gc.id)
+       )
+      ) ORDER BY gc.created_at DESC
+    ) INTO v_checkins 
+    FROM (SELECT * FROM public.guest_checkins ORDER BY created_at DESC LIMIT 200) gc;
   ELSE
-    SELECT json_agg(gc.* ORDER BY gc.created_at DESC) INTO v_checkins FROM public.guest_checkins gc WHERE gc.owner_id = p_owner_id;
+    SELECT json_agg(
+      (row_to_json(gc.*)::jsonb || 
+       jsonb_build_object(
+         'properties', (SELECT json_build_object('name', pr.name) FROM public.properties pr WHERE pr.id = gc.property_id),
+         'identities', (SELECT COALESCE(json_agg(gi.*), '[]'::json) FROM public.guest_identity gi WHERE gi.checkin_id = gc.id)
+       )
+      ) ORDER BY gc.created_at DESC
+    ) INTO v_checkins 
+    FROM (
+      SELECT gc.* 
+      FROM public.guest_checkins gc
+      LEFT JOIN public.properties pr ON gc.property_id = pr.id
+      WHERE gc.owner_id = p_owner_id OR pr.owner_id = p_owner_id
+      ORDER BY gc.created_at DESC
+    ) gc;
   END IF;
 
   -- 4. Get wallet (using the v_user_id we fetched earlier)
