@@ -109,7 +109,12 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
                         {item.guest_name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
+                          {item.status === 'draft' && (
+                            <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-gray-500 mt-1">
                           <Phone className="w-3 h-3" />
                           <span className="text-xs font-bold">{item.guest_phone}</span>

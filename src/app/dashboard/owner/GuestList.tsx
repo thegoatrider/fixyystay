@@ -20,6 +20,7 @@ type GuestCheckin = {
   identities?: any[]
   created_at: string
   uid: string | null
+  status?: string
   properties: { name: string }
 }
 
@@ -361,6 +362,9 @@ export default React.memo(function GuestList({
                         {guest.num_people} PAX
                       </span>
                       {guest.uid && <p className="text-[9px] font-mono text-indigo-400 mt-1 uppercase">{guest.uid}</p>}
+                      {guest.status === 'draft' && (
+                        <p className="text-[9px] font-bold text-amber-500 mt-1 uppercase tracking-wider">Pending IDs</p>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -401,7 +405,12 @@ export default React.memo(function GuestList({
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
                           <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
-                          {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                            {guest.status === 'draft' && (
+                              <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="flex-shrink-0 flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -450,7 +459,12 @@ export default React.memo(function GuestList({
                         <div className="min-w-0">
                           <p className="font-bold text-gray-900 text-sm truncate">{guest.guest_name}</p>
                           <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
-                          {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                            {guest.status === 'draft' && (
+                              <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="flex-shrink-0 flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -482,9 +496,14 @@ export default React.memo(function GuestList({
                   <div>
                     <h3 className="font-bold text-gray-900">{selectedGuest?.guest_name}</h3>
                     <p className="text-xs text-gray-400">{selectedGuest?.properties?.name || 'Property'}</p>
-                    {selectedGuest.uid && (
-                      <p className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">{selectedGuest.uid}</p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      {selectedGuest.uid && (
+                        <p className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded inline-block">{selectedGuest.uid}</p>
+                      )}
+                      {selectedGuest.status === 'draft' && (
+                        <p className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded uppercase tracking-wider">Pending IDs</p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setSelectedGuest(null)}

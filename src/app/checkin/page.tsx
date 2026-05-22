@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook, Camera, Image as ImageIcon } from 'lucide-react'
-import { submitCheckin, getPropertyInfo } from './actions'
+import { createDraftCheckin, completeCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
 import { DocumentUpload } from './DocumentUpload'
@@ -30,7 +30,8 @@ function CheckinForm() {
   const prefilledPhone = searchParams.get('pn')
   const prefilledName = searchParams.get('gn')
 
-  const [step, setStep] = useState(1) // 1: Info, 2: Success
+  const [step, setStep] = useState(1) // 1: Info, 2: ID Upload, 3: Success
+  const [checkinId, setCheckinId] = useState<string | null>(null)
   
   const [guestName, setGuestName] = useState('')
   const [countryCode, setCountryCode] = useState('91')
@@ -72,7 +73,7 @@ function CheckinForm() {
     )
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleDraftSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     
@@ -86,26 +87,18 @@ function CheckinForm() {
       formData.append('checkoutDate', checkoutDate)
       formData.append('vehicleNumber', (e.currentTarget.elements.namedItem('vehicleNumber') as HTMLInputElement)?.value || '')
 
-      // Handle Verified IDs Appending
-      for (let i = 0; i < numPeople; i++) {
-        const frontId = verifiedIdentities[`front_${i}`]
-        const backId = verifiedIdentities[`back_${i}`]
+      console.log('Sending draft check-in payload to server...')
+      const result = await createDraftCheckin(formData)
 
-        if (frontId) formData.append(`guestIdentityId_front_${i}`, frontId)
-        if (backId) formData.append(`guestIdentityId_back_${i}`, backId)
-      }
-
-      console.log('Sending check-in payload to server...')
-      const result = await submitCheckin(formData)
-
-      if (result.success) {
+      if (result.success && result.checkinId) {
+        setCheckinId(result.checkinId)
         setSuccessData({
           propertyName: result.propertyName || 'the property',
           helpdesk: result.helpdeskNumber || 'Contact Support'
         })
-        setStep(2)
+        setStep(2) // Move to ID Upload step
       } else {
-        console.error('Check-in Submission Failed:', result.error)
+        console.error('Check-in Draft Failed:', result.error)
         alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
       }
     } catch (err: any) {
@@ -116,7 +109,29 @@ function CheckinForm() {
     }
   }
 
-  if (step === 2) {
+  const handleFinalSubmit = async () => {
+    if (!checkinId) return
+    setIsLoading(true)
+    
+    try {
+      console.log('Completing check-in...')
+      const result = await completeCheckin(checkinId, verifiedIdentities, numPeople)
+
+      if (result.success) {
+        setStep(3) // Move to Success Screen
+      } else {
+        console.error('Check-in Completion Failed:', result.error)
+        alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
+      }
+    } catch (err: any) {
+      console.error('Catch-all Completion Error:', err)
+      alert(`Unexpected Error: ${err.message || 'The server could not process your request.'}\n\nPlease check your internet connection and try again.`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (step === 3) {
     const whatsappLink = successData?.helpdesk 
       ? `https://wa.me/${formatWhatsAppNumber(successData.helpdesk)}`
       : 'https://wa.me/'
@@ -196,101 +211,115 @@ function CheckinForm() {
           <p className="text-gray-500 mt-3 font-medium">Please provide your details and ID proof for a smooth entry.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
-              <div className="flex gap-2">
-                <select
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  className="w-[90px] h-10 px-2 py-2 rounded-md border border-gray-300 bg-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {COUNTRY_CODES.map(c => (
-                    <option key={c.code} value={c.code}>{c.icon} +{c.code}</option>
-                  ))}
-                </select>
-                <div className="relative flex-1">
-                  <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                  <Input 
-                    id="phone" 
-                    placeholder="9876543210" 
-                    required 
-                    className="pl-9"
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                  />
+        {step === 1 && (
+          <form onSubmit={handleDraftSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
+                <div className="flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-[90px] h-10 px-2 py-2 rounded-md border border-gray-300 bg-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {COUNTRY_CODES.map(c => (
+                      <option key={c.code} value={c.code}>{c.icon} +{c.code}</option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1">
+                    <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <Input 
+                      id="phone" 
+                      placeholder="9876543210" 
+                      required 
+                      className="pl-9"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                    />
+                  </div>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="name" className="flex items-center gap-1"><User className="w-4 h-4"/> Full Name</Label>
+                <Input 
+                  id="name" 
+                  placeholder="John Doe" 
+                  required 
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="checkinDate">Check-in Date</Label>
+                <Input 
+                  id="checkinDate" 
+                  type="date" 
+                  required 
+                  value={checkinDate}
+                  onChange={(e) => setCheckinDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="checkoutDate">Check-out Date</Label>
+                <Input 
+                  id="checkoutDate" 
+                  type="date" 
+                  required 
+                  value={checkoutDate}
+                  onChange={(e) => setCheckoutDate(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name" className="flex items-center gap-1"><User className="w-4 h-4"/> Full Name</Label>
+              <Label htmlFor="vehicleNumber" className="flex items-center gap-1">
+                Vehicle Number <span className="text-[10px] text-gray-400 font-medium ml-1">(Optional)</span>
+              </Label>
               <Input 
-                id="name" 
-                placeholder="John Doe" 
-                required 
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
+                id="vehicleNumber" 
+                name="vehicleNumber"
+                placeholder="e.g. MH-12-AB-1234" 
+                className="bg-gray-50/50 focus:bg-white transition-colors"
               />
             </div>
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="checkinDate">Check-in Date</Label>
-              <Input 
-                id="checkinDate" 
-                type="date" 
+              <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4"/> Number of People Staying</Label>
+              <select 
+                id="pax" 
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 required 
-                value={checkinDate}
-                onChange={(e) => setCheckinDate(e.target.value)}
-              />
+                value={numPeople}
+                onChange={(e) => setNumPeople(parseInt(e.target.value))}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                  <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+                ))}
+              </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="checkoutDate">Check-out Date</Label>
-              <Input 
-                id="checkoutDate" 
-                type="date" 
-                required 
-                value={checkoutDate}
-                onChange={(e) => setCheckoutDate(e.target.value)}
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vehicleNumber" className="flex items-center gap-1">
-              Vehicle Number <span className="text-[10px] text-gray-400 font-medium ml-1">(Optional)</span>
-            </Label>
-            <Input 
-              id="vehicleNumber" 
-              name="vehicleNumber"
-              placeholder="e.g. MH-12-AB-1234" 
-              className="bg-gray-50/50 focus:bg-white transition-colors"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4"/> Number of People Staying</Label>
-            <select 
-              id="pax" 
-              className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              required 
-              value={numPeople}
-              onChange={(e) => setNumPeople(parseInt(e.target.value))}
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4 shadow-lg shadow-blue-100"
+              disabled={isLoading}
             >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
-              ))}
-            </select>
-          </div>
+              {isLoading ? 'Saving Data...' : 'Proceed to Identity Verification'}
+            </Button>
+          </form>
+        )}
 
-          <div className="mt-4">
-            <Label className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
-               Government ID Verification
-            </Label>
-            <p className="text-sm text-gray-500 mb-6">Upload mandatory front and back ID photos for each guest.</p>
+        {step === 2 && (
+          <div className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6 animate-in slide-in-from-right duration-500">
+            <div className="text-center mb-2">
+              <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+              <h2 className="text-2xl font-bold text-gray-900">Identity Verification</h2>
+              <p className="text-sm text-gray-500">Upload mandatory front and back ID photos for each guest.</p>
+            </div>
             
             <div className="flex flex-col gap-6">
               {Array.from({ length: numPeople }).map((_, i) => (
@@ -315,21 +344,21 @@ function CheckinForm() {
                 </div>
               ))}
             </div>
+
+            <Button 
+              onClick={handleFinalSubmit}
+              size="lg" 
+              className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-4 shadow-lg shadow-green-100"
+              disabled={isLoading || Object.keys(verifiedIdentities).length < numPeople * 2}
+            >
+              {isLoading ? 'Completing Check-in...' : 'Complete Check-in'}
+            </Button>
+
+            <p className="text-center text-[10px] text-gray-400 mt-2 font-medium">
+               Security Policy: All IDs are stored securely in our encrypted vaults.
+            </p>
           </div>
-
-          <Button 
-            type="submit" 
-            size="lg" 
-            className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4 shadow-lg shadow-blue-100"
-            disabled={isLoading || Object.keys(verifiedIdentities).length < numPeople * 2}
-          >
-            {isLoading ? 'Processing Check-in...' : 'Complete Check-in'}
-          </Button>
-
-          <p className="text-center text-[10px] text-gray-400 mt-2 font-medium">
-             Security Policy: All IDs are stored securely in our encrypted vaults.
-          </p>
-        </form>
+        )}
       </div>
     </div>
   )
