@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import PoliceDashboardClient from './PoliceDashboardClient'
 import { redirect } from 'next/navigation'
 
@@ -12,8 +13,9 @@ export default async function PoliceDashboard() {
     redirect('/login')
   }
 
-  // Fetch all check-ins with related property and owner data
-  const { data: checkins, error } = await supabase
+  // Fetch all check-ins with related property and owner data using admin client to bypass RLS
+  const supabaseAdmin = createAdminClient()
+  const { data: checkins, error } = await supabaseAdmin
     .from('guest_checkins')
     .select(`
       *,
