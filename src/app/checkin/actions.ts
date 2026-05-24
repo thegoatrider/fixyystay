@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin'
 
-export async function createDraftCheckin(formData: FormData) {
+export async function submitSingleCheckin(formData: FormData, verifiedIdentityId: string) {
   try {
     const supabaseAdmin = createAdminClient()
 
@@ -13,7 +13,7 @@ export async function createDraftCheckin(formData: FormData) {
     const checkinDate = formData.get('checkinDate') as string
     const checkoutDate = formData.get('checkoutDate') as string
 
-    console.log(`[CHECKIN] Starting draft check-in for property ${propertyId}, guest ${guestName}`)
+    console.log(`[CHECKIN] Submitting single check-in for property ${propertyId}, guest ${guestName}`)
 
     const { data: property, error: propError } = await supabaseAdmin
       .from('properties')
@@ -29,6 +29,8 @@ export async function createDraftCheckin(formData: FormData) {
     // Generate UID
     const uid = 'GST-' + Date.now().toString(16).toUpperCase().slice(-8)
 
+    const idDocuments = [{ primaryIdentityId: verifiedIdentityId }]
+
     const checkinRecord = {
       property_id: propertyId,
       owner_id: property.owner_id,
@@ -38,9 +40,9 @@ export async function createDraftCheckin(formData: FormData) {
       checkin_date: checkinDate || null,
       checkout_date: checkoutDate || null,
       vehicle_number: formData.get('vehicleNumber') as string || null,
-      id_documents: [], // Empty initially
+      id_documents: idDocuments,
       uid: uid,
-      status: 'draft' // Mark as draft
+      status: 'completed'
     }
 
     const { data: insertedCheckin, error: insertError } = await supabaseAdmin
@@ -50,79 +52,29 @@ export async function createDraftCheckin(formData: FormData) {
       .single()
 
     if (insertError) {
-      console.error('[CHECKIN] Draft Insert failed:', insertError)
+      console.error('[CHECKIN] Check-in Insert failed:', insertError)
       return { error: `Database error: ${insertError.message}. Please contact the property owner.` }
     }
 
+    // Link Guest Identity to Checkin Record
+    const { error: updateError } = await supabaseAdmin
+      .from('guest_identity')
+      .update({ checkin_id: insertedCheckin.id })
+      .eq('id', verifiedIdentityId)
+
+    if (updateError) {
+      console.error('[CHECKIN] Failed to link identity:', updateError)
+    }
+
+    console.log(`[CHECKIN] Successfully completed check-in: ${insertedCheckin.id}`)
+
     return { 
       success: true, 
-      checkinId: insertedCheckin.id,
       propertyName: property.name, 
       helpdeskNumber: property.helpdesk_number || 'No helpdesk set'
     }
   } catch (err: any) {
-    console.error('[CHECKIN] Critical uncaught exception during draft check-in:', err)
-    return { error: `System Error: ${err.message || 'The server encountered an unexpected issue.'}` }
-  }
-}
-
-export async function completeCheckin(checkinId: string, verifiedIdentities: Record<string, string>, numPeople: number) {
-  try {
-    const supabaseAdmin = createAdminClient()
-
-    console.log(`[CHECKIN] Completing checkin ${checkinId}`)
-
-    const idDocuments = []
-    const allIdentityIds: string[] = []
-    
-    for (let i = 0; i < numPeople; i++) {
-      const frontId = verifiedIdentities[`front_${i}`]
-      const backId = verifiedIdentities[`back_${i}`]
-      
-      if (!frontId || !backId) {
-        return { error: `Missing verified IDs for Guest ${i+1}. Please ensure all IDs are uploaded and verified.` }
-      }
-
-      allIdentityIds.push(frontId, backId)
-
-      idDocuments.push({
-        personIndex: i + 1,
-        frontIdentityId: frontId,
-        backIdentityId: backId
-      })
-    }
-
-    // Link Guest Identities to Checkin Record
-    console.log(`[CHECKIN] Linking ${allIdentityIds.length} identities to checkin ${checkinId}...`)
-    
-    const { error: updateError } = await supabaseAdmin
-      .from('guest_identity')
-      .update({ checkin_id: checkinId })
-      .in('id', allIdentityIds)
-
-    if (updateError) {
-      console.error('[CHECKIN] Failed to link identities:', updateError)
-    }
-
-    // Mark checkin as completed and save legacy id_documents structure
-    const { error: finalError } = await supabaseAdmin
-      .from('guest_checkins')
-      .update({
-        status: 'completed',
-        id_documents: idDocuments
-      })
-      .eq('id', checkinId)
-
-    if (finalError) {
-      console.error('[CHECKIN] Failed to update checkin status:', finalError)
-      return { error: 'Failed to complete checkin. Please contact support.' }
-    }
-
-    console.log(`[CHECKIN] Successfully completed check-in: ${checkinId}`)
-
-    return { success: true }
-  } catch (err: any) {
-    console.error('[CHECKIN] Critical uncaught exception during check-in completion:', err)
+    console.error('[CHECKIN] Critical uncaught exception during check-in:', err)
     return { error: `System Error: ${err.message || 'The server encountered an unexpected issue.'}` }
   }
 }

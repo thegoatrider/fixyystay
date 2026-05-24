@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { 
   Search, 
   FileDown, 
-  User, 
   Phone, 
   MapPin, 
   Calendar, 
@@ -14,10 +13,18 @@ import {
   Building2,
   ExternalLink,
   ShieldCheck,
-  FilterX
+  FilterX,
+  Briefcase
 } from 'lucide-react'
 
-export default function PoliceDashboardClient({ initialCheckins }: { initialCheckins: any[] }) {
+export default function PoliceDashboardClient({ 
+  initialCheckins,
+  initialEmployees 
+}: { 
+  initialCheckins: any[]
+  initialEmployees: any[]
+}) {
+  const [activeTab, setActiveTab] = useState<'guests' | 'staff'>('guests')
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [selectedCheckin, setSelectedCheckin] = useState<any>(null)
@@ -37,6 +44,17 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
     })
   }, [searchTerm, dateFilter, initialCheckins])
 
+  const filteredEmployees = useMemo(() => {
+    return initialEmployees.filter(emp => {
+      const searchStr = searchTerm.toLowerCase()
+      const name = `${emp.first_name} ${emp.last_name}`.toLowerCase()
+      return name.includes(searchStr) || 
+             emp.mobile_number.includes(searchTerm) ||
+             emp.properties?.name.toLowerCase().includes(searchStr) ||
+             emp.properties?.city_area?.toLowerCase().includes(searchStr)
+    })
+  }, [searchTerm, initialEmployees])
+
   const handleExport = () => {
     window.print()
   }
@@ -46,8 +64,8 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
       {/* Header Info */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 print:hidden">
         <div>
-          <h2 className="text-4xl font-black text-blue-900 tracking-tight mb-2">Registry Overview</h2>
-          <p className="text-gray-500 font-medium">Monitoring {initialCheckins.length} active and past guest check-ins across Alibag.</p>
+          <h2 className="text-4xl font-black text-blue-900 tracking-tight mb-2">Central Registry</h2>
+          <p className="text-gray-500 font-medium">Monitoring active check-ins and property staff across Alibag.</p>
         </div>
         <div className="flex gap-3">
            <Button 
@@ -66,115 +84,201 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-gray-200 print:hidden">
+        <button 
+          className={`pb-4 px-4 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${activeTab === 'guests' ? 'border-blue-600 text-blue-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          onClick={() => setActiveTab('guests')}
+        >
+          <Users className="w-5 h-5" /> Guest Registry
+        </button>
+        <button 
+          className={`pb-4 px-4 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${activeTab === 'staff' ? 'border-blue-600 text-blue-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          onClick={() => setActiveTab('staff')}
+        >
+          <Briefcase className="w-5 h-5" /> Staff Registry
+        </button>
+      </div>
+
       {/* Search Bar */}
-      <div className="grid md:grid-cols-4 gap-4 print:hidden">
-        <div className="md:col-span-3 relative">
+      <div className={`grid gap-4 print:hidden ${activeTab === 'guests' ? 'md:grid-cols-4' : 'grid-cols-1'}`}>
+        <div className={`${activeTab === 'guests' ? 'md:col-span-3' : ''} relative`}>
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <Input 
-            placeholder="Search by Guest Name, Phone, or Property..." 
+            placeholder={`Search by ${activeTab === 'guests' ? 'Guest Name' : 'Staff Name'}, Phone, or Property...`}
             className="pl-12 h-14 rounded-2xl border-gray-200 bg-white shadow-sm text-lg font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="relative">
-          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input 
-            type="date"
-            className="pl-12 h-14 rounded-2xl border-gray-200 bg-white shadow-sm"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-          />
-        </div>
+        {activeTab === 'guests' && (
+          <div className="relative">
+            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input 
+              type="date"
+              className="pl-12 h-14 rounded-2xl border-gray-200 bg-white shadow-sm"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Main Table Content */}
       <div className="bg-white border border-gray-100 rounded-[32px] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Guest Details</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Stay Duration</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Property & Owner</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right print:hidden">Identification</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredCheckins.map((item) => (
-                <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-900 font-black text-xl shrink-0">
-                        {item.guest_name.charAt(0)}
+          {activeTab === 'guests' ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Guest Details</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Stay Duration</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Property & Owner</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right print:hidden">Identification</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredCheckins.map((item) => (
+                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-6 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-900 font-black text-xl shrink-0">
+                          {item.guest_name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
+                            {item.status === 'draft' && (
+                              <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-500 mt-1">
+                            <Phone className="w-3 h-3" />
+                            <span className="text-xs font-bold">{item.guest_phone}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                          <span className="text-sm font-bold">{new Date(item.checkin_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} — {new Date(item.checkout_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="text-xs font-bold uppercase">{item.num_people} Persons</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
-                          {item.status === 'draft' && (
-                            <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
-                          )}
+                          <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                          <p className="font-black text-gray-900 text-sm uppercase tracking-tight">{item.properties?.name}</p>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500 mt-1">
-                          <Phone className="w-3 h-3" />
-                          <span className="text-xs font-bold">{item.guest_phone}</span>
+                        <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 ml-5">
+                          <MapPin className="w-2.5 h-2.5" /> {item.properties?.city_area}
+                        </p>
+                        <div className="mt-2 pt-2 border-t border-gray-50 flex flex-col">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Owner</span>
+                          <span className="text-xs font-bold text-gray-700">{item.properties?.owners?.name}</span>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-6">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="text-sm font-bold">{new Date(item.checkin_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} — {new Date(item.checkout_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Users className="w-3.5 h-3.5" />
-                        <span className="text-xs font-bold uppercase">{item.num_people} Persons</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-6">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                        <p className="font-black text-gray-900 text-sm uppercase tracking-tight">{item.properties?.name}</p>
-                      </div>
-                      <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1 ml-5">
-                        <MapPin className="w-2.5 h-2.5" /> {item.properties?.city_area}
-                      </p>
-                      <div className="mt-2 pt-2 border-t border-gray-50 flex flex-col">
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Owner</span>
-                        <span className="text-xs font-bold text-gray-700">{item.properties?.owners?.name}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-6 text-right print:hidden">
-                    <Button 
-                      variant="outline" 
-                      className="rounded-xl border-blue-100 bg-blue-50/50 text-blue-700 font-bold text-xs hover:bg-blue-600 hover:text-white transition-all"
-                      onClick={() => setSelectedCheckin(item)}
-                    >
-                      View ID Proofs
-                    </Button>
-                  </td>
+                    </td>
+                    <td className="px-6 py-6 text-right print:hidden">
+                      <Button 
+                        variant="outline" 
+                        className="rounded-xl border-blue-100 bg-blue-50/50 text-blue-700 font-bold text-xs hover:bg-blue-600 hover:text-white transition-all"
+                        onClick={() => setSelectedCheckin(item)}
+                      >
+                        View ID Proofs
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCheckins.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-20 text-center text-gray-400 italic">
+                      No records found matching your search criteria.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Staff Member</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Role & Property</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Permanent Address</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Verification Status</th>
                 </tr>
-              ))}
-              {filteredCheckins.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-20 text-center text-gray-400 italic">
-                    No records found matching your search criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-6 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-900 font-black text-xl shrink-0">
+                          {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-black text-gray-900 text-lg leading-tight">{emp.first_name} {emp.last_name}</p>
+                          <div className="flex items-center gap-2 text-gray-500 mt-1">
+                            <Phone className="w-3 h-3" />
+                            <span className="text-xs font-bold">{emp.mobile_number}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
+                          <p className="font-bold text-gray-900 text-sm uppercase">{emp.role}</p>
+                        </div>
+                        <p className="text-xs font-medium text-gray-500 flex items-center gap-1 ml-5">
+                          {emp.properties?.name}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="text-sm text-gray-700 max-w-xs break-words">
+                        <MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                        {emp.permanent_address || 'Not Provided'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      {emp.govt_verification_id ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                          <ShieldCheck className="w-3.5 h-3.5" /> ID on File
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filteredEmployees.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-20 text-center text-gray-400 italic">
+                      No staff records found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
       {/* ID Proof Modal */}
       {selectedCheckin && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
           <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl relative">
              <button 
               onClick={() => setSelectedCheckin(null)}
@@ -220,44 +324,47 @@ export default function PoliceDashboardClient({ initialCheckins }: { initialChec
                     selectedCheckin.id_documents.map((person: any, idx: number) => (
                       <React.Fragment key={idx}>
                         {/* Front ID */}
-                        <div className="space-y-3">
-                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Front Side</p>
-                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
-                            <img 
-                              src={person.frontUrl} 
-                              alt="Front ID" 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                            <a 
-                              href={person.frontUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
-                            >
-                              <ExternalLink className="w-5 h-5" /> Open Full Image
-                            </a>
+                        {person.frontUrl && (
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Front Side</p>
+                            <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
+                              <img 
+                                src={person.frontUrl} 
+                                alt="Front ID" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                              <a 
+                                href={person.frontUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
+                              >
+                                <ExternalLink className="w-5 h-5" /> Open Full Image
+                              </a>
+                            </div>
                           </div>
-                        </div>
-
+                        )}
                         {/* Back ID */}
-                        <div className="space-y-3">
-                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Back Side</p>
-                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
-                            <img 
-                              src={person.backUrl} 
-                              alt="Back ID" 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                            <a 
-                              href={person.backUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
-                            >
-                              <ExternalLink className="w-5 h-5" /> Open Full Image
-                            </a>
+                        {person.backUrl && (
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Back Side</p>
+                            <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
+                              <img 
+                                src={person.backUrl} 
+                                alt="Back ID" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                              <a 
+                                href={person.backUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]"
+                              >
+                                <ExternalLink className="w-5 h-5" /> Open Full Image
+                              </a>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </React.Fragment>
                     ))
                   ) : (

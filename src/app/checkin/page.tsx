@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook, Camera, Image as ImageIcon } from 'lucide-react'
-import { createDraftCheckin, completeCheckin, getPropertyInfo } from './actions'
+import { submitSingleCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
 import { DocumentUpload } from './DocumentUpload'
@@ -30,8 +30,7 @@ function CheckinForm() {
   const prefilledPhone = searchParams.get('pn')
   const prefilledName = searchParams.get('gn')
 
-  const [step, setStep] = useState(1) // 1: Info, 2: ID Upload, 3: Success
-  const [checkinId, setCheckinId] = useState<string | null>(null)
+  const [step, setStep] = useState(1) // 1: Form, 2: Success
   
   const [guestName, setGuestName] = useState('')
   const [countryCode, setCountryCode] = useState('91')
@@ -42,6 +41,9 @@ function CheckinForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
   const [propertyInfo, setPropertyInfo] = useState<{ name: string, helpdesk_number: string } | null>(null)
+
+  // Track verified Identity ID
+  const [verifiedIdentity, setVerifiedIdentity] = useState<string | null>(null)
 
   // Fetch Property Info
   useEffect(() => {
@@ -58,8 +60,6 @@ function CheckinForm() {
     if (prefilledName) setGuestName(prefilledName)
   }, [prefilledPhone, prefilledName])
 
-  // Track verified Identity IDs
-  const [verifiedIdentities, setVerifiedIdentities] = useState<Record<string, string>>({})
 
   if (!propertyId) {
     return (
@@ -73,8 +73,9 @@ function CheckinForm() {
     )
   }
 
-  const handleDraftSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!verifiedIdentity) return
     setIsLoading(true)
     
     try {
@@ -87,18 +88,17 @@ function CheckinForm() {
       formData.append('checkoutDate', checkoutDate)
       formData.append('vehicleNumber', (e.currentTarget.elements.namedItem('vehicleNumber') as HTMLInputElement)?.value || '')
 
-      console.log('Sending draft check-in payload to server...')
-      const result = await createDraftCheckin(formData)
+      console.log('Sending check-in payload to server...')
+      const result = await submitSingleCheckin(formData, verifiedIdentity)
 
-      if (result.success && result.checkinId) {
-        setCheckinId(result.checkinId)
+      if (result.success) {
         setSuccessData({
           propertyName: result.propertyName || 'the property',
           helpdesk: result.helpdeskNumber || 'Contact Support'
         })
-        setStep(2) // Move to ID Upload step
+        setStep(2) // Move to Success Screen
       } else {
-        console.error('Check-in Draft Failed:', result.error)
+        console.error('Check-in Failed:', result.error)
         alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
       }
     } catch (err: any) {
@@ -109,29 +109,7 @@ function CheckinForm() {
     }
   }
 
-  const handleFinalSubmit = async () => {
-    if (!checkinId) return
-    setIsLoading(true)
-    
-    try {
-      console.log('Completing check-in...')
-      const result = await completeCheckin(checkinId, verifiedIdentities, numPeople)
-
-      if (result.success) {
-        setStep(3) // Move to Success Screen
-      } else {
-        console.error('Check-in Completion Failed:', result.error)
-        alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
-      }
-    } catch (err: any) {
-      console.error('Catch-all Completion Error:', err)
-      alert(`Unexpected Error: ${err.message || 'The server could not process your request.'}\n\nPlease check your internet connection and try again.`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  if (step === 3) {
+  if (step === 2) {
     const whatsappLink = successData?.helpdesk 
       ? `https://wa.me/${formatWhatsAppNumber(successData.helpdesk)}`
       : 'https://wa.me/'
@@ -212,7 +190,7 @@ function CheckinForm() {
         </div>
 
         {step === 1 && (
-          <form onSubmit={handleDraftSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
+          <form onSubmit={handleSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
@@ -302,62 +280,36 @@ function CheckinForm() {
               </select>
             </div>
 
-            <Button 
-              type="submit" 
-              size="lg" 
-              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 mt-4 shadow-lg shadow-blue-100"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Saving Data...' : 'Proceed to Identity Verification'}
-            </Button>
-          </form>
-        )}
-
-        {step === 2 && (
-          <div className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6 animate-in slide-in-from-right duration-500">
-            <div className="text-center mb-2">
-              <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-              <h2 className="text-2xl font-bold text-gray-900">Identity Verification</h2>
-              <p className="text-sm text-gray-500">Upload mandatory front and back ID photos for each guest.</p>
-            </div>
-            
-            <div className="flex flex-col gap-6">
-              {Array.from({ length: numPeople }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-4 p-5 border rounded-2xl bg-gray-50 shadow-sm border-gray-200">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-sm font-bold text-gray-700">Guest {i + 1} Documents</span>
-                    <span className="text-[10px] font-bold uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Mandatory</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <DocumentUpload 
-                      label="Front Side" 
-                      idKey={`front_${i}`} 
-                      onVerified={(id) => setVerifiedIdentities(prev => ({...prev, [`front_${i}`]: id}))} 
-                    />
-                    <DocumentUpload 
-                      label="Back Side" 
-                      idKey={`back_${i}`} 
-                      onVerified={(id) => setVerifiedIdentities(prev => ({...prev, [`back_${i}`]: id}))} 
-                    />
-                  </div>
+            {/* Document Upload Section */}
+            <div className="mt-4 pt-6 border-t border-gray-100 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                <div>
+                  <h3 className="font-bold text-gray-900">Identity Verification</h3>
+                  <p className="text-xs text-gray-500">Please upload a valid government ID for the primary guest.</p>
                 </div>
-              ))}
+              </div>
+              
+              <div className="max-w-[240px] mx-auto w-full">
+                <DocumentUpload 
+                  label="Primary Guest ID" 
+                  idKey="primary_id" 
+                  onVerified={(id) => setVerifiedIdentity(id)} 
+                />
+              </div>
             </div>
 
-            <Button 
-              onClick={handleFinalSubmit}
-              size="lg" 
-              className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-4 shadow-lg shadow-green-100"
-              disabled={isLoading || Object.keys(verifiedIdentities).length < numPeople * 2}
-            >
-              {isLoading ? 'Completing Check-in...' : 'Complete Check-in'}
-            </Button>
-
-            <p className="text-center text-[10px] text-gray-400 mt-2 font-medium">
-               Security Policy: All IDs are stored securely in our encrypted vaults.
-            </p>
-          </div>
+            {verifiedIdentity && (
+              <Button 
+                type="submit" 
+                size="lg" 
+                className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-6 shadow-lg shadow-green-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Completing Check-in...' : 'Complete Check-in'}
+              </Button>
+            )}
+          </form>
         )}
       </div>
     </div>

@@ -15,18 +15,14 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
   const [preview, setPreview] = useState<string | null>(null)
   const [status, setStatus] = useState<'IDLE' | 'UPLOADING' | 'PROCESSING' | 'EXTRACTING' | 'VERIFIED' | 'FAILED' | 'MANUAL_REVIEW'>('IDLE')
   const [reason, setReason] = useState<string>('')
-  const [attempts, setAttempts] = useState(0)
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (attempts >= 3) return
-
     const url = URL.createObjectURL(file)
     setPreview(url)
     setStatus('UPLOADING')
-    setAttempts(prev => prev + 1)
     setReason('')
 
     try {
@@ -43,17 +39,12 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
         if (result.status === 'VERIFIED') {
           setStatus('VERIFIED')
           onVerified(result.guest_identity_id)
-        } else if (result.status === 'MANUAL_REVIEW' && attempts >= 2) {
-          // If it's the 3rd attempt, lock it to manual review
-          setStatus('MANUAL_REVIEW')
-          setReason(result.reason || "We couldn't verify your document automatically. Please contact the property.")
+        } else if (result.status === 'MANUAL_REVIEW') {
+          setStatus('FAILED')
+          setReason("Could not verify automatically. Please upload a clearer image of your ID.")
         } else {
           setStatus('FAILED')
           setReason(result.reason || 'Verification failed. Please try again with a clearer image.')
-          if (attempts >= 2) {
-            setStatus('MANUAL_REVIEW')
-            setReason("We couldn't verify your document automatically. Please contact the property.")
-          }
         }
       } else {
         setStatus('FAILED')
@@ -73,7 +64,7 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
     setReason('')
   }
 
-  const isLocked = status === 'VERIFIED' || status === 'MANUAL_REVIEW'
+  const isLocked = status === 'VERIFIED'
 
   return (
     <div className="space-y-2 relative group">
@@ -121,7 +112,7 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
                 <AlertTriangle className="w-8 h-8 mb-2" />
                 <span className="text-xs font-bold mb-2">{reason}</span>
                 <button type="button" onClick={resetUpload} className="bg-white text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow hover:bg-gray-100">
-                  Try Again ({3 - attempts} left)
+                  Try Again
                 </button>
               </div>
             )}

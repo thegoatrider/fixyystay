@@ -33,10 +33,35 @@ export default async function PoliceDashboard() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Police fetch error:', error)
+    console.error('Police fetch checkins error:', error)
+  }
+
+  // Fetch employees
+  const { data: employees, error: empError } = await supabaseAdmin
+    .from('property_employees')
+    .select(`
+      *,
+      properties (
+        name,
+        city_area,
+        helpdesk_number,
+        owners (
+          name,
+          email
+        )
+      )
+    `)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+
+  if (empError) {
+    console.error('Police fetch employees error:', empError)
   }
 
   return (
-    <PoliceDashboardClient initialCheckins={checkins || []} />
+    <PoliceDashboardClient 
+      initialCheckins={checkins || []} 
+      initialEmployees={employees || []}
+    />
   )
 }
