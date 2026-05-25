@@ -187,25 +187,25 @@ export default React.memo(function GuestList({
       if (c.identities && Array.isArray(c.identities)) {
         matchesIdentity = c.identities.some((doc: any) => 
           (doc.document_number && String(doc.document_number).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.full_name && String(doc.full_name).toLowerCase().includes(q)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(q)) ||
-          (doc.address && String(doc.address).toLowerCase().includes(q)) ||
-          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().includes(q))
+          (doc.full_name && String(doc.full_name).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
+          (doc.address && String(doc.address).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
+          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/\s+/g, '').includes(cleanQ))
         )
       } else if (c.id_documents && Array.isArray(c.id_documents)) {
         matchesIdentity = c.id_documents.some((doc: any) => 
           (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.fullName && String(doc.fullName).toLowerCase().includes(q))
+          (doc.fullName && String(doc.fullName).toLowerCase().replace(/\s+/g, '').includes(cleanQ))
         )
       }
 
       const cleanPhone = (c.guest_phone || '').replace(/\s+/g, '')
       const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/\s+/g, '')
 
-      return c.guest_name?.toLowerCase().includes(q) ||
+      return (c.guest_name && c.guest_name.toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
              cleanPhone.includes(cleanQ) ||
              cleanVehicle.includes(cleanQ) ||
-             c.properties?.name?.toLowerCase().includes(q) ||
+             (c.properties?.name && c.properties.name.toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
              (c.uid && c.uid.toLowerCase().includes(q)) ||
              matchesIdentity;
     })
