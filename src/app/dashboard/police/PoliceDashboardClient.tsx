@@ -28,6 +28,7 @@ export default function PoliceDashboardClient({
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [selectedCheckin, setSelectedCheckin] = useState<any>(null)
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
 
   const filteredCheckins = useMemo(() => {
     return initialCheckins.filter(item => {
@@ -213,6 +214,7 @@ export default function PoliceDashboardClient({
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Staff Member</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Role & Property</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Permanent Address</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Guardian</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Verification Status</th>
                 </tr>
               </thead>
@@ -230,6 +232,12 @@ export default function PoliceDashboardClient({
                             <Phone className="w-3 h-3" />
                             <span className="text-xs font-bold">{emp.mobile_number}</span>
                           </div>
+                          {emp.date_of_birth && (
+                            <div className="flex items-center gap-2 text-gray-500 mt-0.5">
+                              <Calendar className="w-3 h-3" />
+                              <span className="text-xs font-medium">DOB: {emp.date_of_birth}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -251,15 +259,47 @@ export default function PoliceDashboardClient({
                       </div>
                     </td>
                     <td className="px-6 py-6">
-                      {emp.govt_verification_id ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
-                          <ShieldCheck className="w-3.5 h-3.5" /> ID on File
-                        </span>
+                      {emp.guardian_name ? (
+                        <div className="text-sm text-gray-700">
+                          <p className="font-bold">{emp.guardian_name}</p>
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <Phone className="w-3 h-3" /> {emp.guardian_phone || '—'}
+                          </div>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
-                          Pending
-                        </span>
+                        <span className="text-xs text-gray-400 italic">Not provided</span>
                       )}
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="flex flex-col gap-2 items-start">
+                        {emp.govt_doc_verified ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-100 text-green-800">
+                            <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                          </span>
+                        ) : emp.govt_doc_front_url ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800">
+                            Review
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-600">
+                            Pending
+                          </span>
+                        )}
+                        {(emp.name_match_status === 'MISMATCH' || emp.dob_match_status === 'MISMATCH') && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest bg-red-100 text-red-800">
+                            Mismatch ⚠
+                          </span>
+                        )}
+                        {emp.govt_doc_front_url && (
+                          <Button 
+                            variant="outline" 
+                            className="rounded-lg h-7 px-3 border-indigo-100 bg-indigo-50/50 text-indigo-700 font-bold text-[10px] uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all print:hidden"
+                            onClick={() => setSelectedEmployee(emp)}
+                          >
+                            View ID
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -389,6 +429,95 @@ export default function PoliceDashboardClient({
              <div className="p-8 border-t bg-white flex justify-end">
                 <Button 
                   onClick={() => setSelectedCheckin(null)}
+                  className="bg-gray-900 hover:bg-black text-white px-8 h-12 rounded-xl font-bold"
+                >
+                  Close Viewer
+                </Button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Employee ID Proof Modal */}
+      {selectedEmployee && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
+          <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl relative">
+             <button 
+              onClick={() => setSelectedEmployee(null)}
+              className="absolute top-6 right-6 w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors z-10"
+             >
+               <Search className="w-6 h-6 rotate-45" />
+             </button>
+
+             <div className="p-8 border-b bg-gray-50/50">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-indigo-900 text-white p-1.5 rounded-lg"><Briefcase className="w-5 h-5" /></div>
+                  <h3 className="text-2xl font-black text-gray-900">Staff Identification</h3>
+                </div>
+                <p className="text-gray-500 font-medium">Verification for <span className="text-indigo-900 font-bold">{selectedEmployee.first_name} {selectedEmployee.last_name}</span> working at {selectedEmployee.properties?.name}</p>
+             </div>
+
+             <div className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+               <div className="flex flex-col gap-8">
+                 <div className="flex flex-col gap-4">
+                   <div className="flex items-center gap-2 flex-wrap">
+                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                       {selectedEmployee.govt_doc_type || 'Government ID'}
+                       {selectedEmployee.govt_doc_number ? ` · ${selectedEmployee.govt_doc_number}` : ''}
+                       {selectedEmployee.govt_doc_name ? ` · ${selectedEmployee.govt_doc_name}` : ''}
+                     </p>
+                     {selectedEmployee.govt_doc_verified && (
+                       <span className="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black uppercase">✓ Verified</span>
+                     )}
+                     {selectedEmployee.name_match_status === 'MISMATCH' && (
+                       <span className="text-[9px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-black uppercase">⚠ Name Mismatch</span>
+                     )}
+                     {selectedEmployee.dob_match_status === 'MISMATCH' && (
+                       <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black uppercase">⚠ DOB Mismatch</span>
+                     )}
+                   </div>
+                   <div className="grid sm:grid-cols-2 gap-6">
+                     {/* Front */}
+                     {selectedEmployee.govt_doc_front_url && (
+                       <div className="space-y-2">
+                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">▣ Front Side</p>
+                         <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
+                           <img src={selectedEmployee.govt_doc_front_url} alt="Front ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                           <a href={selectedEmployee.govt_doc_front_url} target="_blank" rel="noopener noreferrer"
+                             className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
+                             <ExternalLink className="w-5 h-5" /> Open Full Image
+                           </a>
+                         </div>
+                       </div>
+                     )}
+                     {/* Back */}
+                     {selectedEmployee.govt_doc_back_url ? (
+                       <div className="space-y-2">
+                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">◫ Back Side</p>
+                         <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
+                           <img src={selectedEmployee.govt_doc_back_url} alt="Back ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                           <a href={selectedEmployee.govt_doc_back_url} target="_blank" rel="noopener noreferrer"
+                             className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
+                             <ExternalLink className="w-5 h-5" /> Open Full Image
+                           </a>
+                         </div>
+                       </div>
+                     ) : (
+                       <div className="space-y-2">
+                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">◫ Back Side</p>
+                         <div className="aspect-[4/3] rounded-3xl border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-xs font-bold">
+                           Not uploaded
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               </div>
+             </div>
+             
+             <div className="p-8 border-t bg-white flex justify-end">
+                <Button 
+                  onClick={() => setSelectedEmployee(null)}
                   className="bg-gray-900 hover:bg-black text-white px-8 h-12 rounded-xl font-bold"
                 >
                   Close Viewer
