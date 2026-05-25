@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Camera, Image as ImageIcon, CheckCircle, AlertTriangle, Loader2, FlipHorizontal, X } from 'lucide-react'
 import { uploadAndVerifyFront, uploadBackImage } from './verify-action'
 import { cn } from '@/lib/utils'
@@ -136,6 +136,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const [backPreview, setBackPreview] = useState<string | null>(null)
   const [backReason, setBackReason] = useState('')
   const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
+  const pendingBackFileRef = useRef<File | null>(null)
 
   const frontDone = frontStatus === 'VERIFIED'
   const backDone = backStatus === 'DONE'
@@ -166,10 +167,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
         }
 
         // Automatically upload the pending back file if it exists
-        if (pendingBackFile) {
+        const backFileToUpload = pendingBackFileRef.current || pendingBackFile
+        if (backFileToUpload) {
           setBackStatus('UPLOADING')
           const backFd = new FormData()
-          backFd.append('image', pendingBackFile)
+          backFd.append('image', backFileToUpload)
           backFd.append('identityId', result.guest_identity_id)
           const backRes = await uploadBackImage(backFd)
           if (backRes.success) {
@@ -180,6 +182,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
             setBackStatus('FAILED')
             setBackReason(backRes.error || 'Back image upload failed.')
             setPendingBackFile(null)
+            pendingBackFileRef.current = null
             onVerified(null)
           }
         }
@@ -205,6 +208,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (!identityId) {
       // Front is not verified yet. Store the file to be uploaded later.
       setPendingBackFile(file)
+      pendingBackFileRef.current = file
       setBackStatus('PENDING')
       return
     }

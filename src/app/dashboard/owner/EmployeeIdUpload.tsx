@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Camera, Image as ImageIcon, CheckCircle, AlertTriangle,
   Loader2, FlipHorizontal, ShieldCheck, User, AlertCircle, X
@@ -118,6 +118,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
   const [backUrl, setBackUrl]         = useState<string | null>(null)
   const [backReason, setBackReason]   = useState('')
   const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
+  const pendingBackFileRef = useRef<File | null>(null)
 
   const [nameMatch, setNameMatch] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
   const [dobMatchSt, setDobMatchSt] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
@@ -180,10 +181,11 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     setDobMatchSt(dm)
 
     // Automatically upload the pending back file if it exists
-    if (pendingBackFile) {
+    const backFileToUpload = pendingBackFileRef.current || pendingBackFile
+    if (backFileToUpload) {
       setBackStatus('UPLOADING')
       const backFd = new FormData()
-      backFd.append('image', pendingBackFile)
+      backFd.append('image', backFileToUpload)
       const backRes = await uploadEmployeeBackId(backFd)
       if (backRes.success && backRes.backUrl) {
         setBackStatus('DONE')
@@ -194,6 +196,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
         setBackStatus('FAILED')
         setBackReason(backRes.error || 'Back image upload failed.')
         setPendingBackFile(null)
+        pendingBackFileRef.current = null
       }
     } else {
       // If back already done (not pending), notify complete
@@ -209,6 +212,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
 
     if (!frontDone || !frontUrl) {
       setPendingBackFile(file)
+      pendingBackFileRef.current = file
       setBackStatus('PENDING')
       return
     }
@@ -239,7 +243,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
 
   const resetAll = () => {
     setFrontStatus('IDLE'); setFrontPreview(null); setFrontReason(''); setFrontUrl(null); setExtracted(null)
-    setBackStatus('IDLE');  setBackPreview(null);  setBackReason('');  setBackUrl(null); setPendingBackFile(null)
+    setBackStatus('IDLE');  setBackPreview(null);  setBackReason('');  setBackUrl(null); setPendingBackFile(null); pendingBackFileRef.current = null
     setNameMatch('UNVERIFIED'); setDobMatchSt('UNVERIFIED')
     onReset()
   }
