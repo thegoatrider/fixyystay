@@ -132,12 +132,10 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
       } else {
         setFrontStatus('FAILED')
         setFrontReason(result.reason || 'Could not verify. Please upload a clearer image.')
-        setFrontPreview(null)
       }
     } else {
       setFrontStatus('FAILED')
       setFrontReason(result.error || 'Verification failed. Please try again.')
-      setFrontPreview(null)
     }
   }
 

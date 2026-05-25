@@ -33,11 +33,26 @@ export default function PoliceDashboardClient({
   const filteredCheckins = useMemo(() => {
     return initialCheckins.filter(item => {
       const searchStr = searchTerm.toLowerCase()
+      
+      let matchesIdentity = false;
+      if (item.identities && Array.isArray(item.identities)) {
+        matchesIdentity = item.identities.some((doc: any) => 
+          (doc.document_number && String(doc.document_number).toLowerCase().includes(searchStr)) ||
+          (doc.full_name && String(doc.full_name).toLowerCase().includes(searchStr))
+        )
+      } else if (item.id_documents && Array.isArray(item.id_documents)) {
+        matchesIdentity = item.id_documents.some((doc: any) => 
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().includes(searchStr)) ||
+          (doc.fullName && String(doc.fullName).toLowerCase().includes(searchStr))
+        )
+      }
+
       const matchesSearch = 
         item.guest_name.toLowerCase().includes(searchStr) ||
         item.guest_phone.includes(searchTerm) ||
         item.properties?.name.toLowerCase().includes(searchStr) ||
-        item.properties?.city_area?.toLowerCase().includes(searchStr)
+        item.properties?.city_area?.toLowerCase().includes(searchStr) ||
+        matchesIdentity
       
       const matchesDate = !dateFilter || item.checkin_date === dateFilter
       
@@ -49,10 +64,16 @@ export default function PoliceDashboardClient({
     return initialEmployees.filter(emp => {
       const searchStr = searchTerm.toLowerCase()
       const name = `${emp.first_name} ${emp.last_name}`.toLowerCase()
+      
+      const matchesIdentity = 
+        (emp.govt_doc_number && String(emp.govt_doc_number).toLowerCase().includes(searchStr)) ||
+        (emp.govt_doc_name && String(emp.govt_doc_name).toLowerCase().includes(searchStr))
+
       return name.includes(searchStr) || 
              emp.mobile_number.includes(searchTerm) ||
              emp.properties?.name.toLowerCase().includes(searchStr) ||
-             emp.properties?.city_area?.toLowerCase().includes(searchStr)
+             emp.properties?.city_area?.toLowerCase().includes(searchStr) ||
+             matchesIdentity
     })
   }, [searchTerm, initialEmployees])
 

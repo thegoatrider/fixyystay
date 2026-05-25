@@ -79,17 +79,26 @@ export async function uploadAndVerifyFront(formData: FormData) {
 
     let aiResponseText = '{}'
     try {
-      const response = await ai.models.generateContent({
+      const generatePromise = ai.models.generateContent({
         model: MODEL_NAME,
         contents: [
           SYSTEM_PROMPT,
           { inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }
         ],
         config: { temperature: 0.0, responseMimeType: 'application/json' }
-      })
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
+      );
+
+      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
       aiResponseText = response.text || '{}'
     } catch (aiError: any) {
       console.error('[VERIFY-FRONT] AI call failed:', aiError)
+      if (aiError.message === 'AI_TIMEOUT') {
+        return { success: false, error: 'Scanning timed out. The image quality might be too poor. Please retake the photo.' }
+      }
       return { success: false, error: 'AI verification service temporarily unavailable.' }
     }
 
