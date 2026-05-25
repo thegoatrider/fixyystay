@@ -2,7 +2,12 @@
 
 import { createAdminClient } from '@/utils/supabase/admin'
 
-export async function submitSingleCheckin(formData: FormData, verifiedIdentityId: string) {
+/**
+ * submitCheckin — handles multi-guest check-in.
+ * @param formData   Standard form fields
+ * @param identityIds  Array of guest_identity IDs — one per guest, all already verified by AI
+ */
+export async function submitCheckin(formData: FormData, identityIds: string[]) {
   try {
     const supabaseAdmin = createAdminClient()
 
@@ -13,7 +18,15 @@ export async function submitSingleCheckin(formData: FormData, verifiedIdentityId
     const checkinDate = formData.get('checkinDate') as string
     const checkoutDate = formData.get('checkoutDate') as string
 
-    console.log(`[CHECKIN] Submitting single check-in for property ${propertyId}, guest ${guestName}`)
+    if (!identityIds || identityIds.length === 0) {
+      return { error: 'No verified identities provided.' }
+    }
+
+    if (identityIds.length !== numPeople) {
+      return { error: `Expected ${numPeople} verified ID(s) but received ${identityIds.length}.` }
+    }
+
+    console.log(`[CHECKIN] Submitting check-in for property ${propertyId}, guest ${guestName}, ${numPeople} person(s)`)
 
     const { data: property, error: propError } = await supabaseAdmin
       .from('properties')
@@ -22,14 +35,15 @@ export async function submitSingleCheckin(formData: FormData, verifiedIdentityId
       .single()
 
     if (propError || !property) {
-      console.error('[CHECKIN] Property fetch error:', propError, 'propertyId:', propertyId)
+      console.error('[CHECKIN] Property fetch error:', propError)
       return { error: 'Property not found. Please verify the check-in link.' }
     }
 
     // Generate UID
     const uid = 'GST-' + Date.now().toString(16).toUpperCase().slice(-8)
 
-    const idDocuments = [{ primaryIdentityId: verifiedIdentityId }]
+    // Store identity IDs as an array for reference
+    const idDocuments = identityIds.map((id, i) => ({ personIndex: i + 1, identityId: id }))
 
     const checkinRecord = {
       property_id: propertyId,
@@ -39,9 +53,9 @@ export async function submitSingleCheckin(formData: FormData, verifiedIdentityId
       num_people: numPeople,
       checkin_date: checkinDate || null,
       checkout_date: checkoutDate || null,
-      vehicle_number: formData.get('vehicleNumber') as string || null,
+      vehicle_number: (formData.get('vehicleNumber') as string) || null,
       id_documents: idDocuments,
-      uid: uid,
+      uid,
       status: 'completed'
     }
 
@@ -53,31 +67,35 @@ export async function submitSingleCheckin(formData: FormData, verifiedIdentityId
 
     if (insertError) {
       console.error('[CHECKIN] Check-in Insert failed:', insertError)
-      return { error: `Database error: ${insertError.message}. Please contact the property owner.` }
+      return { error: `Database error: ${insertError.message}` }
     }
 
-    // Link Guest Identity to Checkin Record
+    // Link ALL guest identities to this checkin record
     const { error: updateError } = await supabaseAdmin
       .from('guest_identity')
       .update({ checkin_id: insertedCheckin.id })
-      .eq('id', verifiedIdentityId)
+      .in('id', identityIds)
 
     if (updateError) {
-      console.error('[CHECKIN] Failed to link identity:', updateError)
+      console.error('[CHECKIN] Failed to link identities to checkin:', updateError)
+      // Non-fatal — checkin is still created
     }
 
-    console.log(`[CHECKIN] Successfully completed check-in: ${insertedCheckin.id}`)
+    console.log(`[CHECKIN] Successfully completed check-in: ${insertedCheckin.id}, linked ${identityIds.length} identity record(s)`)
 
-    return { 
-      success: true, 
-      propertyName: property.name, 
+    return {
+      success: true,
+      propertyName: property.name,
       helpdeskNumber: property.helpdesk_number || 'No helpdesk set'
     }
   } catch (err: any) {
-    console.error('[CHECKIN] Critical uncaught exception during check-in:', err)
+    console.error('[CHECKIN] Critical uncaught exception:', err)
     return { error: `System Error: ${err.message || 'The server encountered an unexpected issue.'}` }
   }
 }
+
+// Keep the old name as an alias so nothing else breaks if imported
+export const submitSingleCheckin = submitCheckin
 
 export async function getPropertyInfo(propertyId: string) {
   try {
@@ -95,4 +113,3 @@ export async function getPropertyInfo(propertyId: string) {
     return null
   }
 }
-

@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, Upload, Users, Phone, User, ShieldCheck, HelpCircle, Globe, Instagram, Facebook, Camera, Image as ImageIcon } from 'lucide-react'
-import { submitSingleCheckin, getPropertyInfo } from './actions'
+import {
+  CheckCircle, Users, Phone, User, ShieldCheck,
+  HelpCircle, Globe, Instagram, Facebook
+} from 'lucide-react'
+import { submitCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
 import { DocumentUpload } from './DocumentUpload'
@@ -31,7 +34,7 @@ function CheckinForm() {
   const prefilledName = searchParams.get('gn')
 
   const [step, setStep] = useState(1) // 1: Form, 2: Success
-  
+
   const [guestName, setGuestName] = useState('')
   const [countryCode, setCountryCode] = useState('91')
   const [guestPhone, setGuestPhone] = useState('')
@@ -42,8 +45,30 @@ function CheckinForm() {
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
   const [propertyInfo, setPropertyInfo] = useState<{ name: string, helpdesk_number: string } | null>(null)
 
-  // Track verified Identity ID
-  const [verifiedIdentity, setVerifiedIdentity] = useState<string | null>(null)
+  // Array of verified identity IDs — one slot per guest, null if not yet verified
+  const [verifiedIds, setVerifiedIds] = useState<(string | null)[]>([null])
+
+  // Sync verifiedIds array length when numPeople changes
+  useEffect(() => {
+    setVerifiedIds(prev => {
+      const next = Array(numPeople).fill(null)
+      // preserve already-verified IDs if the count grows
+      for (let i = 0; i < Math.min(prev.length, numPeople); i++) {
+        next[i] = prev[i]
+      }
+      return next
+    })
+  }, [numPeople])
+
+  const handleGuestVerified = useCallback((index: number, identityId: string) => {
+    setVerifiedIds(prev => {
+      const next = [...prev]
+      next[index] = identityId
+      return next
+    })
+  }, [])
+
+  const allVerified = verifiedIds.length === numPeople && verifiedIds.every(id => id !== null)
 
   // Fetch Property Info
   useEffect(() => {
@@ -60,7 +85,6 @@ function CheckinForm() {
     if (prefilledName) setGuestName(prefilledName)
   }, [prefilledPhone, prefilledName])
 
-
   if (!propertyId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
@@ -75,9 +99,9 @@ function CheckinForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!verifiedIdentity) return
+    if (!allVerified) return
     setIsLoading(true)
-    
+
     try {
       const formData = new FormData()
       formData.append('propertyId', propertyId)
@@ -88,29 +112,26 @@ function CheckinForm() {
       formData.append('checkoutDate', checkoutDate)
       formData.append('vehicleNumber', (e.currentTarget.elements.namedItem('vehicleNumber') as HTMLInputElement)?.value || '')
 
-      console.log('Sending check-in payload to server...')
-      const result = await submitSingleCheckin(formData, verifiedIdentity)
+      const result = await submitCheckin(formData, verifiedIds as string[])
 
       if (result.success) {
         setSuccessData({
           propertyName: result.propertyName || 'the property',
           helpdesk: result.helpdeskNumber || 'Contact Support'
         })
-        setStep(2) // Move to Success Screen
+        setStep(2)
       } else {
-        console.error('Check-in Failed:', result.error)
-        alert(`Check-in Error: ${result.error}\n\nPlease try again. If issues persist, contact support.`)
+        alert(`Check-in Error: ${result.error}\n\nPlease try again.`)
       }
     } catch (err: any) {
-      console.error('Catch-all Checkin Error:', err)
-      alert(`Unexpected Error: ${err.message || 'The server could not process your request.'}\n\nPlease check your internet connection and try again.`)
+      alert(`Unexpected Error: ${err.message || 'Please check your connection and try again.'}`)
     } finally {
       setIsLoading(false)
     }
   }
 
   if (step === 2) {
-    const whatsappLink = successData?.helpdesk 
+    const whatsappLink = successData?.helpdesk
       ? `https://wa.me/${formatWhatsAppNumber(successData.helpdesk)}`
       : 'https://wa.me/'
 
@@ -124,13 +145,13 @@ function CheckinForm() {
           <p className="text-lg text-gray-600 mb-8">
             Welcome to <span className="font-bold text-blue-600">{successData?.propertyName}</span>!
           </p>
-          
+
           <div className="w-full bg-blue-50 border border-blue-100 p-6 rounded-2xl text-left mb-6">
             <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5" /> Important Info
             </h3>
             <p className="text-blue-800 text-sm leading-relaxed">
-              We&apos;ve received your details. Please head to the property entrance. This is **Fixy Stays**. 
+              We&apos;ve received your details and verified all guest IDs. Please head to the property entrance.
             </p>
             <div className="mt-4 pt-4 border-t border-blue-200">
               <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Helpdesk Number</div>
@@ -139,34 +160,28 @@ function CheckinForm() {
           </div>
 
           <div className="w-full flex flex-col gap-3 mb-8">
-            <Button 
-              asChild 
+            <Button
+              asChild
               className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white border-0 shadow-md flex items-center justify-center gap-2"
             >
               <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
                 <HelpCircle className="w-5 h-5" /> Help & Support (WhatsApp)
               </a>
             </Button>
-            
+
             <div className="grid grid-cols-3 gap-2">
               <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-blue-600">
-                <a href="https://fixystays.com" target="_blank" rel="noopener noreferrer">
-                  <Globe className="w-5 h-5" />
-                </a>
+                <a href="https://fixystays.com" target="_blank" rel="noopener noreferrer"><Globe className="w-5 h-5" /></a>
               </Button>
               <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-pink-600">
-                <a href="https://instagram.com/fixystays" target="_blank" rel="noopener noreferrer">
-                  <Instagram className="w-5 h-5" />
-                </a>
+                <a href="https://instagram.com/fixystays" target="_blank" rel="noopener noreferrer"><Instagram className="w-5 h-5" /></a>
               </Button>
               <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-blue-800">
-                <a href="https://facebook.com/fixystays" target="_blank" rel="noopener noreferrer">
-                  <Facebook className="w-5 h-5" />
-                </a>
+                <a href="https://facebook.com/fixystays" target="_blank" rel="noopener noreferrer"><Facebook className="w-5 h-5" /></a>
               </Button>
             </div>
           </div>
-          
+
           <p className="text-gray-400 text-[10px] font-medium uppercase tracking-widest">
             Enjoy your stay with Fixy Stays
           </p>
@@ -174,6 +189,9 @@ function CheckinForm() {
       </div>
     )
   }
+
+  // Count verified
+  const verifiedCount = verifiedIds.filter(Boolean).length
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-6">
@@ -183,17 +201,18 @@ function CheckinForm() {
             Fixy Stays
           </Link>
           <h1 className="text-4xl font-extrabold text-gray-900 leading-tight">
-            Welcome to <br/>
+            Welcome to <br />
             <span className="text-blue-600 drop-shadow-sm">{propertyInfo?.name || 'Guest Check-in'}</span>
           </h1>
-          <p className="text-gray-500 mt-3 font-medium">Please provide your details and ID proof for a smooth entry.</p>
+          <p className="text-gray-500 mt-3 font-medium">Please provide your details and ID proof for every guest.</p>
         </div>
 
         {step === 1 && (
           <form onSubmit={handleSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
+            {/* Phone + Name */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4"/> Phone Number</Label>
+                <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4" /> Phone Number</Label>
                 <div className="flex gap-2">
                   <select
                     value={countryCode}
@@ -206,10 +225,10 @@ function CheckinForm() {
                   </select>
                   <div className="relative flex-1">
                     <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <Input 
-                      id="phone" 
-                      placeholder="9876543210" 
-                      required 
+                    <Input
+                      id="phone"
+                      placeholder="9876543210"
+                      required
                       className="pl-9"
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
@@ -219,58 +238,49 @@ function CheckinForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name" className="flex items-center gap-1"><User className="w-4 h-4"/> Full Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="John Doe" 
-                  required 
+                <Label htmlFor="name" className="flex items-center gap-1"><User className="w-4 h-4" /> Full Name (Primary Guest)</Label>
+                <Input
+                  id="name"
+                  placeholder="John Doe"
+                  required
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                 />
               </div>
             </div>
 
+            {/* Dates */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="checkinDate">Check-in Date</Label>
-                <Input 
-                  id="checkinDate" 
-                  type="date" 
-                  required 
-                  value={checkinDate}
-                  onChange={(e) => setCheckinDate(e.target.value)}
-                />
+                <Input id="checkinDate" type="date" required value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="checkoutDate">Check-out Date</Label>
-                <Input 
-                  id="checkoutDate" 
-                  type="date" 
-                  required 
-                  value={checkoutDate}
-                  onChange={(e) => setCheckoutDate(e.target.value)}
-                />
+                <Input id="checkoutDate" type="date" required value={checkoutDate} onChange={(e) => setCheckoutDate(e.target.value)} />
               </div>
             </div>
 
+            {/* Vehicle */}
             <div className="space-y-2">
               <Label htmlFor="vehicleNumber" className="flex items-center gap-1">
                 Vehicle Number <span className="text-[10px] text-gray-400 font-medium ml-1">(Optional)</span>
               </Label>
-              <Input 
-                id="vehicleNumber" 
+              <Input
+                id="vehicleNumber"
                 name="vehicleNumber"
-                placeholder="e.g. MH-12-AB-1234" 
+                placeholder="e.g. MH-12-AB-1234"
                 className="bg-gray-50/50 focus:bg-white transition-colors"
               />
             </div>
 
+            {/* Number of Guests */}
             <div className="space-y-2">
-              <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4"/> Number of People Staying</Label>
-              <select 
-                id="pax" 
+              <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4" /> Number of People Staying</Label>
+              <select
+                id="pax"
                 className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                required 
+                required
                 value={numPeople}
                 onChange={(e) => setNumPeople(parseInt(e.target.value))}
               >
@@ -280,33 +290,84 @@ function CheckinForm() {
               </select>
             </div>
 
-            {/* Document Upload Section */}
-            <div className="mt-4 pt-6 border-t border-gray-100 flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <div>
-                  <h3 className="font-bold text-gray-900">Identity Verification</h3>
-                  <p className="text-xs text-gray-500">Please upload a valid government ID for the primary guest.</p>
+            {/* ─── ID Upload Section — one per guest ─── */}
+            <div className="mt-2 pt-6 border-t border-gray-100 flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-bold text-gray-900">Identity Verification</h3>
+                    <p className="text-xs text-gray-500">
+                      Upload a valid government ID for <span className="font-bold text-blue-600">each guest</span>.
+                    </p>
+                  </div>
+                </div>
+                {/* Progress pill */}
+                <div className={cn(
+                  'text-xs font-bold px-3 py-1.5 rounded-full transition-colors',
+                  allVerified
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-amber-50 text-amber-700'
+                )}>
+                  {verifiedCount}/{numPeople} Verified
                 </div>
               </div>
-              
-              <div className="max-w-[240px] mx-auto w-full">
-                <DocumentUpload 
-                  label="Primary Guest ID" 
-                  idKey="primary_id" 
-                  onVerified={(id) => setVerifiedIdentity(id)} 
-                />
+
+              {/* One upload card per guest */}
+              <div className={cn(
+                'grid gap-6',
+                numPeople === 1 ? 'grid-cols-1 max-w-[280px] mx-auto w-full' :
+                numPeople === 2 ? 'grid-cols-2' :
+                'grid-cols-2 md:grid-cols-3'
+              )}>
+                {Array.from({ length: numPeople }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <div className={cn(
+                      'text-[10px] font-black uppercase tracking-widest px-1 flex items-center gap-1',
+                      verifiedIds[i] ? 'text-green-600' : 'text-gray-400'
+                    )}>
+                      {verifiedIds[i]
+                        ? <><CheckCircle className="w-3 h-3" /> Guest {i + 1} ✓</>
+                        : `Guest ${i + 1}`
+                      }
+                    </div>
+                    <DocumentUpload
+                      label={i === 0 ? 'Primary Guest ID' : `Guest ${i + 1} ID`}
+                      idKey={`guest_${i}`}
+                      onVerified={(id) => handleGuestVerified(i, id)}
+                    />
+                  </div>
+                ))}
               </div>
+
+              {/* All verified banner */}
+              {allVerified && (
+                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-bold text-green-800">
+                    All {numPeople} guest{numPeople > 1 ? 's' : ''} verified! You&apos;re ready to check in.
+                  </p>
+                </div>
+              )}
+
+              {/* Not yet verified hint */}
+              {!allVerified && verifiedCount > 0 && (
+                <p className="text-xs text-amber-600 font-medium text-center">
+                  {numPeople - verifiedCount} more ID{numPeople - verifiedCount > 1 ? 's' : ''} needed before you can complete check-in.
+                </p>
+              )}
             </div>
 
-            {verifiedIdentity && (
-              <Button 
-                type="submit" 
-                size="lg" 
-                className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-6 shadow-lg shadow-green-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
+            {/* Submit Button — only visible when all verified */}
+            {allVerified && (
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-2 shadow-lg shadow-green-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
                 disabled={isLoading}
               >
-                {isLoading ? 'Completing Check-in...' : 'Complete Check-in'}
+                {isLoading ? 'Completing Check-in...' : `Complete Check-in for ${numPeople} Guest${numPeople > 1 ? 's' : ''}`}
               </Button>
             )}
           </form>
