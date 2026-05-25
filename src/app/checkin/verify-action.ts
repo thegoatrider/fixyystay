@@ -40,6 +40,20 @@ Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
 If a field cannot be read, leave it as an empty string "".
 `
 
+const BACK_SYSTEM_PROMPT = `
+You are an expert Government ID verification AI for a hotel check-in system.
+Analyze the back side of the provided ID image and extract information strictly in JSON format.
+Your task is to identify and extract the address.
+
+Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
+{
+  "address": string,
+  "raw_ocr_text_back": string
+}
+
+If a field cannot be read, leave it as an empty string "".
+`
+
 // ─── Helper: upload a file to Supabase storage and return public URL ───────────
 async function uploadToStorage(file: File, folder: string): Promise<string | null> {
   const supabaseAdmin = createAdminClient()
@@ -223,11 +237,56 @@ export async function uploadBackImage(formData: FormData) {
     const backUrl = await uploadToStorage(file, 'temp_verification')
     if (!backUrl) return { success: false, error: 'Failed to upload back image.' }
 
-    // Update the existing guest_identity record with back_image_url
+    // OCR with Gemini for back image
+    console.log('[VERIFY-BACK] Analyzing back image with Gemini AI...')
+    const arrayBuffer = await file.arrayBuffer()
+    const base64Data = Buffer.from(arrayBuffer).toString('base64')
+
+    let aiResponseText = '{}'
+    try {
+      const generatePromise = ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: [
+          BACK_SYSTEM_PROMPT,
+          { inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }
+        ],
+        config: { temperature: 0.0, responseMimeType: 'application/json' }
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
+      );
+
+      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+      aiResponseText = response.text || '{}'
+    } catch (aiError: any) {
+      console.error('[VERIFY-BACK] AI call failed:', aiError)
+    }
+
+    let address = ''
+    let rawOcrTextBack = aiResponseText
+    try {
+      const firstBrace = aiResponseText.indexOf('{')
+      const lastBrace = aiResponseText.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonStr = aiResponseText.substring(firstBrace, lastBrace + 1)
+        const result = JSON.parse(jsonStr)
+        address = result.address || ''
+        rawOcrTextBack = result.raw_ocr_text_back || aiResponseText
+      }
+    } catch (e) {
+      console.warn('[VERIFY-BACK] Failed to parse AI JSON response.')
+    }
+
+    // Update the existing guest_identity record with back_image_url and address
     const supabaseAdmin = createAdminClient()
     const { error } = await supabaseAdmin
       .from('guest_identity')
-      .update({ back_image_url: backUrl })
+      .update({ 
+        back_image_url: backUrl,
+        address: address,
+        raw_ocr_text_back: rawOcrTextBack
+      })
       .eq('id', identityId)
 
     if (error) {
@@ -236,7 +295,7 @@ export async function uploadBackImage(formData: FormData) {
     }
 
     console.log('[VERIFY-BACK] Back image saved successfully for identity:', identityId)
-    return { success: true, back_image_url: backUrl }
+    return { success: true, back_image_url: backUrl, address }
   } catch (err: any) {
     console.error('[VERIFY-BACK] Uncaught exception:', err)
     return { success: false, error: 'Internal error during back image upload.' }

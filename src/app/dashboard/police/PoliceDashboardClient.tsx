@@ -39,7 +39,9 @@ export default function PoliceDashboardClient({
         matchesIdentity = item.identities.some((doc: any) => 
           (doc.document_number && String(doc.document_number).toLowerCase().includes(searchStr)) ||
           (doc.full_name && String(doc.full_name).toLowerCase().includes(searchStr)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(searchStr))
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(searchStr)) ||
+          (doc.address && String(doc.address).toLowerCase().includes(searchStr)) ||
+          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().includes(searchStr))
         )
       } else if (item.id_documents && Array.isArray(item.id_documents)) {
         matchesIdentity = item.id_documents.some((doc: any) => 
@@ -377,10 +379,19 @@ export default function PoliceDashboardClient({
                             </span>
                           )}
                         </div>
-                        {doc.raw_ocr_text && (
+                        {doc.address && (
+                          <div className="bg-blue-50/50 rounded-xl p-3 mb-2 border border-blue-100">
+                            <span className="font-bold text-blue-400 uppercase text-[9px] tracking-wider block mb-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> Extracted Address
+                            </span>
+                            <p className="text-xs text-blue-900 font-medium">{doc.address}</p>
+                          </div>
+                        )}
+                        {(doc.raw_ocr_text || doc.raw_ocr_text_back) && (
                           <div className="bg-gray-100 rounded-xl p-3 mb-2 max-h-32 overflow-y-auto text-[10px] text-gray-600 font-mono whitespace-pre-wrap shadow-inner border border-gray-200">
                             <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-1">Raw Extracted OCR Data:</span>
-                            {doc.raw_ocr_text}
+                            {doc.raw_ocr_text && <div><span className="font-bold text-gray-500">FRONT:</span> {doc.raw_ocr_text}</div>}
+                            {doc.raw_ocr_text_back && <div className="mt-2 pt-2 border-t border-gray-200"><span className="font-bold text-gray-500">BACK:</span> {doc.raw_ocr_text_back}</div>}
                           </div>
                         )}
                         <div className="grid sm:grid-cols-2 gap-6">

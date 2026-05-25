@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -187,7 +187,9 @@ export default React.memo(function GuestList({
         matchesIdentity = c.identities.some((doc: any) => 
           (doc.document_number && String(doc.document_number).toLowerCase().includes(q)) ||
           (doc.full_name && String(doc.full_name).toLowerCase().includes(q)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(q))
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(q)) ||
+          (doc.address && String(doc.address).toLowerCase().includes(q)) ||
+          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().includes(q))
         )
       } else if (c.id_documents && Array.isArray(c.id_documents)) {
         matchesIdentity = c.id_documents.some((doc: any) => 
@@ -654,10 +656,19 @@ export default React.memo(function GuestList({
                               </div>
                             </div>
 
-                            {doc.raw_ocr_text && (
+                            {doc.address && (
+                              <div className="bg-indigo-50/50 rounded-xl p-3 mb-2 mt-2 border border-indigo-100">
+                                <span className="font-bold text-indigo-400 uppercase text-[9px] tracking-wider block mb-1 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" /> Extracted Address
+                                </span>
+                                <p className="text-xs text-indigo-900 font-medium">{doc.address}</p>
+                              </div>
+                            )}
+                            {(doc.raw_ocr_text || doc.raw_ocr_text_back) && (
                               <div className="bg-white rounded-xl p-3 max-h-32 overflow-y-auto text-[10px] text-gray-600 font-mono whitespace-pre-wrap shadow-inner border border-gray-200 mb-2 mt-2">
                                 <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-1">Raw Extracted OCR Data:</span>
-                                {doc.raw_ocr_text}
+                                {doc.raw_ocr_text && <div><span className="font-bold text-gray-500">FRONT:</span> {doc.raw_ocr_text}</div>}
+                                {doc.raw_ocr_text_back && <div className="mt-2 pt-2 border-t border-gray-100"><span className="font-bold text-gray-500">BACK:</span> {doc.raw_ocr_text_back}</div>}
                               </div>
                             )}
 

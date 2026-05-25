@@ -38,6 +38,19 @@ Return STRICTLY this JSON (no markdown, just raw JSON):
 If a field cannot be read, use empty string "".
 `
 
+const BACK_SYSTEM_PROMPT = `
+You are an expert Government ID verification AI.
+Analyze the back side of the provided ID image and extract information strictly in JSON format.
+Your task is to identify and extract the address.
+
+Return STRICTLY this JSON (no markdown, just raw JSON):
+{
+  "address": string,
+  "raw_ocr_text_back": string
+}
+If a field cannot be read, use empty string "".
+`
+
 async function uploadToStorage(file: File, folder: string): Promise<string | null> {
   const admin = createAdminClient()
   const ext = file.name.split('.').pop() || 'jpg'
@@ -130,14 +143,46 @@ export async function verifyEmployeeFrontId(formData: FormData) {
   }
 }
 
-// ─── Action 2: Upload back ID → just store URL, return it ────────────────────
+// ─── Action 2: Upload back ID → run OCR → just store URL & address ────────────
 export async function uploadEmployeeBackId(formData: FormData) {
   try {
     const file = formData.get('image') as File
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
     const backUrl = await uploadToStorage(file, 'employee_ids')
     if (!backUrl) return { success: false, error: 'Upload failed.' }
-    return { success: true, backUrl }
+
+    // OCR
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    let aiText = '{}'
+    try {
+      const res = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: [BACK_SYSTEM_PROMPT, { inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }],
+        config: { temperature: 0.0, responseMimeType: 'application/json' }
+      })
+      aiText = res.text || '{}'
+    } catch (err) {
+      console.error('[EMP-VERIFY] Gemini error for back image:', err)
+    }
+
+    let address = ''
+    let rawOcrTextBack = aiText
+    try {
+      const firstBrace = aiText.indexOf('{')
+      const lastBrace = aiText.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonStr = aiText.substring(firstBrace, lastBrace + 1)
+        const result = JSON.parse(jsonStr)
+        address = result.address || ''
+        rawOcrTextBack = result.raw_ocr_text_back || aiText
+      }
+    } catch (e) {
+      console.warn('[EMP-VERIFY] Failed to parse AI JSON response for back image.')
+    }
+
+    return { success: true, backUrl, address, raw_ocr_text_back: rawOcrTextBack }
   } catch (err: any) {
     return { success: false, error: 'Internal error during back image upload.' }
   }
