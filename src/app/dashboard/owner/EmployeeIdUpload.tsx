@@ -122,7 +122,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
   const [nameMatch, setNameMatch] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
   const [dobMatchSt, setDobMatchSt] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
 
-  const frontDone = frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW'
+  const frontDone = frontStatus === 'VERIFIED'
   const backDone  = backStatus === 'DONE'
 
   // Notify parent whenever both sides are done
@@ -130,7 +130,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     onComplete({
       frontUrl: fu,
       backUrl: bu,
-      status: frontStatus === 'VERIFIED' ? 'VERIFIED' : 'MANUAL_REVIEW',
+      status: 'VERIFIED',
       extracted: ex,
       nameMatchStatus: nm,
       dobMatchStatus: dm
@@ -155,7 +155,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     }
 
     const ex = res.extracted!
-    const fs = res.status === 'VERIFIED' ? 'VERIFIED' : res.status === 'MANUAL_REVIEW' ? 'MANUAL_REVIEW' : 'FAILED'
+    const fs = res.status === 'VERIFIED' ? 'VERIFIED' : 'FAILED'
 
     if (fs === 'FAILED') {
       setFrontStatus('FAILED')

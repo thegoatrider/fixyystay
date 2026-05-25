@@ -33,11 +33,12 @@ export default function PoliceDashboardClient({
   const filteredCheckins = useMemo(() => {
     return initialCheckins.filter(item => {
       const searchStr = searchTerm.toLowerCase()
+      const cleanSearchStr = searchStr.replace(/\s+/g, '')
       
       let matchesIdentity = false;
       if (item.identities && Array.isArray(item.identities)) {
         matchesIdentity = item.identities.some((doc: any) => 
-          (doc.document_number && String(doc.document_number).toLowerCase().includes(searchStr)) ||
+          (doc.document_number && String(doc.document_number).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
           (doc.full_name && String(doc.full_name).toLowerCase().includes(searchStr)) ||
           (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(searchStr)) ||
           (doc.address && String(doc.address).toLowerCase().includes(searchStr)) ||
@@ -45,14 +46,18 @@ export default function PoliceDashboardClient({
         )
       } else if (item.id_documents && Array.isArray(item.id_documents)) {
         matchesIdentity = item.id_documents.some((doc: any) => 
-          (doc.documentNumber && String(doc.documentNumber).toLowerCase().includes(searchStr)) ||
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
           (doc.fullName && String(doc.fullName).toLowerCase().includes(searchStr))
         )
       }
 
+      const cleanPhone = (item.guest_phone || '').replace(/\s+/g, '')
+      const cleanVehicle = (item.vehicle_number || '').toLowerCase().replace(/\s+/g, '')
+
       const matchesSearch = 
         item.guest_name.toLowerCase().includes(searchStr) ||
-        item.guest_phone.includes(searchTerm) ||
+        cleanPhone.includes(cleanSearchStr) ||
+        cleanVehicle.includes(cleanSearchStr) ||
         item.properties?.name.toLowerCase().includes(searchStr) ||
         item.properties?.city_area?.toLowerCase().includes(searchStr) ||
         matchesIdentity
@@ -66,14 +71,17 @@ export default function PoliceDashboardClient({
   const filteredEmployees = useMemo(() => {
     return initialEmployees.filter(emp => {
       const searchStr = searchTerm.toLowerCase()
+      const cleanSearchStr = searchStr.replace(/\s+/g, '')
       const name = `${emp.first_name} ${emp.last_name}`.toLowerCase()
       
       const matchesIdentity = 
-        (emp.govt_doc_number && String(emp.govt_doc_number).toLowerCase().includes(searchStr)) ||
+        (emp.govt_doc_number && String(emp.govt_doc_number).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
         (emp.govt_doc_name && String(emp.govt_doc_name).toLowerCase().includes(searchStr))
 
+      const cleanPhone = (emp.mobile_number || '').replace(/\s+/g, '')
+
       return name.includes(searchStr) || 
-             emp.mobile_number.includes(searchTerm) ||
+             cleanPhone.includes(cleanSearchStr) ||
              emp.properties?.name.toLowerCase().includes(searchStr) ||
              emp.properties?.city_area?.toLowerCase().includes(searchStr) ||
              matchesIdentity

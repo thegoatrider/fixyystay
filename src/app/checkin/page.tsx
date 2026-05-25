@@ -60,7 +60,7 @@ function CheckinForm() {
     })
   }, [numPeople])
 
-  const handleGuestVerified = useCallback((index: number, identityId: string) => {
+  const handleGuestVerified = useCallback((index: number, identityId: string | null) => {
     setVerifiedIds(prev => {
       const next = [...prev]
       next[index] = identityId

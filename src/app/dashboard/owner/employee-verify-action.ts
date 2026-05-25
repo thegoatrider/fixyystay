@@ -35,7 +35,6 @@ Return STRICTLY this JSON (no markdown, just raw JSON):
   "reason": string,
   "raw_ocr_text": string
 }
-If a field cannot be read, use empty string "".
 `
 
 const BACK_SYSTEM_PROMPT = `
@@ -45,9 +44,20 @@ Your task is to identify and extract the address.
 
 Return STRICTLY this JSON (no markdown, just raw JSON):
 {
+  "is_government_id": boolean,
+  "confidence": number,
+  "suspicious": boolean,
+  "reason": string,
   "address": string,
   "raw_ocr_text_back": string
 }
+
+Rules for abuse detection (set suspicious: true if any are met):
+- It is a selfie, meme, cartoon, or random picture.
+- It is a photo of a screen displaying a document.
+- It is clearly a handwritten note or forged text.
+
+Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
 If a field cannot be read, use empty string "".
 `
 
@@ -111,14 +121,16 @@ export async function verifyEmployeeFrontId(formData: FormData) {
       if (result.document_type === 'AADHAAR' && (!/^\d{12}$/.test(num))) validFormat = false
       if (result.document_type === 'PAN'    && (!/^[A-Z]{5}\d{4}[A-Z]$/i.test(num))) validFormat = false
 
-      if (!validFormat && result.confidence > 0.40) {
-        status = 'MANUAL_REVIEW'; reason = 'Format mismatch — please verify manually.'
-      } else if (result.confidence >= 0.50) {
-        status = 'VERIFIED'
-      } else if (result.confidence >= 0.30) {
-        status = 'MANUAL_REVIEW'; reason = 'Low confidence — may need manual review.'
+      if (!validFormat) {
+        status = 'FAILED'
+        reason = 'Document number does not match expected format or image is not clear enough. Please re-upload.'
       } else {
-        status = 'FAILED'; reason = 'Confidence too low. Upload a clearer image.'
+        if (result.confidence >= 0.50) {
+          status = 'VERIFIED'
+        } else {
+          status = 'FAILED'
+          reason = 'Confidence too low. Please upload a clearer image.'
+        }
       }
     }
 
@@ -169,6 +181,9 @@ export async function uploadEmployeeBackId(formData: FormData) {
 
     let address = ''
     let rawOcrTextBack = aiText
+    let confidence = 0
+    let suspicious = false
+    let isGovtId = true
     try {
       const firstBrace = aiText.indexOf('{')
       const lastBrace = aiText.lastIndexOf('}')
@@ -177,9 +192,19 @@ export async function uploadEmployeeBackId(formData: FormData) {
         const result = JSON.parse(jsonStr)
         address = result.address || ''
         rawOcrTextBack = result.raw_ocr_text_back || aiText
+        confidence = result.confidence || 0
+        suspicious = result.suspicious || false
+        isGovtId = result.is_government_id !== false
+      } else {
+        return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
       }
     } catch (e) {
       console.warn('[EMP-VERIFY] Failed to parse AI JSON response for back image.')
+      return { success: false, error: 'Failed to process back image. Please re-upload.' }
+    }
+
+    if (suspicious || !isGovtId || confidence < 0.50) {
+      return { success: false, error: 'Back image is not clear enough or suspicious. Please re-upload a clear photo.' }
     }
 
     return { success: true, backUrl, address, raw_ocr_text_back: rawOcrTextBack }

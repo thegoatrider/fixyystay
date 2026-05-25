@@ -56,8 +56,8 @@ const compressImage = (file: File): Promise<File> => {
 };
 
 type GuestIdUploadProps = {
-  guestIndex: number         // 0-based index
-  onVerified: (identityId: string) => void  // called once front is verified
+  guestIndex: number
+  onVerified: (identityId: string | null) => void
 }
 
 function SingleSideUpload({
@@ -137,7 +137,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const [backReason, setBackReason] = useState('')
   const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
 
-  const frontDone = frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW'
+  const frontDone = frontStatus === 'VERIFIED'
   const backDone = backStatus === 'DONE'
   const bothDone = frontDone && backDone
 
@@ -154,14 +154,16 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
-        const isVerified = result.status === 'VERIFIED'
-        setFrontStatus(isVerified ? 'VERIFIED' : 'MANUAL_REVIEW')
-        if (!isVerified) {
-          setFrontReason('Manual review needed — image was accepted but may be re-checked.')
-        }
+      if (result.status === 'VERIFIED') {
+        setFrontStatus('VERIFIED')
         setIdentityId(result.guest_identity_id)
-        onVerified(result.guest_identity_id)
+
+        // Only call onVerified if back is already DONE (edge case if back was processed before somehow, though unlikely)
+        if (backStatus === 'DONE') {
+          onVerified(result.guest_identity_id)
+        } else {
+          onVerified(null)
+        }
 
         // Automatically upload the pending back file if it exists
         if (pendingBackFile) {
@@ -173,19 +175,23 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
           if (backRes.success) {
             setBackStatus('DONE')
             setPendingBackFile(null)
+            onVerified(result.guest_identity_id)
           } else {
             setBackStatus('FAILED')
             setBackReason(backRes.error || 'Back image upload failed.')
             setPendingBackFile(null)
+            onVerified(null)
           }
         }
       } else {
         setFrontStatus('FAILED')
         setFrontReason(result.reason || 'Could not verify. Please upload a clearer image.')
+        onVerified(null)
       }
     } else {
       setFrontStatus('FAILED')
       setFrontReason(result.error || 'Verification failed. Please try again.')
+      onVerified(null)
     }
   }
 
@@ -212,6 +218,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (result.success) {
       setBackStatus('DONE')
       setPendingBackFile(null)
+      if (identityId && frontStatus === 'VERIFIED') onVerified(identityId)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')
@@ -225,11 +232,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     setFrontStatus('IDLE')
     setFrontReason('')
     setIdentityId(null)
-    // If back was uploaded or pending, maybe keep it or reset it? Better to reset it so it links to the new front.
     setBackPreview(null)
     setBackStatus('IDLE')
     setBackReason('')
     setPendingBackFile(null)
+    onVerified(null)
   }
 
   const resetBack = () => {
@@ -237,6 +244,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     setBackStatus('IDLE')
     setBackReason('')
     setPendingBackFile(null)
+    onVerified(null)
   }
 
   return (

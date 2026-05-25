@@ -181,11 +181,12 @@ export default React.memo(function GuestList({
   const allSearchResults = useMemo(() => {
     if (!searchTerm) return []
     const q = searchTerm.toLowerCase()
+    const cleanQ = q.replace(/\s+/g, '')
     return checkins.filter(c => {
       let matchesIdentity = false;
       if (c.identities && Array.isArray(c.identities)) {
         matchesIdentity = c.identities.some((doc: any) => 
-          (doc.document_number && String(doc.document_number).toLowerCase().includes(q)) ||
+          (doc.document_number && String(doc.document_number).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
           (doc.full_name && String(doc.full_name).toLowerCase().includes(q)) ||
           (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(q)) ||
           (doc.address && String(doc.address).toLowerCase().includes(q)) ||
@@ -193,13 +194,17 @@ export default React.memo(function GuestList({
         )
       } else if (c.id_documents && Array.isArray(c.id_documents)) {
         matchesIdentity = c.id_documents.some((doc: any) => 
-          (doc.documentNumber && String(doc.documentNumber).toLowerCase().includes(q)) ||
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
           (doc.fullName && String(doc.fullName).toLowerCase().includes(q))
         )
       }
 
+      const cleanPhone = (c.guest_phone || '').replace(/\s+/g, '')
+      const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/\s+/g, '')
+
       return c.guest_name?.toLowerCase().includes(q) ||
-             c.guest_phone?.includes(q) ||
+             cleanPhone.includes(cleanQ) ||
+             cleanVehicle.includes(cleanQ) ||
              c.properties?.name?.toLowerCase().includes(q) ||
              (c.uid && c.uid.toLowerCase().includes(q)) ||
              matchesIdentity;

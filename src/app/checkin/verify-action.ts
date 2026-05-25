@@ -36,8 +36,6 @@ Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
   "reason": string,
   "raw_ocr_text": string
 }
-
-If a field cannot be read, leave it as an empty string "".
 `
 
 const BACK_SYSTEM_PROMPT = `
@@ -47,10 +45,20 @@ Your task is to identify and extract the address.
 
 Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
 {
+  "is_government_id": boolean,
+  "confidence": number,
+  "suspicious": boolean,
+  "reason": string,
   "address": string,
   "raw_ocr_text_back": string
 }
 
+Rules for abuse detection (set suspicious: true if any are met):
+- It is a selfie, meme, cartoon, or random picture.
+- It is a photo of a screen displaying a document.
+- It is clearly a handwritten note or forged text.
+
+Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
 If a field cannot be read, leave it as an empty string "".
 `
 
@@ -147,11 +155,11 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let finalReason = result.reason
 
     if (parseFailed) {
-      status = 'MANUAL_REVIEW'
-      finalReason = 'AI extraction returned unformatted data. Please review manually.'
+      status = 'FAILED'
+      finalReason = 'AI extraction returned unformatted data. Please re-upload a clearer image.'
     } else if (result.suspicious || !result.is_government_id) {
       status = 'FAILED'
-      finalReason = result.reason || 'Document flagged as non-ID or suspicious.'
+      finalReason = result.reason || 'Document flagged as non-ID or suspicious. Please upload a real ID.'
     } else {
       const num = result.document_number?.trim().replace(/\s/g, '')
       let validFormat = true
@@ -162,22 +170,16 @@ export async function uploadAndVerifyFront(formData: FormData) {
         if (!num || !/[A-Z]{5}\d{4}[A-Z]/i.test(num)) validFormat = false
       }
 
-      if (!validFormat && result.confidence > 0.40) {
-        status = 'MANUAL_REVIEW'
-        finalReason = 'Format validation failed. Document number does not match expected pattern.'
-      } else if (validFormat) {
+      if (!validFormat) {
+        status = 'FAILED'
+        finalReason = 'Document number does not match expected format or image is not clear enough. Please re-upload.'
+      } else {
         if (result.confidence >= 0.50) {
           status = 'VERIFIED'
-        } else if (result.confidence >= 0.30) {
-          status = 'MANUAL_REVIEW'
-          finalReason = 'Image quality too poor. Requires manual review.'
         } else {
           status = 'FAILED'
-          finalReason = 'Confidence too low. Please upload a clearer image.'
+          finalReason = 'Image quality too poor. Please upload a clearer image.'
         }
-      } else {
-        status = 'FAILED'
-        finalReason = 'Extracted data invalid.'
       }
     }
 
@@ -265,6 +267,9 @@ export async function uploadBackImage(formData: FormData) {
 
     let address = ''
     let rawOcrTextBack = aiResponseText
+    let confidence = 0
+    let suspicious = false
+    let isGovtId = true
     try {
       const firstBrace = aiResponseText.indexOf('{')
       const lastBrace = aiResponseText.lastIndexOf('}')
@@ -273,9 +278,19 @@ export async function uploadBackImage(formData: FormData) {
         const result = JSON.parse(jsonStr)
         address = result.address || ''
         rawOcrTextBack = result.raw_ocr_text_back || aiResponseText
+        confidence = result.confidence || 0
+        suspicious = result.suspicious || false
+        isGovtId = result.is_government_id !== false
+      } else {
+        return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
       }
     } catch (e) {
       console.warn('[VERIFY-BACK] Failed to parse AI JSON response.')
+      return { success: false, error: 'Failed to process back image. Please re-upload.' }
+    }
+
+    if (suspicious || !isGovtId || confidence < 0.50) {
+      return { success: false, error: 'Back image is not clear enough or suspicious. Please re-upload a clear photo.' }
     }
 
     // Update the existing guest_identity record with back_image_url and address
