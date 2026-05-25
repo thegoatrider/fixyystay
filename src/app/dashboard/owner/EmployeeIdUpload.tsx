@@ -36,6 +36,54 @@ type FrontStatus = 'IDLE' | 'PROCESSING' | 'VERIFIED' | 'MANUAL_REVIEW' | 'FAILE
 type BackStatus  = 'IDLE' | 'PENDING' | 'UPLOADING' | 'DONE' | 'FAILED'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1600;
+        const MAX_HEIGHT = 1600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (!blob) return resolve(file);
+          const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.jpg", {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 function normalise(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -89,10 +137,11 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     })
   }
 
-  const handleFrontFile = async (file: File) => {
-    setFrontPreview(URL.createObjectURL(file))
+  const handleFrontFile = async (originalFile: File) => {
     setFrontStatus('PROCESSING')
     setFrontReason('')
+    const file = await compressImage(originalFile)
+    setFrontPreview(URL.createObjectURL(file))
 
     const fd = new FormData()
     fd.append('image', file)
@@ -152,7 +201,9 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     }
   }
 
-  const handleBackFile = async (file: File) => {
+  const handleBackFile = async (originalFile: File) => {
+    setBackStatus('UPLOADING')
+    const file = await compressImage(originalFile)
     setBackPreview(URL.createObjectURL(file))
     setBackReason('')
 
@@ -258,14 +309,12 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
                     <button type="button" onClick={resetAll} className="mt-1 bg-white text-red-600 text-[9px] font-black px-2 py-0.5 rounded-full">Retry</button>
                   </div>
                 )}
-                {frontStatus !== 'PROCESSING' && (
-                  <button type="button" onClick={resetAll}
-                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
-                    title="Remove Image"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button type="button" onClick={(e) => { e.stopPropagation(); resetAll(); }}
+                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm z-10"
+                  title="Remove Image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </>
             ) : (
               <div className="absolute inset-0 flex flex-col gap-1 items-center justify-center p-2">
@@ -325,14 +374,12 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
                       className="mt-1 bg-white text-red-600 text-[9px] font-black px-2 py-0.5 rounded-full">Retry</button>
                   </div>
                 )}
-                {backStatus !== 'UPLOADING' && (
-                  <button type="button" onClick={() => { setBackPreview(null); setBackStatus('IDLE'); setBackUrl(null); setPendingBackFile(null); }}
-                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
-                    title="Remove Image"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setBackPreview(null); setBackStatus('IDLE'); setBackUrl(null); setPendingBackFile(null); }}
+                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm z-10"
+                  title="Remove Image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </>
             ) : (
               <div className="absolute inset-0 flex flex-col gap-1 items-center justify-center p-2">

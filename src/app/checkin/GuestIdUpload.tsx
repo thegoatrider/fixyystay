@@ -7,6 +7,54 @@ import { cn } from '@/lib/utils'
 
 type UploadState = 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'VERIFIED' | 'FAILED' | 'MANUAL_REVIEW'
 
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1600;
+        const MAX_HEIGHT = 1600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (!blob) return resolve(file);
+          const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.jpg", {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 type GuestIdUploadProps = {
   guestIndex: number         // 0-based index
   onVerified: (identityId: string) => void  // called once front is verified
@@ -94,9 +142,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const bothDone = frontDone && backDone
 
   // Process front image — OCR verification
-  const handleFrontFile = async (file: File) => {
-    setFrontPreview(URL.createObjectURL(file))
+  const handleFrontFile = async (originalFile: File) => {
     setFrontStatus('PROCESSING')
+    setFrontReason('')
+    const file = await compressImage(originalFile)
+    setFrontPreview(URL.createObjectURL(file))
     setFrontReason('')
 
     const fd = new FormData()
@@ -140,7 +190,9 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   }
 
   // Process back image — store as pending if front isn't verified yet, otherwise upload
-  const handleBackFile = async (file: File) => {
+  const handleBackFile = async (originalFile: File) => {
+    setBackStatus('UPLOADING') // Set a temporary status so UI shows action
+    const file = await compressImage(originalFile)
     setBackPreview(URL.createObjectURL(file))
     setBackReason('')
 
@@ -261,17 +313,15 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                     </button>
                   </div>
                 )}
-                {/* Remove / Retake button */}
-                {frontStatus !== 'PROCESSING' && (
-                  <button
-                    type="button"
-                    onClick={resetFront}
-                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
-                    title="Remove Image"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                {/* Remove / Retake button always visible */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); resetFront(); }}
+                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm z-10"
+                  title="Remove Image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </>
             ) : (
               <div className="absolute inset-0 flex flex-col gap-1 items-center justify-center p-2">
@@ -348,17 +398,15 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                     </button>
                   </div>
                 )}
-                {/* Remove / Retake button */}
-                {backStatus !== 'UPLOADING' && (
-                  <button
-                    type="button"
-                    onClick={resetBack}
-                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
-                    title="Remove Image"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                {/* Remove / Retake button always visible */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); resetBack(); }}
+                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm z-10"
+                  title="Remove Image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </>
             ) : (
               <div className="absolute inset-0 flex flex-col gap-1 items-center justify-center p-2">
