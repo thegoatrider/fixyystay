@@ -37,33 +37,33 @@ export default function PoliceDashboardClient({
   const filteredCheckins = useMemo(() => {
     return initialCheckins.filter(item => {
       const searchStr = searchTerm.toLowerCase()
-      const cleanSearchStr = searchStr.replace(/\s+/g, '')
+      const cleanSearchStr = searchStr.replace(/[\s+]+/g, '')
       
       let matchesIdentity = false;
       if (item.identities && Array.isArray(item.identities)) {
         matchesIdentity = item.identities.some((doc: any) => 
-          (doc.document_number && String(doc.document_number).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-          (doc.full_name && String(doc.full_name).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-          (doc.address && String(doc.address).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr))
+          (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.address && String(doc.address).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
         )
       } else if (item.id_documents && Array.isArray(item.id_documents)) {
         matchesIdentity = item.id_documents.some((doc: any) => 
-          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-          (doc.fullName && String(doc.fullName).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr))
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
         )
       }
 
-      const cleanPhone = (item.guest_phone || '').replace(/\s+/g, '')
-      const cleanVehicle = (item.vehicle_number || '').toLowerCase().replace(/\s+/g, '')
+      const cleanPhone = (item.guest_phone || '').replace(/[\s+]+/g, '')
+      const cleanVehicle = (item.vehicle_number || '').toLowerCase().replace(/[\s+]+/g, '')
 
       const matchesSearch = 
-        (item.guest_name && item.guest_name.toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
+        (item.guest_name && item.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         cleanPhone.includes(cleanSearchStr) ||
         cleanVehicle.includes(cleanSearchStr) ||
-        (item.properties?.name && item.properties.name.toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-        (item.properties?.city_area && item.properties.city_area.toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
+        (item.properties?.name && item.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+        (item.properties?.city_area && item.properties.city_area.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         matchesIdentity
       
       const matchesDate = !dateFilter || item.checkin_date === dateFilter
@@ -75,19 +75,19 @@ export default function PoliceDashboardClient({
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const searchStr = searchTerm.toLowerCase()
-      const cleanSearchStr = searchStr.replace(/\s+/g, '')
+      const cleanSearchStr = searchStr.replace(/[\s+]+/g, '')
       const name = `${emp.first_name} ${emp.last_name}`.toLowerCase()
       
       const matchesIdentity = 
-        (emp.govt_doc_number && String(emp.govt_doc_number).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-        (emp.govt_doc_name && String(emp.govt_doc_name).toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr))
+        (emp.govt_doc_number && String(emp.govt_doc_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+        (emp.govt_doc_name && String(emp.govt_doc_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
 
-      const cleanPhone = (emp.mobile_number || '').replace(/\s+/g, '')
+      const cleanPhone = (emp.mobile_number || '').replace(/[\s+]+/g, '')
 
-      return (name && name.replace(/\s+/g, '').includes(cleanSearchStr)) || 
+      return (name && name.replace(/[\s+]+/g, '').includes(cleanSearchStr)) || 
              cleanPhone.includes(cleanSearchStr) ||
-             (emp.properties?.name && emp.properties.name.toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
-             (emp.properties?.city_area && emp.properties.city_area.toLowerCase().replace(/\s+/g, '').includes(cleanSearchStr)) ||
+             (emp.properties?.name && emp.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+             (emp.properties?.city_area && emp.properties.city_area.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
              matchesIdentity
     })
   }, [searchTerm, employees])

@@ -181,31 +181,31 @@ export default React.memo(function GuestList({
   const allSearchResults = useMemo(() => {
     if (!searchTerm) return []
     const q = searchTerm.toLowerCase()
-    const cleanQ = q.replace(/\s+/g, '')
+    const cleanQ = q.replace(/[\s+]+/g, '')
     return checkins.filter(c => {
       let matchesIdentity = false;
       if (c.identities && Array.isArray(c.identities)) {
         matchesIdentity = c.identities.some((doc: any) => 
-          (doc.document_number && String(doc.document_number).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.full_name && String(doc.full_name).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.address && String(doc.address).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/\s+/g, '').includes(cleanQ))
+          (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+          (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+          (doc.address && String(doc.address).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
         )
       } else if (c.id_documents && Array.isArray(c.id_documents)) {
         matchesIdentity = c.id_documents.some((doc: any) => 
-          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
-          (doc.fullName && String(doc.fullName).toLowerCase().replace(/\s+/g, '').includes(cleanQ))
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+          (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
         )
       }
 
-      const cleanPhone = (c.guest_phone || '').replace(/\s+/g, '')
-      const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/\s+/g, '')
+      const cleanPhone = (c.guest_phone || '').replace(/[\s+]+/g, '')
+      const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/[\s+]+/g, '')
 
-      return (c.guest_name && c.guest_name.toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
+      return (c.guest_name && c.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
              cleanPhone.includes(cleanQ) ||
              cleanVehicle.includes(cleanQ) ||
-             (c.properties?.name && c.properties.name.toLowerCase().replace(/\s+/g, '').includes(cleanQ)) ||
+             (c.properties?.name && c.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
              (c.uid && c.uid.toLowerCase().includes(q)) ||
              matchesIdentity;
     })
