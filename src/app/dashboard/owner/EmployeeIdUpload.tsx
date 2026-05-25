@@ -33,7 +33,7 @@ type Props = {
 }
 
 type FrontStatus = 'IDLE' | 'PROCESSING' | 'VERIFIED' | 'MANUAL_REVIEW' | 'FAILED'
-type BackStatus  = 'IDLE' | 'UPLOADING' | 'DONE' | 'FAILED'
+type BackStatus  = 'IDLE' | 'PENDING' | 'UPLOADING' | 'DONE' | 'FAILED'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function normalise(s: string) {
@@ -69,6 +69,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
   const [backPreview, setBackPreview] = useState<string | null>(null)
   const [backUrl, setBackUrl]         = useState<string | null>(null)
   const [backReason, setBackReason]   = useState('')
+  const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
 
   const [nameMatch, setNameMatch] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
   const [dobMatchSt, setDobMatchSt] = useState<'MATCHED' | 'MISMATCH' | 'UNVERIFIED'>('UNVERIFIED')
@@ -129,13 +130,38 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     setNameMatch(nm)
     setDobMatchSt(dm)
 
-    // If back already done, notify complete
-    if (backDone && backUrl) notifyComplete(res.frontUrl, backUrl, ex, nm, dm)
+    // Automatically upload the pending back file if it exists
+    if (pendingBackFile) {
+      setBackStatus('UPLOADING')
+      const backFd = new FormData()
+      backFd.append('image', pendingBackFile)
+      const backRes = await uploadEmployeeBackId(backFd)
+      if (backRes.success && backRes.backUrl) {
+        setBackStatus('DONE')
+        setBackUrl(backRes.backUrl)
+        setPendingBackFile(null)
+        notifyComplete(res.frontUrl, backRes.backUrl, ex, nm, dm)
+      } else {
+        setBackStatus('FAILED')
+        setBackReason(backRes.error || 'Back image upload failed.')
+        setPendingBackFile(null)
+      }
+    } else {
+      // If back already done (not pending), notify complete
+      if (backDone && backUrl) notifyComplete(res.frontUrl, backUrl, ex, nm, dm)
+    }
   }
 
   const handleBackFile = async (file: File) => {
-    if (!frontDone) return
     setBackPreview(URL.createObjectURL(file))
+    setBackReason('')
+
+    if (!frontDone || !frontUrl) {
+      setPendingBackFile(file)
+      setBackStatus('PENDING')
+      return
+    }
+
     setBackStatus('UPLOADING')
 
     const fd = new FormData()
@@ -146,11 +172,13 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
       setBackStatus('FAILED')
       setBackReason(res.error || 'Upload failed.')
       setBackPreview(null)
+      setPendingBackFile(null)
       return
     }
 
     setBackStatus('DONE')
     setBackUrl(res.backUrl)
+    setPendingBackFile(null)
 
     // Notify parent
     if (frontDone && frontUrl && extracted) {
@@ -160,7 +188,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
 
   const resetAll = () => {
     setFrontStatus('IDLE'); setFrontPreview(null); setFrontReason(''); setFrontUrl(null); setExtracted(null)
-    setBackStatus('IDLE');  setBackPreview(null);  setBackReason('');  setBackUrl(null)
+    setBackStatus('IDLE');  setBackPreview(null);  setBackReason('');  setBackUrl(null); setPendingBackFile(null)
     setNameMatch('UNVERIFIED'); setDobMatchSt('UNVERIFIED')
     onReset()
   }
@@ -267,20 +295,19 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
             'relative aspect-[3/2] rounded-xl overflow-hidden border-2 transition-all',
             backStatus === 'DONE'     ? 'border-green-400' :
             backStatus === 'FAILED'   ? 'border-red-400'   :
-            backStatus === 'UPLOADING'? 'border-blue-300'  :
-            !frontDone                ? 'border-dashed border-gray-100 bg-gray-50/50' :
-                                        'border-dashed border-gray-200 bg-gray-50'
+            (backStatus === 'UPLOADING' || backStatus === 'PENDING') ? 'border-blue-300' :
+            'border-dashed border-gray-200 bg-gray-50'
           )}>
-            {!frontDone ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                <FlipHorizontal className="w-5 h-5 text-gray-200" />
-                <span className="text-[8px] text-gray-300 font-bold text-center">Verify front first</span>
-              </div>
-            ) : backPreview ? (
+            {backPreview ? (
               <>
                 <img src={backPreview} alt="Back ID" className={cn('w-full h-full object-cover', backStatus === 'UPLOADING' && 'opacity-40 blur-sm')} />
                 {backStatus === 'UPLOADING' && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Loader2 className="w-5 h-5 text-white animate-spin" /></div>
+                )}
+                {backStatus === 'PENDING' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white gap-1">
+                    <span className="text-[9px] font-bold uppercase text-center px-2">Waiting for front...</span>
+                  </div>
                 )}
                 {backStatus === 'DONE' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 gap-1">
@@ -313,11 +340,11 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
             )}
             <input type="file" id="emp_cam_back" accept="image/*" capture="environment" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
-              disabled={!frontDone || backStatus === 'UPLOADING'}
+              disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
             <input type="file" id="emp_gal_back" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
-              disabled={!frontDone || backStatus === 'UPLOADING'}
+              disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
           </div>
         </div>

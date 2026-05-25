@@ -84,9 +84,10 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const [identityId, setIdentityId] = useState<string | null>(null)
 
   // Back states
-  const [backStatus, setBackStatus] = useState<'IDLE' | 'UPLOADING' | 'DONE' | 'FAILED'>('IDLE')
+  const [backStatus, setBackStatus] = useState<'IDLE' | 'PENDING' | 'UPLOADING' | 'DONE' | 'FAILED'>('IDLE')
   const [backPreview, setBackPreview] = useState<string | null>(null)
   const [backReason, setBackReason] = useState('')
+  const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
 
   const frontDone = frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW'
   const backDone = backStatus === 'DONE'
@@ -103,16 +104,31 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED') {
-        setFrontStatus('VERIFIED')
+      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
+        const isVerified = result.status === 'VERIFIED'
+        setFrontStatus(isVerified ? 'VERIFIED' : 'MANUAL_REVIEW')
+        if (!isVerified) {
+          setFrontReason('Manual review needed — image was accepted but may be re-checked.')
+        }
         setIdentityId(result.guest_identity_id)
         onVerified(result.guest_identity_id)
-      } else if (result.status === 'MANUAL_REVIEW') {
-        // Still accept MANUAL_REVIEW as "verified enough" to proceed
-        setFrontStatus('MANUAL_REVIEW')
-        setFrontReason('Manual review needed — image was accepted but may be re-checked.')
-        setIdentityId(result.guest_identity_id)
-        onVerified(result.guest_identity_id)
+
+        // Automatically upload the pending back file if it exists
+        if (pendingBackFile) {
+          setBackStatus('UPLOADING')
+          const backFd = new FormData()
+          backFd.append('image', pendingBackFile)
+          backFd.append('identityId', result.guest_identity_id)
+          const backRes = await uploadBackImage(backFd)
+          if (backRes.success) {
+            setBackStatus('DONE')
+            setPendingBackFile(null)
+          } else {
+            setBackStatus('FAILED')
+            setBackReason(backRes.error || 'Back image upload failed.')
+            setPendingBackFile(null)
+          }
+        }
       } else {
         setFrontStatus('FAILED')
         setFrontReason(result.reason || 'Could not verify. Please upload a clearer image.')
@@ -125,13 +141,19 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     }
   }
 
-  // Process back image — just upload and store
+  // Process back image — store as pending if front isn't verified yet, otherwise upload
   const handleBackFile = async (file: File) => {
-    if (!identityId) return // Front must be done first
     setBackPreview(URL.createObjectURL(file))
-    setBackStatus('UPLOADING')
     setBackReason('')
 
+    if (!identityId) {
+      // Front is not verified yet. Store the file to be uploaded later.
+      setPendingBackFile(file)
+      setBackStatus('PENDING')
+      return
+    }
+
+    setBackStatus('UPLOADING')
     const fd = new FormData()
     fd.append('image', file)
     fd.append('identityId', identityId)
@@ -139,10 +161,12 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
 
     if (result.success) {
       setBackStatus('DONE')
+      setPendingBackFile(null)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')
       setBackPreview(null)
+      setPendingBackFile(null)
     }
   }
 
@@ -151,16 +175,18 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     setFrontStatus('IDLE')
     setFrontReason('')
     setIdentityId(null)
-    // also reset back since front has changed
+    // If back was uploaded or pending, maybe keep it or reset it? Better to reset it so it links to the new front.
     setBackPreview(null)
     setBackStatus('IDLE')
     setBackReason('')
+    setPendingBackFile(null)
   }
 
   const resetBack = () => {
     setBackPreview(null)
     setBackStatus('IDLE')
     setBackReason('')
+    setPendingBackFile(null)
   }
 
   return (
@@ -287,17 +313,10 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
             "relative aspect-[3/2] rounded-xl overflow-hidden border-2 transition-all",
             backStatus === 'DONE' ? "border-green-400" :
             backStatus === 'FAILED' ? "border-red-400" :
-            backStatus === 'UPLOADING' ? "border-blue-300" :
-            !frontDone ? "border-dashed border-gray-100 bg-gray-50/50" :
+            (backStatus === 'UPLOADING' || backStatus === 'PENDING') ? "border-blue-300" :
             "border-dashed border-gray-200 bg-gray-50"
           )}>
-            {!frontDone ? (
-              // Locked until front is verified
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1">
-                <FlipHorizontal className="w-5 h-5 text-gray-200" />
-                <span className="text-[8px] text-gray-300 font-bold text-center">Verify front first</span>
-              </div>
-            ) : backPreview ? (
+            {backPreview ? (
               <>
                 <img
                   src={backPreview}
@@ -308,6 +327,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white gap-1">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span className="text-[9px] font-bold uppercase">Saving...</span>
+                  </div>
+                )}
+                {backStatus === 'PENDING' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white gap-1">
+                    <span className="text-[9px] font-bold uppercase text-center px-2">Ready. Waiting for front to verify...</span>
                   </div>
                 )}
                 {backStatus === 'DONE' && (
@@ -355,11 +379,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
             )}
             <input type="file" id={`cam_back_${prefix}`} accept="image/*" capture="environment" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
-              disabled={!frontDone || backStatus === 'UPLOADING'}
+              disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
             <input type="file" id={`gal_back_${prefix}`} accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
-              disabled={!frontDone || backStatus === 'UPLOADING'}
+              disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
           </div>
         </div>
