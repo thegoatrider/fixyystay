@@ -217,4 +217,6 @@ export async function uploadBackImage(formData: FormData) {
 }
 
 // Keep old name as alias for backward compatibility
-export { uploadAndVerifyFront as uploadAndVerifyDocument }
+export async function uploadAndVerifyDocument(formData: FormData) {
+  return uploadAndVerifyFront(formData)
+}
