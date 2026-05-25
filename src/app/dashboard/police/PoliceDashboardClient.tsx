@@ -14,8 +14,11 @@ import {
   ExternalLink,
   ShieldCheck,
   FilterX,
-  Briefcase
+  Briefcase,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
+import { updateEmployeePoliceStatus } from './police-actions'
 
 export default function PoliceDashboardClient({ 
   initialCheckins,
@@ -24,6 +27,7 @@ export default function PoliceDashboardClient({
   initialCheckins: any[]
   initialEmployees: any[]
 }) {
+  const [employees, setEmployees] = useState(initialEmployees)
   const [activeTab, setActiveTab] = useState<'guests' | 'staff'>('guests')
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('')
@@ -69,7 +73,7 @@ export default function PoliceDashboardClient({
   }, [searchTerm, dateFilter, initialCheckins])
 
   const filteredEmployees = useMemo(() => {
-    return initialEmployees.filter(emp => {
+    return employees.filter(emp => {
       const searchStr = searchTerm.toLowerCase()
       const cleanSearchStr = searchStr.replace(/\s+/g, '')
       const name = `${emp.first_name} ${emp.last_name}`.toLowerCase()
@@ -86,7 +90,7 @@ export default function PoliceDashboardClient({
              emp.properties?.city_area?.toLowerCase().includes(searchStr) ||
              matchesIdentity
     })
-  }, [searchTerm, initialEmployees])
+  }, [searchTerm, employees])
 
   const handleExport = () => {
     window.print()
@@ -320,6 +324,21 @@ export default function PoliceDashboardClient({
                         {(emp.name_match_status === 'MISMATCH' || emp.dob_match_status === 'MISMATCH') && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest bg-red-100 text-red-800">
                             Mismatch ⚠
+                          </span>
+                        )}
+                        {emp.police_verification_status === 'APPROVED' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-100 text-green-800 mt-1">
+                            <CheckCircle className="w-3.5 h-3.5" /> Police Approved
+                          </span>
+                        )}
+                        {emp.police_verification_status === 'REJECTED' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-800 mt-1">
+                            <XCircle className="w-3.5 h-3.5" /> Police Rejected
+                          </span>
+                        )}
+                        {(!emp.police_verification_status || emp.police_verification_status === 'PENDING') && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800 mt-1">
+                            Pending Police Approval
                           </span>
                         )}
                         {emp.govt_doc_front_url && (
@@ -567,7 +586,39 @@ export default function PoliceDashboardClient({
                </div>
              </div>
              
-             <div className="p-8 border-t bg-white flex justify-end">
+             <div className="p-8 border-t bg-white flex justify-end gap-3">
+                {(!selectedEmployee.police_verification_status || selectedEmployee.police_verification_status === 'PENDING') && (
+                  <>
+                    <Button 
+                      onClick={async () => {
+                        const res = await updateEmployeePoliceStatus(selectedEmployee.id, 'REJECTED')
+                        if (res.success) {
+                          setEmployees(employees.map(e => e.id === selectedEmployee.id ? { ...e, police_verification_status: 'REJECTED' } : e))
+                          setSelectedEmployee(null)
+                        } else {
+                          alert(res.error)
+                        }
+                      }}
+                      className="bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 px-8 h-12 rounded-xl font-bold"
+                    >
+                      Reject Employee
+                    </Button>
+                    <Button 
+                      onClick={async () => {
+                        const res = await updateEmployeePoliceStatus(selectedEmployee.id, 'APPROVED')
+                        if (res.success) {
+                          setEmployees(employees.map(e => e.id === selectedEmployee.id ? { ...e, police_verification_status: 'APPROVED' } : e))
+                          setSelectedEmployee(null)
+                        } else {
+                          alert(res.error)
+                        }
+                      }}
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 h-12 rounded-xl font-bold"
+                    >
+                      Approve Employee
+                    </Button>
+                  </>
+                )}
                 <Button 
                   onClick={() => setSelectedEmployee(null)}
                   className="bg-gray-900 hover:bg-black text-white px-8 h-12 rounded-xl font-bold"

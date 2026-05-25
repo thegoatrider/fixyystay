@@ -8,7 +8,7 @@ import { CollapsibleTile } from '@/components/CollapsibleTile'
 import {
   UserPlus, Users, Clock, CheckCircle, Trash2, Smartphone,
   MapPin, Activity, Clock4, User, Phone, Shield, HeartHandshake,
-  Calendar, ExternalLink
+  Calendar, ExternalLink, XCircle
 } from 'lucide-react'
 import { addEmployee, fireEmployee, getEmployeesByOwner } from './employees-actions'
 import AttendanceKiosk from './AttendanceKiosk'
@@ -392,6 +392,21 @@ export default function EmployeeSection({
                         {emp.name_match_status === 'MISMATCH' && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-red-100 text-red-700">
                             Name Mismatch
+                          </span>
+                        )}
+                        {emp.police_verification_status === 'APPROVED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-green-100 text-green-700 flex items-center gap-1">
+                            <Shield className="w-3 h-3" /> Police Approved
+                          </span>
+                        )}
+                        {emp.police_verification_status === 'REJECTED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-red-100 text-red-700 flex items-center gap-1">
+                            <XCircle className="w-3 h-3" /> Police Rejected
+                          </span>
+                        )}
+                        {(!emp.police_verification_status || emp.police_verification_status === 'PENDING') && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-amber-100 text-amber-700 flex items-center gap-1">
+                            Pending Police Approval
                           </span>
                         )}
                       </h4>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Camera, Image as ImageIcon, CheckCircle, AlertTriangle,
   Loader2, FlipHorizontal, ShieldCheck, User, AlertCircle, X
@@ -126,7 +126,6 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
   const frontDone = frontStatus === 'VERIFIED'
   const backDone  = backStatus === 'DONE'
 
-  // Notify parent whenever both sides are done
   const notifyComplete = (fu: string, bu: string | null, ex: EmployeeIdData['extracted'], nm: typeof nameMatch, dm: typeof dobMatchSt) => {
     onComplete({
       frontUrl: fu,
@@ -137,6 +136,26 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
       dobMatchStatus: dm
     })
   }
+
+  // Dynamic mismatch syncing
+  useEffect(() => {
+    if (extracted) {
+      const nm = enteredName.trim()
+        ? (namesMatch(extracted.full_name, enteredName) ? 'MATCHED' : 'MISMATCH')
+        : 'UNVERIFIED'
+      const dm = enteredDob
+        ? (dobMatch(extracted.date_of_birth, enteredDob) ? 'MATCHED' : 'MISMATCH')
+        : 'UNVERIFIED'
+      
+      let changed = false;
+      if (nm !== nameMatch) { setNameMatch(nm); changed = true; }
+      if (dm !== dobMatchSt) { setDobMatchSt(dm); changed = true; }
+      
+      if (changed && frontDone) {
+        notifyComplete(frontUrl!, backUrl, extracted, nm, dm)
+      }
+    }
+  }, [enteredName, enteredDob, extracted, frontDone, frontUrl, backUrl])
 
   const handleFrontFile = async (originalFile: File) => {
     setFrontStatus('PROCESSING')
@@ -169,16 +188,9 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     setFrontUrl(res.frontUrl)
     setExtracted(ex)
 
-    // Cross-check
-    const nm = enteredName.trim()
-      ? (namesMatch(ex.full_name, enteredName) ? 'MATCHED' : 'MISMATCH')
-      : 'UNVERIFIED'
-    const dm = enteredDob
-      ? (dobMatch(ex.date_of_birth, enteredDob) ? 'MATCHED' : 'MISMATCH')
-      : 'UNVERIFIED'
-
-    setNameMatch(nm)
-    setDobMatchSt(dm)
+    // We don't set nameMatch and dobMatchSt here directly because the useEffect will handle it
+    // But we still need to wait for state updates before uploading the back file, 
+    // actually useEffect will handle the notification. But for the pending back file upload:
 
     // Automatically upload the pending back file if it exists
     const backFileToUpload = pendingBackFileRef.current || pendingBackFile
@@ -191,7 +203,11 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
         setBackStatus('DONE')
         setBackUrl(backRes.backUrl)
         setPendingBackFile(null)
-        notifyComplete(res.frontUrl, backRes.backUrl, ex, nm, dm)
+        // useEffect will notify parent when state updates, but we can also trigger it manually
+        // because the back file is now done.
+        const nmSync = enteredName.trim() ? (namesMatch(ex.full_name, enteredName) ? 'MATCHED' : 'MISMATCH') : 'UNVERIFIED'
+        const dmSync = enteredDob ? (dobMatch(ex.date_of_birth, enteredDob) ? 'MATCHED' : 'MISMATCH') : 'UNVERIFIED'
+        notifyComplete(res.frontUrl, backRes.backUrl, ex, nmSync, dmSync)
       } else {
         setBackStatus('FAILED')
         setBackReason(backRes.error || 'Back image upload failed.')
@@ -200,7 +216,9 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
       }
     } else {
       // If back already done (not pending), notify complete
-      if (backDone && backUrl) notifyComplete(res.frontUrl, backUrl, ex, nm, dm)
+      const nmSync = enteredName.trim() ? (namesMatch(ex.full_name, enteredName) ? 'MATCHED' : 'MISMATCH') : 'UNVERIFIED'
+      const dmSync = enteredDob ? (dobMatch(ex.date_of_birth, enteredDob) ? 'MATCHED' : 'MISMATCH') : 'UNVERIFIED'
+      if (backDone && backUrl) notifyComplete(res.frontUrl, backUrl, ex, nmSync, dmSync)
     }
   }
 
