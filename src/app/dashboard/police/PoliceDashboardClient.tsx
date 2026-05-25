@@ -38,7 +38,8 @@ export default function PoliceDashboardClient({
       if (item.identities && Array.isArray(item.identities)) {
         matchesIdentity = item.identities.some((doc: any) => 
           (doc.document_number && String(doc.document_number).toLowerCase().includes(searchStr)) ||
-          (doc.full_name && String(doc.full_name).toLowerCase().includes(searchStr))
+          (doc.full_name && String(doc.full_name).toLowerCase().includes(searchStr)) ||
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(searchStr))
         )
       } else if (item.id_documents && Array.isArray(item.id_documents)) {
         matchesIdentity = item.id_documents.some((doc: any) => 
@@ -361,7 +362,7 @@ export default function PoliceDashboardClient({
                   <div className="flex flex-col gap-8">
                     {selectedCheckin.identities.map((doc: any, idx: number) => (
                       <div key={idx} className="flex flex-col gap-4">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
                           <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
                             Person {idx + 1} — {doc.document_type || 'ID Document'}
                             {doc.document_number ? ` · ${doc.document_number}` : ''}
@@ -370,7 +371,18 @@ export default function PoliceDashboardClient({
                           {doc.is_verified && (
                             <span className="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black uppercase">✓ Verified</span>
                           )}
+                          {!doc.is_verified && doc.verification_status && (
+                            <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black uppercase">
+                              {doc.verification_status.replace('_', ' ')}
+                            </span>
+                          )}
                         </div>
+                        {doc.raw_ocr_text && (
+                          <div className="bg-gray-100 rounded-xl p-3 mb-2 max-h-32 overflow-y-auto text-[10px] text-gray-600 font-mono whitespace-pre-wrap shadow-inner border border-gray-200">
+                            <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-1">Raw Extracted OCR Data:</span>
+                            {doc.raw_ocr_text}
+                          </div>
+                        )}
                         <div className="grid sm:grid-cols-2 gap-6">
                           {/* Front */}
                           {doc.document_image_url && (

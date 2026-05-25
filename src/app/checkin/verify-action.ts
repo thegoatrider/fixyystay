@@ -104,11 +104,26 @@ export async function uploadAndVerifyFront(formData: FormData) {
 
     // 3. Parse JSON
     let result: any
+    let parseFailed = false
     try {
-      const cleaned = aiResponseText.replace(/^```json/g, '').replace(/```$/g, '').trim()
-      result = JSON.parse(cleaned)
+      const firstBrace = aiResponseText.indexOf('{')
+      const lastBrace = aiResponseText.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonStr = aiResponseText.substring(firstBrace, lastBrace + 1)
+        result = JSON.parse(jsonStr)
+      } else {
+        throw new Error('No JSON object found')
+      }
     } catch {
-      result = { is_government_id: false, document_type: 'UNKNOWN', confidence: 0, suspicious: true, reason: 'AI parse error', raw_ocr_text: '' }
+      parseFailed = true
+      result = { 
+        is_government_id: false, 
+        document_type: 'UNKNOWN', 
+        confidence: 0, 
+        suspicious: false, 
+        reason: 'AI could not format data correctly. Manual review required.', 
+        raw_ocr_text: aiResponseText 
+      }
     }
 
     console.log('[VERIFY-FRONT] AI Result:', result.document_type, 'Confidence:', result.confidence)
@@ -117,7 +132,10 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let status = 'FAILED'
     let finalReason = result.reason
 
-    if (result.suspicious || !result.is_government_id) {
+    if (parseFailed) {
+      status = 'MANUAL_REVIEW'
+      finalReason = 'AI extraction returned unformatted data. Please review manually.'
+    } else if (result.suspicious || !result.is_government_id) {
       status = 'FAILED'
       finalReason = result.reason || 'Document flagged as non-ID or suspicious.'
     } else {
@@ -125,9 +143,9 @@ export async function uploadAndVerifyFront(formData: FormData) {
       let validFormat = true
 
       if (result.document_type === 'AADHAAR') {
-        if (!num || !/^\d{12}$/.test(num)) validFormat = false
+        if (!num || !/\d{12}/.test(num)) validFormat = false
       } else if (result.document_type === 'PAN') {
-        if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
+        if (!num || !/[A-Z]{5}\d{4}[A-Z]/i.test(num)) validFormat = false
       }
 
       if (!validFormat && result.confidence > 0.40) {

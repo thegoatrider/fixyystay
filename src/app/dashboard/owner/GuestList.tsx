@@ -181,12 +181,27 @@ export default React.memo(function GuestList({
   const allSearchResults = useMemo(() => {
     if (!searchTerm) return []
     const q = searchTerm.toLowerCase()
-    return checkins.filter(c =>
-      c.guest_name?.toLowerCase().includes(q) ||
-      c.guest_phone?.includes(q) ||
-      c.properties?.name?.toLowerCase().includes(q) ||
-      (c.uid && c.uid.toLowerCase().includes(q))
-    )
+    return checkins.filter(c => {
+      let matchesIdentity = false;
+      if (c.identities && Array.isArray(c.identities)) {
+        matchesIdentity = c.identities.some((doc: any) => 
+          (doc.document_number && String(doc.document_number).toLowerCase().includes(q)) ||
+          (doc.full_name && String(doc.full_name).toLowerCase().includes(q)) ||
+          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().includes(q))
+        )
+      } else if (c.id_documents && Array.isArray(c.id_documents)) {
+        matchesIdentity = c.id_documents.some((doc: any) => 
+          (doc.documentNumber && String(doc.documentNumber).toLowerCase().includes(q)) ||
+          (doc.fullName && String(doc.fullName).toLowerCase().includes(q))
+        )
+      }
+
+      return c.guest_name?.toLowerCase().includes(q) ||
+             c.guest_phone?.includes(q) ||
+             c.properties?.name?.toLowerCase().includes(q) ||
+             (c.uid && c.uid.toLowerCase().includes(q)) ||
+             matchesIdentity;
+    })
   }, [checkins, searchTerm])
 
   const isGlobalSearch = searchTerm.length > 0
@@ -624,6 +639,9 @@ export default React.memo(function GuestList({
                             {doc.verification_status === 'MANUAL_REVIEW' && (
                               <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Review Needed</div>
                             )}
+                            {doc.verification_status === 'FAILED' && !doc.is_verified && (
+                              <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Failed</div>
+                            )}
 
                             {/* Doc meta */}
                             <div className="flex items-center gap-3 mt-1">
@@ -635,6 +653,13 @@ export default React.memo(function GuestList({
                                 <p className="text-[11px] text-gray-500 font-bold">{doc.document_number || '—'}{doc.full_name ? ` · ${doc.full_name}` : ''}</p>
                               </div>
                             </div>
+
+                            {doc.raw_ocr_text && (
+                              <div className="bg-white rounded-xl p-3 max-h-32 overflow-y-auto text-[10px] text-gray-600 font-mono whitespace-pre-wrap shadow-inner border border-gray-200 mb-2 mt-2">
+                                <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-1">Raw Extracted OCR Data:</span>
+                                {doc.raw_ocr_text}
+                              </div>
+                            )}
 
                             {/* Front + Back images */}
                             <div className="grid grid-cols-2 gap-3">
