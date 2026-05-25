@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Camera, Image as ImageIcon, CheckCircle, AlertTriangle, Loader2, FlipHorizontal } from 'lucide-react'
+import { Camera, Image as ImageIcon, CheckCircle, AlertTriangle, Loader2, FlipHorizontal, X } from 'lucide-react'
 import { uploadAndVerifyFront, uploadBackImage } from './verify-action'
 import { cn } from '@/lib/utils'
 
@@ -263,14 +263,15 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                     </button>
                   </div>
                 )}
-                {/* Retake button when verified */}
-                {(frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW') && (
+                {/* Remove / Retake button */}
+                {frontStatus !== 'PROCESSING' && (
                   <button
                     type="button"
                     onClick={resetFront}
-                    className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full hover:bg-black/70 transition"
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
+                    title="Remove Image"
                   >
-                    Retake
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </>
@@ -349,13 +350,15 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                     </button>
                   </div>
                 )}
-                {backStatus === 'DONE' && (
+                {/* Remove / Retake button */}
+                {backStatus !== 'UPLOADING' && (
                   <button
                     type="button"
                     onClick={resetBack}
-                    className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full hover:bg-black/70 transition"
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
+                    title="Remove Image"
                   >
-                    Retake
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </>

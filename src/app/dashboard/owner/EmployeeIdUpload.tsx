@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   Camera, Image as ImageIcon, CheckCircle, AlertTriangle,
-  Loader2, FlipHorizontal, ShieldCheck, User, AlertCircle
+  Loader2, FlipHorizontal, ShieldCheck, User, AlertCircle, X
 } from 'lucide-react'
 import { verifyEmployeeFrontId, uploadEmployeeBackId } from './employee-verify-action'
 import { cn } from '@/lib/utils'
@@ -258,10 +258,12 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
                     <button type="button" onClick={resetAll} className="mt-1 bg-white text-red-600 text-[9px] font-black px-2 py-0.5 rounded-full">Retry</button>
                   </div>
                 )}
-                {frontDone && (
+                {frontStatus !== 'PROCESSING' && (
                   <button type="button" onClick={resetAll}
-                    className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full hover:bg-black/70 transition">
-                    Retake
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
+                    title="Remove Image"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </>
@@ -323,9 +325,13 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
                       className="mt-1 bg-white text-red-600 text-[9px] font-black px-2 py-0.5 rounded-full">Retry</button>
                   </div>
                 )}
-                {backStatus === 'DONE' && (
-                  <button type="button" onClick={() => { setBackPreview(null); setBackStatus('IDLE'); setBackUrl(null) }}
-                    className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">Retake</button>
+                {backStatus !== 'UPLOADING' && (
+                  <button type="button" onClick={() => { setBackPreview(null); setBackStatus('IDLE'); setBackUrl(null); setPendingBackFile(null); }}
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm backdrop-blur-sm"
+                    title="Remove Image"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </>
             ) : (
