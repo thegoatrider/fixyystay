@@ -119,7 +119,7 @@ export default function EmployeeSection({
       {/* Add Employee Form */}
       <CollapsibleTile 
         title="Add New Employee" 
-        icon={<UserPlus className="w-5 h-5 text-green-600" />}
+        icon={UserPlus}
         defaultOpen={false}
       >
         <form onSubmit={handleAddEmployee} className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">

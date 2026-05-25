@@ -388,35 +388,17 @@ export default function PoliceDashboardClient({
       )}
 
       {/* Global CSS for Print Optimization */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          body {
-            background: white !important;
-          }
-          .max-w-7xl {
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          table {
-            border: 1px solid #eee !important;
-          }
-          th {
-            background-color: #f9fafb !important;
-            color: #1e3a8a !important;
-          }
-          td {
-            padding: 12px 15px !important;
-          }
-          .rounded-[32px] {
-            border-radius: 0 !important;
-          }
-          /* Prevent page breaks inside table rows */
-          tr {
-            page-break-inside: avoid !important;
-          }
+          body { background: white !important; }
+          .max-w-7xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+          table { border: 1px solid #eee !important; }
+          th { background-color: #f9fafb !important; color: #1e3a8a !important; }
+          td { padding: 12px 15px !important; }
+          .rounded-\\[32px\\] { border-radius: 0 !important; }
+          tr { page-break-inside: avoid !important; }
         }
-      `}</style>
+      `}} />
     </div>
   )
 }
