@@ -113,8 +113,8 @@ export async function fireEmployee(employeeId: string) {
 }
 
 export async function getEmployeesByOwner(ownerId: string) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
+  const supabaseAdmin = createAdminClient()
+  const { data, error } = await supabaseAdmin
     .from('property_employees')
     .select(`
       *,
