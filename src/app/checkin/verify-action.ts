@@ -3,12 +3,9 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+const MODEL_NAME = 'gemini-2.5-flash'
 
-// Using Gemini 2.5 Flash as requested (fastest multimodal model)
-const MODEL_NAME = 'gemini-2.5-flash';
-
-// Basic prompt to enforce structure and detect fake/meme/suspicious images
 const SYSTEM_PROMPT = `
 You are an expert Government ID verification AI for a hotel check-in system.
 Analyze the provided image and extract information strictly in JSON format.
@@ -24,7 +21,7 @@ Rules for abuse detection (set suspicious: true if any are met):
 
 Calculate confidence score (0.0 to 1.0) based on:
 - 0.80-1.0: Good clarity, standard format matches.
-- 0.50-0.79: Blurry, low light, or lower quality camera, but still looks like a real ID and main text is somewhat discernible.
+- 0.50-0.79: Blurry, low light, or lower quality camera, but still looks like a real ID.
 - Below 0.50: Completely unrecognizable, totally blank, or obviously fake.
 
 Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
@@ -41,133 +38,110 @@ Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
 }
 
 If a field cannot be read, leave it as an empty string "".
-`;
+`
 
-export async function uploadAndVerifyDocument(formData: FormData) {
-  console.log('[VERIFY] Starting document verification...');
-  
+// ─── Helper: upload a file to Supabase storage and return public URL ───────────
+async function uploadToStorage(file: File, folder: string): Promise<string | null> {
+  const supabaseAdmin = createAdminClient()
+  const fileExt = file.name.split('.').pop() || 'jpg'
+  const randomStr = Math.random().toString(36).substring(2, 7)
+  const fileName = `${folder}/${Date.now()}-${randomStr}.${fileExt}`
+
+  const { error } = await supabaseAdmin.storage
+    .from('property_images')
+    .upload(fileName, file, { contentType: file.type, cacheControl: '3600' })
+
+  if (error) {
+    console.error('[STORAGE] Upload failed:', error)
+    return null
+  }
+
+  const { data } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
+  return data.publicUrl
+}
+
+// ─── Action 1: Upload FRONT ID → run OCR → create guest_identity record ────────
+export async function uploadAndVerifyFront(formData: FormData) {
+  console.log('[VERIFY-FRONT] Starting front ID verification...')
+
   try {
-    const file = formData.get('image') as File;
-    if (!file || file.size === 0) {
-      return { success: false, error: 'No image provided.' };
-    }
+    const file = formData.get('image') as File
+    if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
 
-    const supabaseAdmin = createAdminClient();
-    
-    // 1. Upload to temporary storage
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const randomStr = Math.random().toString(36).substring(2, 7);
-    const fileName = `temp-${Date.now()}-${randomStr}.${fileExt}`;
-    
-    console.log('[VERIFY] Uploading to temp storage...', fileName);
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('property_images')
-      .upload(`temp_verification/${fileName}`, file, {
-        contentType: file.type,
-        cacheControl: '3600'
-      });
+    // 1. Upload front image
+    const imageUrl = await uploadToStorage(file, 'temp_verification')
+    if (!imageUrl) return { success: false, error: 'Failed to upload front image.' }
 
-    if (uploadError) {
-      console.error('[VERIFY] Upload failed:', uploadError);
-      return { success: false, error: 'Failed to upload document for verification.' };
-    }
+    // 2. OCR with Gemini
+    console.log('[VERIFY-FRONT] Analyzing with Gemini AI...')
+    const arrayBuffer = await file.arrayBuffer()
+    const base64Data = Buffer.from(arrayBuffer).toString('base64')
 
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('property_images')
-      .getPublicUrl(`temp_verification/${fileName}`);
-      
-    const imageUrl = publicUrlData.publicUrl;
-
-    // 2. Prepare file for Gemini
-    console.log('[VERIFY] Analyzing with Gemini AI...');
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString('base64');
-    
-    let aiResponseText = "";
+    let aiResponseText = '{}'
     try {
       const response = await ai.models.generateContent({
         model: MODEL_NAME,
         contents: [
           SYSTEM_PROMPT,
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: file.type || 'image/jpeg'
-            }
-          }
+          { inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }
         ],
-        config: {
-          temperature: 0.0, // strict facts only
-          responseMimeType: "application/json",
-        }
-      });
-      
-      aiResponseText = response.text || "{}";
+        config: { temperature: 0.0, responseMimeType: 'application/json' }
+      })
+      aiResponseText = response.text || '{}'
     } catch (aiError: any) {
-      console.error('[VERIFY] AI call failed:', aiError);
-      return { success: false, error: 'AI verification service temporarily unavailable.' };
+      console.error('[VERIFY-FRONT] AI call failed:', aiError)
+      return { success: false, error: 'AI verification service temporarily unavailable.' }
     }
 
     // 3. Parse JSON
-    let result;
+    let result: any
     try {
-      // Handle potential markdown wrapping
-      const cleaned = aiResponseText.replace(/^```json/g, '').replace(/```$/g, '').trim();
-      result = JSON.parse(cleaned);
-    } catch (parseError) {
-      console.error('[VERIFY] Failed to parse AI response:', aiResponseText);
-      result = {
-        is_government_id: false,
-        document_type: 'UNKNOWN',
-        confidence: 0,
-        suspicious: true,
-        reason: 'AI failed to format output',
-        raw_ocr_text: ''
-      };
+      const cleaned = aiResponseText.replace(/^```json/g, '').replace(/```$/g, '').trim()
+      result = JSON.parse(cleaned)
+    } catch {
+      result = { is_government_id: false, document_type: 'UNKNOWN', confidence: 0, suspicious: true, reason: 'AI parse error', raw_ocr_text: '' }
     }
 
-    console.log('[VERIFY] AI Result:', result.document_type, 'Confidence:', result.confidence);
+    console.log('[VERIFY-FRONT] AI Result:', result.document_type, 'Confidence:', result.confidence)
 
-    // 4. Validation Layer
-    let status = 'FAILED';
-    let finalReason = result.reason;
+    // 4. Validation
+    let status = 'FAILED'
+    let finalReason = result.reason
 
     if (result.suspicious || !result.is_government_id) {
-      status = 'FAILED';
-      finalReason = result.reason || 'Document flagged as non-ID or suspicious.';
+      status = 'FAILED'
+      finalReason = result.reason || 'Document flagged as non-ID or suspicious.'
     } else {
-      // Basic format validation
-      let validFormat = true;
-      const num = result.document_number?.trim().replace(/\s/g, ''); // remove spaces for regex check
-      
+      const num = result.document_number?.trim().replace(/\s/g, '')
+      let validFormat = true
+
       if (result.document_type === 'AADHAAR') {
-        if (!num || !/^\d{12}$/.test(num)) validFormat = false;
+        if (!num || !/^\d{12}$/.test(num)) validFormat = false
       } else if (result.document_type === 'PAN') {
-        if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false;
+        if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
       }
-      
+
       if (!validFormat && result.confidence > 0.40) {
-        // If AI is confident but format fails, maybe OCR missed a digit. Downgrade to manual review.
-        status = 'MANUAL_REVIEW';
-        finalReason = 'Format validation failed. Document number does not match expected pattern.';
+        status = 'MANUAL_REVIEW'
+        finalReason = 'Format validation failed. Document number does not match expected pattern.'
       } else if (validFormat) {
         if (result.confidence >= 0.50) {
-          status = 'VERIFIED';
+          status = 'VERIFIED'
         } else if (result.confidence >= 0.30) {
-          status = 'MANUAL_REVIEW';
-          finalReason = 'Image quality too poor for automatic verification. Requires manual review.';
+          status = 'MANUAL_REVIEW'
+          finalReason = 'Image quality too poor. Requires manual review.'
         } else {
-          status = 'FAILED';
-          finalReason = 'Confidence too low. Please upload a clearer image.';
+          status = 'FAILED'
+          finalReason = 'Confidence too low. Please upload a clearer image.'
         }
       } else {
-         status = 'FAILED';
-         finalReason = 'Extracted data invalid.';
+        status = 'FAILED'
+        finalReason = 'Extracted data invalid.'
       }
     }
 
-    // 5. Save to guest_identity table
+    // 5. Save to guest_identity (front only, back_image_url will be updated later)
+    const supabaseAdmin = createAdminClient()
     const identityRecord = {
       document_type: result.document_type || 'UNKNOWN',
       document_number: result.document_number,
@@ -176,33 +150,71 @@ export async function uploadAndVerifyDocument(formData: FormData) {
       document_confidence: result.confidence || 0,
       is_verified: status === 'VERIFIED',
       verification_status: status,
-      document_image_url: imageUrl,
+      document_image_url: imageUrl,    // front image
+      back_image_url: null,            // will be filled by uploadBackImage
       raw_ocr_text: result.raw_ocr_text || '',
       ocr_json: result,
       verification_reason: finalReason
-    };
+    }
 
-    console.log(`[VERIFY] Inserting identity record. Status: ${status}`);
+    console.log(`[VERIFY-FRONT] Inserting identity record. Status: ${status}`)
     const { data: inserted, error: dbError } = await supabaseAdmin
       .from('guest_identity')
       .insert([identityRecord])
       .select('id, verification_status')
-      .single();
+      .single()
 
     if (dbError) {
-      console.error('[VERIFY] DB Insert failed:', dbError);
-      return { success: false, error: 'Database error while saving identity.' };
+      console.error('[VERIFY-FRONT] DB Insert failed:', dbError)
+      return { success: false, error: 'Database error while saving identity.' }
     }
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       guest_identity_id: inserted.id,
       status: inserted.verification_status,
       reason: finalReason
-    };
-
+    }
   } catch (err: any) {
-    console.error('[VERIFY] Uncaught exception:', err);
-    return { success: false, error: 'Internal system error during verification.' };
+    console.error('[VERIFY-FRONT] Uncaught exception:', err)
+    return { success: false, error: 'Internal system error during front ID verification.' }
   }
 }
+
+// ─── Action 2: Upload BACK ID → update the existing guest_identity record ──────
+export async function uploadBackImage(formData: FormData) {
+  console.log('[VERIFY-BACK] Uploading back ID image...')
+
+  try {
+    const file = formData.get('image') as File
+    const identityId = formData.get('identityId') as string
+
+    if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
+    if (!identityId) return { success: false, error: 'No identity ID provided.' }
+
+    // Upload back image to storage
+    const backUrl = await uploadToStorage(file, 'temp_verification')
+    if (!backUrl) return { success: false, error: 'Failed to upload back image.' }
+
+    // Update the existing guest_identity record with back_image_url
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
+      .from('guest_identity')
+      .update({ back_image_url: backUrl })
+      .eq('id', identityId)
+
+    if (error) {
+      console.error('[VERIFY-BACK] Failed to update record:', error)
+      return { success: false, error: 'Failed to save back image to database.' }
+    }
+
+    console.log('[VERIFY-BACK] Back image saved successfully for identity:', identityId)
+    return { success: true, back_image_url: backUrl }
+  } catch (err: any) {
+    console.error('[VERIFY-BACK] Uncaught exception:', err)
+    return { success: false, error: 'Internal error during back image upload.' }
+  }
+}
+
+// Keep old name as alias for backward compatibility
+export { uploadAndVerifyFront as uploadAndVerifyDocument }

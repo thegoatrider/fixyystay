@@ -140,7 +140,8 @@ export default React.memo(function GuestList({
     if (guest.identities && guest.identities.length > 0) {
       guest.identities.forEach((idDoc: any, i: number) => {
         const base = `ID_${guest.guest_name.replace(/\s+/g, '_')}_${idDoc.document_type || 'DOC'}_${i+1}`
-        if (idDoc.document_image_url) items.push({ url: idDoc.document_image_url, name: base })
+        if (idDoc.document_image_url) items.push({ url: idDoc.document_image_url, name: `${base}_Front` })
+        if (idDoc.back_image_url) items.push({ url: idDoc.back_image_url, name: `${base}_Back` })
       })
     } else if (guest.id_documents && guest.id_documents.length > 0) {
       guest.id_documents.forEach((doc: any, i: number) => {
@@ -574,80 +575,84 @@ export default React.memo(function GuestList({
                   {selectedGuest.identities && selectedGuest.identities.length > 0 ? (
                     <div className="flex flex-col gap-3">
                       {selectedGuest.identities.map((doc: any, i: number) => {
-                        return (
-                          <div key={i} className="flex flex-col gap-2 p-4 bg-gray-50 border border-gray-100 rounded-2xl group hover:border-indigo-200 hover:bg-white transition-all shadow-sm relative overflow-hidden">
-                            {doc.is_verified && (
-                              <div className="absolute top-0 right-0 bg-green-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest shadow-sm">
-                                Verified
-                              </div>
-                            )}
-                            {doc.verification_status === 'MANUAL_REVIEW' && (
-                              <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest shadow-sm">
-                                Review Needed
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-10 h-10 border rounded-xl flex items-center justify-center shadow-inner flex-shrink-0 ${doc.is_verified ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
-                                  <FileText className={`w-5 h-5 ${doc.is_verified ? 'text-green-600' : 'text-indigo-500'}`} />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold text-gray-800 truncate">{doc.document_type || 'ID Document'}</p>
-                                  <p className="text-[11px] text-gray-500 font-bold tracking-wide">{doc.document_number || 'No Number'}</p>
-                                </div>
-                              </div>
-                              <a href={doc.document_image_url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-indigo-50 rounded-lg transition-colors" title="View Fullscreen">
-                                <ExternalLink className="w-4 h-4 text-gray-400 hover:text-indigo-600" />
+                        const docBase = `ID_${selectedGuest.guest_name.replace(/\s+/g, '_')}_${doc.document_type || 'DOC'}_${i+1}`
+                        const renderIdImage = (url: string, sideLabel: string, downloadName: string) => (
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-0.5">{sideLabel}</span>
+                            <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
+                              <img src={url} alt={sideLabel} className="w-full h-full object-cover" />
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold gap-1 transition-opacity"
+                              >
+                                <ExternalLink className="w-4 h-4" /> Open
                               </a>
                             </div>
-
-                            {doc.full_name && (
-                              <div className="mt-1 mb-1 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs font-medium text-gray-700 flex items-center gap-2 shadow-sm">
-                                <User className="w-3.5 h-3.5 text-gray-400" /> {doc.full_name}
-                              </div>
-                            )}
-                            
-                            <div className="grid grid-cols-3 gap-2 mt-1 pt-3 border-t border-gray-100/60">
-                              <button 
-                                onClick={() => {
-                                  const filename = `ID_${selectedGuest.guest_name.replace(/\s+/g, '_')}_${doc.document_type || 'DOC'}`;
-                                  handleDownload(doc.document_image_url, filename, `save-${doc.document_image_url}`);
-                                }}
-                                disabled={processingId === `save-${doc.document_image_url}`}
-                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                            <div className="grid grid-cols-3 gap-1">
+                              <button
+                                onClick={() => handleDownload(url, downloadName, `save-${url}`)}
+                                disabled={processingId === `save-${url}`}
+                                className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
                               >
-                                {processingId === `save-${doc.document_image_url}` ? (
-                                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <Download className="w-4 h-4 text-gray-600" />
-                                )}
-                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Save</span>
+                                {processingId === `save-${url}` ? <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> : <Download className="w-3.5 h-3.5 text-gray-600" />}
+                                <span className="text-[8px] font-black uppercase text-gray-400">Save</span>
                               </button>
-                              
-                              <button 
-                                onClick={() => handlePrint(doc.document_image_url)}
-                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors"
-                              >
-                                <Printer className="w-4 h-4 text-gray-600" />
-                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Print</span>
+                              <button onClick={() => handlePrint(url)} className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                                <Printer className="w-3.5 h-3.5 text-gray-600" />
+                                <span className="text-[8px] font-black uppercase text-gray-400">Print</span>
                               </button>
- 
-                              <button 
-                                onClick={() => handleShare(doc.document_image_url, `${doc.document_type} - ${selectedGuest.guest_name}`, `share-${doc.document_image_url}`)}
-                                disabled={processingId === `share-${doc.document_image_url}`}
-                                className="flex flex-col items-center gap-1 py-2 rounded-xl hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                              <button
+                                onClick={() => handleShare(url, `${sideLabel} - ${selectedGuest.guest_name}`, `share-${url}`)}
+                                disabled={processingId === `share-${url}`}
+                                className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
                               >
-                                {processingId === `share-${doc.document_image_url}` ? (
-                                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <Share2 className="w-4 h-4 text-gray-600" />
-                                )}
-                                <span className="text-[9px] font-black uppercase tracking-tighter text-gray-400">Send</span>
+                                {processingId === `share-${url}` ? <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> : <Share2 className="w-3.5 h-3.5 text-gray-600" />}
+                                <span className="text-[8px] font-black uppercase text-gray-400">Send</span>
                               </button>
                             </div>
                           </div>
-                        );
+                        )
+
+                        return (
+                          <div key={i} className="flex flex-col gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:border-indigo-200 hover:bg-white transition-all shadow-sm relative overflow-hidden">
+                            {/* Verified badge */}
+                            {doc.is_verified && (
+                              <div className="absolute top-0 right-0 bg-green-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Verified</div>
+                            )}
+                            {doc.verification_status === 'MANUAL_REVIEW' && (
+                              <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Review Needed</div>
+                            )}
+
+                            {/* Doc meta */}
+                            <div className="flex items-center gap-3 mt-1">
+                              <div className={`w-9 h-9 border rounded-xl flex items-center justify-center flex-shrink-0 ${doc.is_verified ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
+                                <FileText className={`w-4 h-4 ${doc.is_verified ? 'text-green-600' : 'text-indigo-500'}`} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-gray-800">{doc.document_type || 'ID Document'}</p>
+                                <p className="text-[11px] text-gray-500 font-bold">{doc.document_number || '—'}{doc.full_name ? ` · ${doc.full_name}` : ''}</p>
+                              </div>
+                            </div>
+
+                            {/* Front + Back images */}
+                            <div className="grid grid-cols-2 gap-3">
+                              {doc.document_image_url && renderIdImage(doc.document_image_url, '▣ Front Side', `${docBase}_Front`)}
+                              {doc.back_image_url
+                                ? renderIdImage(doc.back_image_url, '◫ Back Side', `${docBase}_Back`)
+                                : (
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-0.5">◫ Back Side</span>
+                                    <div className="aspect-[4/3] rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px] font-bold">
+                                      Not uploaded
+                                    </div>
+                                  </div>
+                                )
+                              }
+                            </div>
+                          </div>
+                        )
                       })}
                     </div>
                   ) : selectedGuest.id_documents && selectedGuest.id_documents.length > 0 ? (
@@ -794,16 +799,14 @@ export default React.memo(function GuestList({
              </button>
           </div>
 
-          <style jsx global>{`
+          <style dangerouslySetInnerHTML={{ __html: `
             @media print {
               body * { visibility: hidden !important; }
-              .fixed.inset-0.z-\[1000\] { visibility: visible !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; }
-              .fixed.inset-0.z-\[1000\] img { visibility: visible !important; width: 100% !important; max-height: none !important; }
-              .fixed.inset-0.z-\[1000\] .bg-gray-900, 
-              .fixed.inset-0.z-\[1000\] button,
-              .fixed.inset-0.z-\[1000\] .text-center { display: none !important; }
+              .print-image-modal { visibility: visible !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; }
+              .print-image-modal img { visibility: visible !important; width: 100% !important; max-height: none !important; }
+              .print-image-modal .bg-gray-900, .print-image-modal button, .print-image-modal .text-center { display: none !important; }
             }
-          `}</style>
+          `}} />
         </div>
       )}
     </div>

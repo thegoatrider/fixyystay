@@ -13,7 +13,7 @@ import {
 import { submitCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
-import { DocumentUpload } from './DocumentUpload'
+import { GuestIdUpload } from './GuestIdUpload'
 
 export default function CheckinPage() {
   return (
@@ -33,7 +33,7 @@ function CheckinForm() {
   const prefilledPhone = searchParams.get('pn')
   const prefilledName = searchParams.get('gn')
 
-  const [step, setStep] = useState(1) // 1: Form, 2: Success
+  const [step, setStep] = useState(1)
 
   const [guestName, setGuestName] = useState('')
   const [countryCode, setCountryCode] = useState('91')
@@ -45,14 +45,14 @@ function CheckinForm() {
   const [successData, setSuccessData] = useState<{ propertyName: string, helpdesk: string } | null>(null)
   const [propertyInfo, setPropertyInfo] = useState<{ name: string, helpdesk_number: string } | null>(null)
 
-  // Array of verified identity IDs — one slot per guest, null if not yet verified
+  // verifiedIds[i] is set when the front ID for guest i is verified by OCR
+  // Submit is only enabled when ALL slots are non-null
   const [verifiedIds, setVerifiedIds] = useState<(string | null)[]>([null])
 
-  // Sync verifiedIds array length when numPeople changes
+  // Sync array length when numPeople changes — preserve existing verified IDs
   useEffect(() => {
     setVerifiedIds(prev => {
       const next = Array(numPeople).fill(null)
-      // preserve already-verified IDs if the count grows
       for (let i = 0; i < Math.min(prev.length, numPeople); i++) {
         next[i] = prev[i]
       }
@@ -68,18 +68,17 @@ function CheckinForm() {
     })
   }, [])
 
+  // All IDs need the front verified (back is stored async without blocking submit in theory,
+  // but GuestIdUpload itself gates on front-only for the onVerified callback)
   const allVerified = verifiedIds.length === numPeople && verifiedIds.every(id => id !== null)
+  const verifiedCount = verifiedIds.filter(Boolean).length
 
-  // Fetch Property Info
   useEffect(() => {
     if (propertyId) {
-      getPropertyInfo(propertyId).then(info => {
-        if (info) setPropertyInfo(info)
-      })
+      getPropertyInfo(propertyId).then(info => { if (info) setPropertyInfo(info) })
     }
   }, [propertyId])
 
-  // Pre-fill from URL
   useEffect(() => {
     if (prefilledPhone) setGuestPhone(prefilledPhone)
     if (prefilledName) setGuestName(prefilledName)
@@ -160,15 +159,11 @@ function CheckinForm() {
           </div>
 
           <div className="w-full flex flex-col gap-3 mb-8">
-            <Button
-              asChild
-              className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white border-0 shadow-md flex items-center justify-center gap-2"
-            >
+            <Button asChild className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white border-0 shadow-md flex items-center justify-center gap-2">
               <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
                 <HelpCircle className="w-5 h-5" /> Help & Support (WhatsApp)
               </a>
             </Button>
-
             <div className="grid grid-cols-3 gap-2">
               <Button asChild variant="outline" className="h-12 border-gray-200 text-gray-600 hover:text-blue-600">
                 <a href="https://fixystays.com" target="_blank" rel="noopener noreferrer"><Globe className="w-5 h-5" /></a>
@@ -190,11 +185,8 @@ function CheckinForm() {
     )
   }
 
-  // Count verified
-  const verifiedCount = verifiedIds.filter(Boolean).length
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-6">
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto flex flex-col gap-8">
         <div className="text-center">
           <Link href="/" className="font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition">
@@ -204,11 +196,14 @@ function CheckinForm() {
             Welcome to <br />
             <span className="text-blue-600 drop-shadow-sm">{propertyInfo?.name || 'Guest Check-in'}</span>
           </h1>
-          <p className="text-gray-500 mt-3 font-medium">Please provide your details and ID proof for every guest.</p>
+          <p className="text-gray-500 mt-3 font-medium">
+            Please fill in your details and upload both sides of a government ID for <strong>every guest</strong>.
+          </p>
         </div>
 
         {step === 1 && (
           <form onSubmit={handleSubmit} className="bg-white border shadow-xl rounded-3xl p-8 flex flex-col gap-6">
+
             {/* Phone + Name */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -225,27 +220,16 @@ function CheckinForm() {
                   </select>
                   <div className="relative flex-1">
                     <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <Input
-                      id="phone"
-                      placeholder="9876543210"
-                      required
-                      className="pl-9"
-                      value={guestPhone}
-                      onChange={(e) => setGuestPhone(e.target.value)}
-                    />
+                    <Input id="phone" placeholder="9876543210" required className="pl-9"
+                      value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-1"><User className="w-4 h-4" /> Full Name (Primary Guest)</Label>
-                <Input
-                  id="name"
-                  placeholder="John Doe"
-                  required
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                />
+                <Input id="name" placeholder="John Doe" required
+                  value={guestName} onChange={(e) => setGuestName(e.target.value)} />
               </div>
             </div>
 
@@ -266,12 +250,8 @@ function CheckinForm() {
               <Label htmlFor="vehicleNumber" className="flex items-center gap-1">
                 Vehicle Number <span className="text-[10px] text-gray-400 font-medium ml-1">(Optional)</span>
               </Label>
-              <Input
-                id="vehicleNumber"
-                name="vehicleNumber"
-                placeholder="e.g. MH-12-AB-1234"
-                className="bg-gray-50/50 focus:bg-white transition-colors"
-              />
+              <Input id="vehicleNumber" name="vehicleNumber" placeholder="e.g. MH-12-AB-1234"
+                className="bg-gray-50/50 focus:bg-white transition-colors" />
             </div>
 
             {/* Number of Guests */}
@@ -279,7 +259,7 @@ function CheckinForm() {
               <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4" /> Number of People Staying</Label>
               <select
                 id="pax"
-                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
                 value={numPeople}
                 onChange={(e) => setNumPeople(parseInt(e.target.value))}
@@ -290,76 +270,56 @@ function CheckinForm() {
               </select>
             </div>
 
-            {/* ─── ID Upload Section — one per guest ─── */}
+            {/* ── ID Verification — one GuestIdUpload per guest ── */}
             <div className="mt-2 pt-6 border-t border-gray-100 flex flex-col gap-5">
-              {/* Header */}
+              {/* Header with progress */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-blue-600" />
                   <div>
                     <h3 className="font-bold text-gray-900">Identity Verification</h3>
                     <p className="text-xs text-gray-500">
-                      Upload a valid government ID for <span className="font-bold text-blue-600">each guest</span>.
+                      Upload <span className="font-bold text-blue-600">front & back</span> of a government ID for each guest.
                     </p>
                   </div>
                 </div>
-                {/* Progress pill */}
                 <div className={cn(
                   'text-xs font-bold px-3 py-1.5 rounded-full transition-colors',
-                  allVerified
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-amber-50 text-amber-700'
+                  allVerified ? 'bg-green-100 text-green-700' : 'bg-amber-50 text-amber-700'
                 )}>
-                  {verifiedCount}/{numPeople} Verified
+                  {verifiedCount}/{numPeople} Ready
                 </div>
               </div>
 
-              {/* One upload card per guest */}
-              <div className={cn(
-                'grid gap-6',
-                numPeople === 1 ? 'grid-cols-1 max-w-[280px] mx-auto w-full' :
-                numPeople === 2 ? 'grid-cols-2' :
-                'grid-cols-2 md:grid-cols-3'
-              )}>
+              {/* One card per guest */}
+              <div className="flex flex-col gap-4">
                 {Array.from({ length: numPeople }).map((_, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <div className={cn(
-                      'text-[10px] font-black uppercase tracking-widest px-1 flex items-center gap-1',
-                      verifiedIds[i] ? 'text-green-600' : 'text-gray-400'
-                    )}>
-                      {verifiedIds[i]
-                        ? <><CheckCircle className="w-3 h-3" /> Guest {i + 1} ✓</>
-                        : `Guest ${i + 1}`
-                      }
-                    </div>
-                    <DocumentUpload
-                      label={i === 0 ? 'Primary Guest ID' : `Guest ${i + 1} ID`}
-                      idKey={`guest_${i}`}
-                      onVerified={(id) => handleGuestVerified(i, id)}
-                    />
-                  </div>
+                  <GuestIdUpload
+                    key={i}
+                    guestIndex={i}
+                    onVerified={(id) => handleGuestVerified(i, id)}
+                  />
                 ))}
               </div>
 
-              {/* All verified banner */}
+              {/* All done banner */}
               {allVerified && (
                 <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                   <p className="text-sm font-bold text-green-800">
-                    All {numPeople} guest{numPeople > 1 ? 's' : ''} verified! You&apos;re ready to check in.
+                    All {numPeople} guest{numPeople > 1 ? 's' : ''} verified — ready to check in!
                   </p>
                 </div>
               )}
 
-              {/* Not yet verified hint */}
               {!allVerified && verifiedCount > 0 && (
                 <p className="text-xs text-amber-600 font-medium text-center">
-                  {numPeople - verifiedCount} more ID{numPeople - verifiedCount > 1 ? 's' : ''} needed before you can complete check-in.
+                  {numPeople - verifiedCount} more guest ID{numPeople - verifiedCount > 1 ? 's' : ''} needed.
                 </p>
               )}
             </div>
 
-            {/* Submit Button — only visible when all verified */}
+            {/* Submit — only shows when all verified */}
             {allVerified && (
               <Button
                 type="submit"
@@ -367,7 +327,9 @@ function CheckinForm() {
                 className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-2 shadow-lg shadow-green-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
                 disabled={isLoading}
               >
-                {isLoading ? 'Completing Check-in...' : `Complete Check-in for ${numPeople} Guest${numPeople > 1 ? 's' : ''}`}
+                {isLoading
+                  ? 'Completing Check-in...'
+                  : `Complete Check-in for ${numPeople} Guest${numPeople > 1 ? 's' : ''}`}
               </Button>
             )}
           </form>
