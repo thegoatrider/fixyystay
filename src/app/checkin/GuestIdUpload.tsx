@@ -354,11 +354,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
               </div>
             )}
             <input type="file" id={`cam_front_${prefix}`} accept="image/*" capture="environment" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFrontFile(f) }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFrontFile(f); e.target.value = ''; }}
               disabled={frontStatus === 'PROCESSING'}
             />
             <input type="file" id={`gal_front_${prefix}`} accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFrontFile(f) }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFrontFile(f); e.target.value = ''; }}
               disabled={frontStatus === 'PROCESSING'}
             />
           </div>
@@ -439,11 +439,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
               </div>
             )}
             <input type="file" id={`cam_back_${prefix}`} accept="image/*" capture="environment" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f); e.target.value = ''; }}
               disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
             <input type="file" id={`gal_back_${prefix}`} accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f) }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleBackFile(f); e.target.value = ''; }}
               disabled={backStatus === 'UPLOADING' || backStatus === 'PENDING'}
             />
           </div>

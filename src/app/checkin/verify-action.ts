@@ -11,6 +11,8 @@ You are an expert Government ID verification AI for a hotel check-in system.
 Analyze the provided image and extract information strictly in JSON format.
 Your task is to identify if it is a real government ID, extract fields if legible, and detect abuse.
 
+Note: E-Aadhaar or long-format printouts are valid Aadhaar cards. Scan the whole document to find the ID card section, usually at the bottom.
+
 Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
 
 Rules for abuse detection (set suspicious: true if any are met):
@@ -82,6 +84,24 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
   return data.publicUrl
 }
 
+// ─── Helper: Retry wrapper for Gemini API to handle rate limits ────────────────
+async function generateContentWithRetry(contents: any, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const generatePromise = ai.models.generateContent(contents);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
+      );
+      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+      return response;
+    } catch (error: any) {
+      if (i === maxRetries - 1) throw error;
+      // If it's a timeout or rate limit, wait and retry
+      await new Promise(res => setTimeout(res, 2000 * (i + 1))); // Exponential backoff
+    }
+  }
+}
+
 // ─── Action 1: Upload FRONT ID → run OCR → create guest_identity record ────────
 export async function uploadAndVerifyFront(formData: FormData) {
   console.log('[VERIFY-FRONT] Starting front ID verification...')
@@ -101,7 +121,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
 
     let aiResponseText = '{}'
     try {
-      const generatePromise = ai.models.generateContent({
+      const response = await generateContentWithRetry({
         model: MODEL_NAME,
         contents: [
           SYSTEM_PROMPT,
@@ -110,12 +130,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
         config: { temperature: 0.0, responseMimeType: 'application/json' }
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
-      );
-
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-      aiResponseText = response.text || '{}'
+      aiResponseText = response?.text || '{}'
     } catch (aiError: any) {
       console.error('[VERIFY-FRONT] AI call failed:', aiError)
       if (aiError.message === 'AI_TIMEOUT') {
@@ -174,7 +189,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
         status = 'FAILED'
         finalReason = 'Document number does not match expected format or image is not clear enough. Please re-upload.'
       } else {
-        if (result.confidence >= 0.50) {
+        if (result.confidence >= 0.40) {
           status = 'VERIFIED'
         } else {
           status = 'FAILED'
@@ -246,7 +261,7 @@ export async function uploadBackImage(formData: FormData) {
 
     let aiResponseText = '{}'
     try {
-      const generatePromise = ai.models.generateContent({
+      const response = await generateContentWithRetry({
         model: MODEL_NAME,
         contents: [
           BACK_SYSTEM_PROMPT,
@@ -255,12 +270,7 @@ export async function uploadBackImage(formData: FormData) {
         config: { temperature: 0.0, responseMimeType: 'application/json' }
       });
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
-      );
-
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-      aiResponseText = response.text || '{}'
+      aiResponseText = response?.text || '{}'
     } catch (aiError: any) {
       console.error('[VERIFY-BACK] AI call failed:', aiError)
     }
@@ -282,16 +292,14 @@ export async function uploadBackImage(formData: FormData) {
         suspicious = result.suspicious || false
         isGovtId = result.is_government_id !== false
       } else {
-        return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
+        console.warn('[VERIFY-BACK] No JSON found in response. Skipping address extraction.')
       }
     } catch (e) {
-      console.warn('[VERIFY-BACK] Failed to parse AI JSON response.')
-      return { success: false, error: 'Failed to process back image. Please re-upload.' }
+      console.warn('[VERIFY-BACK] Failed to parse AI JSON response. Skipping address extraction.')
     }
 
-    if (suspicious || !isGovtId || confidence < 0.50) {
-      return { success: false, error: 'Back image is not clear enough or suspicious. Please re-upload a clear photo.' }
-    }
+    // We intentionally don't block on back image validation to avoid friction.
+    // If it's blurry or unrecognizable, we still save the image.
 
     // Update the existing guest_identity record with back_image_url and address
     const supabaseAdmin = createAdminClient()
