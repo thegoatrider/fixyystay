@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getOwnersWithProperties, getMessages, sendMessage, markAsRead } from '@/app/dashboard/messages/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Send, User, Home, AlertCircle } from 'lucide-react'
+import { Search, Send, User, Home, AlertCircle, ChevronLeft } from 'lucide-react'
 
 export default function PoliceMessagesPage() {
   const [owners, setOwners] = useState<any[]>([])
@@ -114,9 +114,9 @@ export default function PoliceMessagesPage() {
   const selectedOwner = owners.find(o => o.id === selectedOwnerId)
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl shadow-sm border overflow-hidden mt-6">
+    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl shadow-sm border overflow-hidden mt-2 md:mt-6">
       {/* Sidebar - Owners List */}
-      <div className="w-1/3 border-r flex flex-col bg-gray-50">
+      <div className={`w-full md:w-1/3 border-r flex-col bg-gray-50 ${selectedOwnerId ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b bg-white">
           <h2 className="text-xl font-bold mb-4 text-gray-900">Messages</h2>
           <div className="relative">
@@ -167,13 +167,18 @@ export default function PoliceMessagesPage() {
       </div>
 
       {/* Chat Window */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className={`flex-1 flex-col bg-white ${selectedOwnerId ? 'flex' : 'hidden md:flex'}`}>
         {selectedOwnerId ? (
           <>
             <div className="p-4 border-b flex items-center justify-between bg-white shadow-sm z-10">
-              <div>
-                <h3 className="font-bold text-lg text-gray-900">{selectedOwner?.name}</h3>
-                <p className="text-xs text-gray-500">Property Owner</p>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedOwnerId(null)}>
+                  <ChevronLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900">{selectedOwner?.name}</h3>
+                  <p className="text-xs text-gray-500">Property Owner</p>
+                </div>
               </div>
             </div>
             

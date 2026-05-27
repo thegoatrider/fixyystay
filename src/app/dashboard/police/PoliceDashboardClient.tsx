@@ -165,7 +165,7 @@ export default function PoliceDashboardClient({
       <div className="bg-white border border-gray-100 rounded-[32px] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           {activeTab === 'guests' ? (
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Guest Details</th>
@@ -244,7 +244,7 @@ export default function PoliceDashboardClient({
               </tbody>
             </table>
           ) : (
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Staff Member</th>
@@ -378,7 +378,7 @@ export default function PoliceDashboardClient({
                <Search className="w-6 h-6 rotate-45" />
              </button>
 
-             <div className="p-8 border-b bg-gray-50/50">
+             <div className="p-4 md:p-8 border-b bg-gray-50/50">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-blue-900 text-white p-1.5 rounded-lg"><ShieldCheck className="w-5 h-5" /></div>
                   <h3 className="text-2xl font-black text-gray-900">Identification Documents</h3>
@@ -386,7 +386,7 @@ export default function PoliceDashboardClient({
                 <p className="text-gray-500 font-medium">Verification for <span className="text-blue-900 font-bold">{selectedCheckin.guest_name}</span> staying at {selectedCheckin.properties?.name}</p>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+             <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/30">
                 {selectedCheckin.identities && selectedCheckin.identities.length > 0 ? (
                   <div className="flex flex-col gap-8">
                     {selectedCheckin.identities.map((doc: any, idx: number) => (
@@ -497,7 +497,7 @@ export default function PoliceDashboardClient({
                 )}
              </div>
              
-             <div className="p-8 border-t bg-white flex justify-end">
+             <div className="p-4 md:p-8 border-t bg-white flex justify-end">
                 <Button 
                   onClick={() => setSelectedCheckin(null)}
                   className="bg-gray-900 hover:bg-black text-white px-8 h-12 rounded-xl font-bold"
@@ -520,7 +520,7 @@ export default function PoliceDashboardClient({
                <Search className="w-6 h-6 rotate-45" />
              </button>
 
-             <div className="p-8 border-b bg-gray-50/50">
+             <div className="p-4 md:p-8 border-b bg-gray-50/50">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-indigo-900 text-white p-1.5 rounded-lg"><Briefcase className="w-5 h-5" /></div>
                   <h3 className="text-2xl font-black text-gray-900">Staff Identification</h3>
@@ -528,7 +528,7 @@ export default function PoliceDashboardClient({
                 <p className="text-gray-500 font-medium">Verification for <span className="text-indigo-900 font-bold">{selectedEmployee.first_name} {selectedEmployee.last_name}</span> working at {selectedEmployee.properties?.name}</p>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-8 bg-gray-50/30">
+             <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/30">
                <div className="flex flex-col gap-8">
                  <div className="flex flex-col gap-4">
                    <div className="flex items-center gap-2 flex-wrap">
@@ -586,7 +586,7 @@ export default function PoliceDashboardClient({
                </div>
              </div>
              
-             <div className="p-8 border-t bg-white flex justify-end gap-3">
+             <div className="p-4 md:p-8 border-t bg-white flex flex-col md:flex-row justify-end gap-3">
                 {(!selectedEmployee.police_verification_status || selectedEmployee.police_verification_status === 'PENDING') && (
                   <>
                     <Button 
