@@ -20,12 +20,18 @@ export default async function PoliceLayout({
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <header className="bg-white border-b sticky top-0 z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between w-full">
-          <Link href="/dashboard/police" className="flex items-center gap-3 text-blue-900">
-            <div className="bg-blue-900 p-2 rounded-xl text-white">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-            <span className="font-black tracking-tight text-xl">Law Enforcement Hub</span>
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/dashboard/police" className="flex items-center gap-3 text-blue-900">
+              <div className="bg-blue-900 p-2 rounded-xl text-white">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <span className="font-black tracking-tight text-xl hidden md:block">Law Enforcement Hub</span>
+            </Link>
+            <nav className="flex gap-4">
+              <Link href="/dashboard/police" className="text-sm font-bold text-gray-500 hover:text-blue-900">Dashboard</Link>
+              <Link href="/dashboard/police/messages" className="text-sm font-bold text-gray-500 hover:text-blue-900">Messages</Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-4">
              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden sm:block">Official Access Only</span>
              <form action="/auth/signout" method="post">

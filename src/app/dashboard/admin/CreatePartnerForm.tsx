@@ -105,22 +105,12 @@ export function CreatePartnerForm() {
                 const val = e.target.value
                 if (val === '7-Day Free Trial') {
                   if (amountInput) amountInput.value = '0'
-                } else if (val === 'Monthly') {
-                  if (amountInput) amountInput.value = '399'
-                } else if (val === 'Quarterly') {
-                  if (amountInput) amountInput.value = '999'
-                } else if (val === '6-Months' || val === '6 Months') {
-                  if (amountInput) amountInput.value = '1799'
-                } else if (val === 'Yearly') {
-                  if (amountInput) amountInput.value = '3399'
-                } else if (val === 'Starter Monthly') {
-                  if (amountInput) amountInput.value = '199'
-                } else if (val === 'Starter Quarterly') {
-                  if (amountInput) amountInput.value = '499'
-                } else if (val === 'Starter 6 Months') {
-                  if (amountInput) amountInput.value = '899'
-                } else if (val === 'Starter Yearly') {
-                  if (amountInput) amountInput.value = '1699'
+                } else if (val === 'Monthly' || val === 'Starter Monthly') {
+                  if (amountInput) amountInput.value = '99'
+                } else if (val === '6-Months' || val === '6 Months' || val === 'Starter 6 Months') {
+                  if (amountInput) amountInput.value = '500'
+                } else if (val === 'Yearly' || val === 'Starter Yearly') {
+                  if (amountInput) amountInput.value = '1000'
                 }
               }}
               className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500"
@@ -129,22 +119,20 @@ export function CreatePartnerForm() {
                 <option value="7-Day Free Trial">7-Day Free Trial - ₹0</option>
               </optgroup>
               <optgroup label="Standard Business Tiers">
-                <option value="Monthly">Business Monthly - ₹399</option>
-                <option value="Quarterly">Business Quarterly - ₹999</option>
-                <option value="6 Months">Business 6 Months - ₹1799</option>
-                <option value="Yearly">Business Yearly - ₹3399</option>
+                <option value="Monthly">Business Monthly - ₹99</option>
+                <option value="6 Months">Business 6 Months - ₹500</option>
+                <option value="Yearly">Business Yearly - ₹1000</option>
               </optgroup>
               <optgroup label="Starter Partner Tiers">
-                <option value="Starter Monthly">Starter Monthly - ₹199</option>
-                <option value="Starter Quarterly">Starter Quarterly - ₹499</option>
-                <option value="Starter 6 Months">Starter 6 Months - ₹899</option>
-                <option value="Starter Yearly">Starter Yearly - ₹1699</option>
+                <option value="Starter Monthly">Starter Monthly - ₹99</option>
+                <option value="Starter 6 Months">Starter 6 Months - ₹500</option>
+                <option value="Starter Yearly">Starter Yearly - ₹1000</option>
               </optgroup>
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount Paid (₹)</Label>
-            <Input id="amount" name="amount" type="number" defaultValue="399" placeholder="399, 1099, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
+            <Input id="amount" name="amount" type="number" defaultValue="99" placeholder="99, 500, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
           </div>
         </div>
 

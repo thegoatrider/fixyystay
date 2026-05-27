@@ -42,6 +42,20 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
               <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">{isGuest ? 'Browse' : 'Dashboard'}</span>
             </Link>
 
+            {/* Messages Link for Owners */}
+            {userRole === 'owner' && (
+              <Link 
+                href="/dashboard/owner/messages"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all group"
+                title="Messages"
+              >
+                <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Messages</span>
+              </Link>
+            )}
+
             {/* Profile Link */}
             <Link 
               href="/guest/profile"
