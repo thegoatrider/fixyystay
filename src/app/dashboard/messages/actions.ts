@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function sendMessage(ownerId: string, senderType: 'police' | 'owner', content: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: user, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user?.user) {
@@ -35,7 +35,7 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
 
 export async function getMessages(ownerId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -56,7 +56,7 @@ export async function getMessages(ownerId: string) {
 
 export async function markAsRead(ownerId: string, readerType: 'police' | 'owner') {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     
     // We update messages where sender is NOT the reader type and are unread
     const targetSenderType = readerType === 'police' ? 'owner' : 'police'
