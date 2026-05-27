@@ -13,7 +13,7 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
   const dashboardLink = isGuest ? '/guest' : `/dashboard/${userRole}`
 
   return (
-    <header className="bg-white border-b sticky top-0 z-50 w-full shadow-sm pt-[env(safe-area-inset-top)]">
+    <header className="bg-white border-b sticky top-0 z-50 w-full shadow-sm pt-[env(safe-area-inset-top)] pt-10 md:pt-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-[3.5rem] sm:min-h-[4rem] flex items-center justify-between gap-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">

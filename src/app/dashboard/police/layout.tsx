@@ -18,7 +18,7 @@ export default async function PoliceLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <header className="bg-white border-b sticky top-0 z-50 print:hidden pt-[env(safe-area-inset-top)] mt-2 md:mt-0">
+      <header className="bg-white border-b sticky top-0 z-50 print:hidden pt-[env(safe-area-inset-top)] pt-10 md:pt-0">
         <div className="max-w-7xl mx-auto px-4 min-h-[4rem] flex items-center justify-between w-full">
           <div className="flex items-center gap-6">
             <Link href="/dashboard/police" className="flex items-center gap-3 text-blue-900">
