@@ -138,7 +138,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
   const pendingBackFileRef = useRef<File | null>(null)
 
-  const frontDone = frontStatus === 'VERIFIED'
+  const frontDone = frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW'
   const backDone = backStatus === 'DONE'
   const bothDone = frontDone && backDone
 
@@ -155,8 +155,8 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED') {
-        setFrontStatus('VERIFIED')
+      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
+        setFrontStatus(result.status as UploadState)
         setIdentityId(result.guest_identity_id)
 
         // Only call onVerified if back is already DONE (edge case if back was processed before somehow, though unlikely)
@@ -222,7 +222,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (result.success) {
       setBackStatus('DONE')
       setPendingBackFile(null)
-      if (identityId && frontStatus === 'VERIFIED') onVerified(identityId)
+      if (identityId && (frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW')) onVerified(identityId)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')

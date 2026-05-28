@@ -2,11 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import React from 'react'
+import { approveIdentity } from './actions'
 
 type GuestCheckin = {
   id: string
@@ -53,6 +54,17 @@ export default React.memo(function GuestList({
 
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [printUrl, setPrintUrl] = useState<string | null>(null)
+  
+  const handleApproveId = async (id: string) => {
+    setProcessingId(`approve-${id}`)
+    const res = await approveIdentity(id)
+    if (!res.success) {
+      alert(res.error)
+    } else {
+      // Re-fetch or UI state will ideally get updated by revalidatePath
+    }
+    setProcessingId(null)
+  }
   
   const handleDownload = async (url: string, filename: string, id: string) => {
     setProcessingId(id)
@@ -641,10 +653,21 @@ export default React.memo(function GuestList({
                           <div key={i} className="flex flex-col gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:border-indigo-200 hover:bg-white transition-all shadow-sm relative overflow-hidden">
                             {/* Verified badge */}
                             {doc.is_verified && (
-                              <div className="absolute top-0 right-0 bg-green-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Verified</div>
+                              <div className="absolute top-0 right-0 bg-green-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Verified
+                              </div>
                             )}
                             {doc.verification_status === 'MANUAL_REVIEW' && (
-                              <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Review Needed</div>
+                              <div className="absolute top-0 right-0 flex items-center shadow-sm">
+                                <div className="bg-amber-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-bl-lg tracking-widest border-r border-amber-600">Review Needed</div>
+                                <button 
+                                  onClick={() => handleApproveId(doc.id)}
+                                  disabled={processingId === `approve-${doc.id}`}
+                                  className="bg-green-600 hover:bg-green-700 text-white text-[9px] font-black uppercase px-3 py-1.5 transition-colors disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {processingId === `approve-${doc.id}` ? '...' : <><CheckCircle className="w-3 h-3" /> Approve</>}
+                                </button>
+                              </div>
                             )}
                             {doc.verification_status === 'FAILED' && !doc.is_verified && (
                               <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Failed</div>

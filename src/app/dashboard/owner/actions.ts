@@ -330,3 +330,28 @@ export async function claimFreeTrial() {
     return { error: err.message || 'Error claiming trial' }
   }
 }
+
+export async function approveIdentity(identityId: string) {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
+      .from('guest_identity')
+      .update({
+        is_verified: true,
+        verification_status: 'VERIFIED',
+        verification_reason: 'Manually approved by owner'
+      })
+      .eq('id', identityId)
+
+    if (error) {
+      console.error('Failed to approve identity:', error)
+      return { success: false, error: 'Database update failed' }
+    }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    console.error('Error approving identity:', err)
+    return { success: false, error: err.message || 'Unknown error' }
+  }
+}

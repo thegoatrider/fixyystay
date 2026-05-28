@@ -120,6 +120,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
     const base64Data = Buffer.from(arrayBuffer).toString('base64')
 
     let aiResponseText = '{}'
+    let aiUnavailableError = ''
     try {
       const response = await generateContentWithRetry({
         model: MODEL_NAME,
@@ -134,15 +135,17 @@ export async function uploadAndVerifyFront(formData: FormData) {
     } catch (aiError: any) {
       console.error('[VERIFY-FRONT] AI call failed:', aiError)
       if (aiError.message === 'AI_TIMEOUT') {
-        return { success: false, error: 'Scanning timed out. The image quality might be too poor. Please retake the photo.' }
+        aiUnavailableError = 'Scanning timed out. Saved for manual review.'
+      } else {
+        aiUnavailableError = 'AI verification service temporarily unavailable. Saved for manual review.'
       }
-      return { success: false, error: 'AI verification service temporarily unavailable.' }
     }
 
     // 3. Parse JSON
     let result: any
     let parseFailed = false
     try {
+      if (aiUnavailableError) throw new Error('AI Unavailable')
       const firstBrace = aiResponseText.indexOf('{')
       const lastBrace = aiResponseText.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -158,7 +161,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
         document_type: 'UNKNOWN', 
         confidence: 0, 
         suspicious: false, 
-        reason: 'AI could not format data correctly. Manual review required.', 
+        reason: aiUnavailableError || 'AI could not format data correctly. Manual review required.', 
         raw_ocr_text: aiResponseText 
       }
     }
@@ -166,15 +169,15 @@ export async function uploadAndVerifyFront(formData: FormData) {
     console.log('[VERIFY-FRONT] AI Result:', result.document_type, 'Confidence:', result.confidence)
 
     // 4. Validation
-    let status = 'FAILED'
+    let status = 'MANUAL_REVIEW'
     let finalReason = result.reason
 
     if (parseFailed) {
-      status = 'FAILED'
-      finalReason = 'AI extraction returned unformatted data. Please re-upload a clearer image.'
+      status = 'MANUAL_REVIEW'
+      finalReason = result.reason || 'AI extraction failed. Saved for manual review.'
     } else if (result.suspicious || !result.is_government_id) {
-      status = 'FAILED'
-      finalReason = result.reason || 'Document flagged as non-ID or suspicious. Please upload a real ID.'
+      status = 'MANUAL_REVIEW'
+      finalReason = result.reason || 'Document flagged. Saved for manual review.'
     } else {
       const num = result.document_number?.trim().replace(/\s/g, '')
       let validFormat = true
@@ -186,14 +189,14 @@ export async function uploadAndVerifyFront(formData: FormData) {
       }
 
       if (!validFormat) {
-        status = 'FAILED'
-        finalReason = 'Document number does not match expected format or image is not clear enough. Please re-upload.'
+        status = 'MANUAL_REVIEW'
+        finalReason = 'Document number does not match expected format. Saved for manual review.'
       } else {
         if (result.confidence >= 0.40) {
           status = 'VERIFIED'
         } else {
-          status = 'FAILED'
-          finalReason = 'Image quality too poor. Please upload a clearer image.'
+          status = 'MANUAL_REVIEW'
+          finalReason = 'Image quality too poor. Saved for manual review.'
         }
       }
     }
