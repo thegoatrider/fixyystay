@@ -90,7 +90,7 @@ async function generateContentWithRetry(contents: any, maxRetries = 3) {
     try {
       const generatePromise = ai.models.generateContent(contents);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), 25000)
+        setTimeout(() => reject(new Error('AI_TIMEOUT')), 45000)
       );
       const response = await Promise.race([generatePromise, timeoutPromise]) as any;
       return response;
@@ -142,27 +142,30 @@ export async function uploadAndVerifyFront(formData: FormData) {
     }
 
     // 3. Parse JSON
-    let result: any
+    let result: any = {}
     let parseFailed = false
     try {
       if (aiUnavailableError) throw new Error('AI Unavailable')
-      const firstBrace = aiResponseText.indexOf('{')
-      const lastBrace = aiResponseText.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const jsonStr = aiResponseText.substring(firstBrace, lastBrace + 1)
-        result = JSON.parse(jsonStr)
-      } else {
-        throw new Error('No JSON object found')
-      }
+      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
     } catch {
-      parseFailed = true
-      result = { 
-        is_government_id: false, 
-        document_type: 'UNKNOWN', 
-        confidence: 0, 
-        suspicious: false, 
-        reason: aiUnavailableError || 'AI could not format data correctly. Manual review required.', 
-        raw_ocr_text: aiResponseText 
+      try {
+        const firstBrace = aiResponseText.indexOf('{')
+        const lastBrace = aiResponseText.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+        } else {
+          throw new Error('No JSON object found')
+        }
+      } catch (fallbackErr) {
+        parseFailed = true
+        result = { 
+          is_government_id: false, 
+          document_type: 'UNKNOWN', 
+          confidence: 0, 
+          suspicious: false, 
+          reason: aiUnavailableError || 'AI could not format data correctly. Manual review required.', 
+          raw_ocr_text: aiResponseText 
+        }
       }
     }
 
@@ -213,7 +216,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
       verification_status: status,
       document_image_url: imageUrl,    // front image
       back_image_url: null,            // will be filled by uploadBackImage
-      raw_ocr_text: result.raw_ocr_text || '',
+      raw_ocr_text: result.raw_ocr_text || aiResponseText || '',
       ocr_json: result,
       verification_reason: finalReason
     }

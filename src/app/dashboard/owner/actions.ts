@@ -3,6 +3,23 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { GoogleGenAI } from '@google/genai'
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+
+const OCR_SYSTEM_PROMPT = `
+You are an expert Government ID verification AI.
+Analyze the provided image and extract information strictly in JSON format.
+Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
+Return STRICTLY this JSON format (no markdown):
+{
+  "document_type": string,
+  "document_number": string,
+  "full_name": string,
+  "date_of_birth": string,
+  "raw_ocr_text": string
+}
+`
 
 async function generatePropertyUid(supabaseAdmin: any, city: string) {
   const prefixes: Record<string, string> = {
@@ -334,12 +351,58 @@ export async function claimFreeTrial() {
 export async function approveIdentity(identityId: string) {
   try {
     const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch identity to check if OCR data is missing
+    const { data: identity } = await supabaseAdmin
+      .from('guest_identity')
+      .select('document_image_url, document_number, full_name')
+      .eq('id', identityId)
+      .single()
+
+    let ocrUpdates: any = {}
+
+    if (identity && identity.document_image_url && (!identity.document_number || !identity.full_name)) {
+      try {
+        console.log('[APPROVE] Missing OCR data. Running background scan...')
+        const response = await fetch(identity.document_image_url)
+        const arrayBuffer = await response.arrayBuffer()
+        const base64Data = Buffer.from(arrayBuffer).toString('base64')
+        const mimeType = response.headers.get('content-type') || 'image/jpeg'
+
+        const generatePromise = ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            OCR_SYSTEM_PROMPT,
+            { inlineData: { data: base64Data, mimeType } }
+          ],
+          config: { temperature: 0.0, responseMimeType: 'application/json' }
+        });
+        
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 15000));
+        const aiResponse = await Promise.race([generatePromise, timeoutPromise]) as any;
+        const aiText = aiResponse.text || '{}';
+        
+        const result = JSON.parse(aiText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+        
+        if (result.document_number) ocrUpdates.document_number = result.document_number
+        if (result.full_name) ocrUpdates.full_name = result.full_name
+        if (result.document_type && result.document_type !== 'UNKNOWN') ocrUpdates.document_type = result.document_type
+        if (result.date_of_birth) ocrUpdates.date_of_birth = result.date_of_birth
+        if (result.raw_ocr_text) ocrUpdates.raw_ocr_text = result.raw_ocr_text
+        
+        console.log('[APPROVE] Background scan successful.')
+      } catch (ocrErr) {
+        console.error('[APPROVE] Background scan failed:', ocrErr)
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('guest_identity')
       .update({
         is_verified: true,
         verification_status: 'VERIFIED',
-        verification_reason: 'Manually approved by owner'
+        verification_reason: 'Manually approved by owner',
+        ...ocrUpdates
       })
       .eq('id', identityId)
 
