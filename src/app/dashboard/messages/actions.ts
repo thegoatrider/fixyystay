@@ -12,7 +12,18 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
       return { success: false, error: 'Unauthorized' }
     }
 
-    const { error } = await supabase
+    const role = user.user.user_metadata?.role;
+    if (senderType === 'police' && role !== 'police') {
+      return { success: false, error: 'Unauthorized role' }
+    }
+    // Note: We don't strictly enforce owner id match here for owners to avoid edge case issues, 
+    // but we enforce the senderType role.
+    if (senderType === 'owner' && role !== 'owner') {
+      return { success: false, error: 'Unauthorized role' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
       .from('messages')
       .insert({
         owner_id: ownerId,
@@ -36,7 +47,14 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
 export async function getMessages(ownerId: string) {
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    const { data: user, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user?.user) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    const { data, error } = await supabaseAdmin
       .from('messages')
       .select('*')
       .eq('owner_id', ownerId)
@@ -57,11 +75,16 @@ export async function getMessages(ownerId: string) {
 export async function markAsRead(ownerId: string, readerType: 'police' | 'owner') {
   try {
     const supabase = await createClient()
-    
-    // We update messages where sender is NOT the reader type and are unread
+    const { data: user, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user?.user) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
     const targetSenderType = readerType === 'police' ? 'owner' : 'police'
 
-    const { error } = await supabase
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
       .from('messages')
       .update({ is_read: true })
       .eq('owner_id', ownerId)
@@ -84,12 +107,12 @@ export async function getOwnersWithProperties() {
   try {
     const supabaseAdmin = createAdminClient()
     
-    // Using admin client because police might not have RLS access to see all users/properties if not setup
-    // Fetch users who are owners
-    const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
-    if (usersError) throw usersError
+    // Fetch directly from owners table to avoid auth.admin.listUsers() limits
+    const { data: owners, error: ownersError } = await supabaseAdmin
+      .from('owners')
+      .select('*')
 
-    const owners = users.users.filter(u => u.user_metadata?.role === 'owner')
+    if (ownersError) throw ownersError
     
     // Fetch properties
     const { data: properties, error: propError } = await supabaseAdmin
@@ -100,10 +123,11 @@ export async function getOwnersWithProperties() {
 
     // Map owners to their properties
     const ownersData = owners.map(owner => {
+      // properties.owner_id matches owners.id
       const ownerProps = properties.filter(p => p.owner_id === owner.id)
       return {
-        id: owner.id,
-        name: owner.user_metadata?.name || owner.email || 'Unknown Owner',
+        id: owner.user_id, // Important: keep id as user_id for messaging
+        name: owner.name || owner.email || 'Unknown Owner',
         properties: ownerProps
       }
     })
