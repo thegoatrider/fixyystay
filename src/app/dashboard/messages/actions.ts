@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
-export async function sendMessage(ownerId: string, senderType: 'police' | 'owner', content: string) {
+export async function sendMessage(ownerId: string, senderType: 'police' | 'owner', content: string, attachmentUrl?: string) {
   try {
     const supabase = await createClient()
     const { data: user, error: authError } = await supabase.auth.getUser()
@@ -29,6 +29,7 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
         owner_id: ownerId,
         sender_type: senderType,
         content: content,
+        attachment_url: attachmentUrl || null,
         is_read: false
       })
 

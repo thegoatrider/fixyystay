@@ -5,15 +5,17 @@ import { createClient } from '@/utils/supabase/client'
 import { getMessages, sendMessage, markAsRead } from '@/app/dashboard/messages/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, ShieldAlert, AlertCircle } from 'lucide-react'
+import { Send, ShieldAlert, AlertCircle, Paperclip, Loader2 } from 'lucide-react'
 
 export default function OwnerMessagesPage() {
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -91,6 +93,34 @@ export default function OwnerMessagesPage() {
     }
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !ownerId) return
+
+    setIsUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `msg-owner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('message_attachments')
+        .upload(fileName, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('message_attachments').getPublicUrl(fileName)
+      
+      const res = await sendMessage(ownerId, 'owner', '📷 Image attached', urlData.publicUrl)
+      if (!res.success) throw new Error(res.error)
+      
+    } catch (err: any) {
+      alert('Failed to upload image: ' + err.message)
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">Loading messages...</div>
   }
@@ -119,7 +149,14 @@ export default function OwnerMessagesPage() {
             return (
               <div key={msg.id || idx} className={`flex ${isOwner ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] md:max-w-[60%] p-3.5 rounded-2xl ${isOwner ? 'bg-blue-600 text-white rounded-br-sm shadow-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm'}`}>
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                  {msg.attachment_url && (
+                    <div className="mb-2 rounded-lg overflow-hidden bg-black/5 flex justify-center">
+                      <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-64 object-contain rounded-md" />
+                    </div>
+                  )}
+                  {msg.content !== '📷 Image attached' && (
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                  )}
                   <div className={`text-[10px] mt-1.5 text-right font-medium ${isOwner ? 'text-blue-200' : 'text-gray-400'}`}>
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
@@ -132,17 +169,37 @@ export default function OwnerMessagesPage() {
       </div>
 
       <div className="p-4 border-t bg-white">
-        <form onSubmit={handleSendMessage} className="flex gap-2 max-w-4xl mx-auto">
-          <Input 
-            placeholder="Type your message to the police..." 
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="rounded-full bg-gray-50 h-12 px-6"
+        <div className="flex gap-2 items-center max-w-4xl mx-auto">
+          <input 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
           />
-          <Button type="submit" size="icon" className="rounded-full h-12 w-12 shrink-0 bg-blue-600 hover:bg-blue-700 shadow-md" disabled={!newMessage.trim()}>
-            <Send className="w-5 h-5" />
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full h-12 w-12 shrink-0 text-gray-500 hover:bg-gray-100"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            title="Attach Photo"
+          >
+            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
           </Button>
-        </form>
+          <form onSubmit={handleSendMessage} className="flex-1 flex gap-2">
+            <Input 
+              placeholder="Type your message to the police..." 
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="rounded-full bg-gray-50 h-12 px-6"
+            />
+            <Button type="submit" size="icon" className="rounded-full h-12 w-12 shrink-0 bg-blue-600 hover:bg-blue-700 shadow-md" disabled={!newMessage.trim()}>
+              <Send className="w-5 h-5 text-white" />
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   )
