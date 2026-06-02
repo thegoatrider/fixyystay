@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide-react'
+import { Home, List, MessageSquare, Users, Wallet, User, Zap, Megaphone, TrendingUp } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
@@ -116,6 +116,7 @@ export default function OwnerDashboardClient({
         <TabLink href="/dashboard/owner?tab=employees" active={activeTab === 'employees'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Employees" />
         <TabLink href="/dashboard/owner?tab=influencers" active={activeTab === 'influencers'} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Influencers" count={pendingInfluencerRequestCount} />
         <TabLink href="/dashboard/owner?tab=wallet" active={activeTab === 'wallet'} icon={<Wallet className="w-4 h-4 md:w-5 md:h-5" />} label="Wallet" />
+        <TabLink href="/dashboard/owner?tab=marketing" active={activeTab === 'marketing'} icon={<TrendingUp className="w-4 h-4 md:w-5 md:h-5" />} label="Marketing" />
         <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
       </div>
 
@@ -183,6 +184,14 @@ export default function OwnerDashboardClient({
             payouts={payout_requests || []} 
             onRequestPayout={handleRequestPayout}
           />
+        )}
+
+        {activeTab === 'marketing' && (
+          <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border shadow-sm min-h-[400px]">
+            <TrendingUp className="w-16 h-16 text-blue-500 mb-6" />
+            <h3 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Marketing</h3>
+            <p className="text-gray-500 text-lg font-medium">Coming Soon</p>
+          </div>
         )}
       </div>
 
