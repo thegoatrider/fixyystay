@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getOwnersWithProperties, getMessages, sendMessage, markAsRead } from '@/app/dashboard/messages/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Send, User, Home, AlertCircle, ChevronLeft, Paperclip, Loader2 } from 'lucide-react'
+import { Search, Send, User, Home, AlertCircle, ChevronLeft, Paperclip, Loader2, X, FileText } from 'lucide-react'
 
 export default function PoliceMessagesPage() {
   const [owners, setOwners] = useState<any[]>([])
@@ -17,7 +17,7 @@ export default function PoliceMessagesPage() {
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
@@ -90,10 +90,12 @@ export default function PoliceMessagesPage() {
 
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedOwnerId) return
+    if ((!newMessage.trim() && !selectedFile) || !selectedOwnerId || isUploading) return
 
-    const content = newMessage
+    const content = newMessage.trim() || (selectedFile ? `📄 ${selectedFile.name}` : '')
     setNewMessage('')
+    const fileToUpload = selectedFile
+    setSelectedFile(null)
     
     // Optimistic UI update
     const tempMsg = {
@@ -105,7 +107,31 @@ export default function PoliceMessagesPage() {
     }
     setMessages(prev => [...prev, tempMsg])
 
-    const res = await sendMessage(selectedOwnerId, 'police', content)
+    let attachmentUrl = undefined
+    if (fileToUpload) {
+      setIsUploading(true)
+      try {
+        const fileExt = fileToUpload.name.split('.').pop()
+        const fileName = `msg-police-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+        
+        const { error: uploadError } = await supabase.storage
+          .from('message_attachments')
+          .upload(fileName, fileToUpload)
+
+        if (uploadError) throw uploadError
+
+        const { data: urlData } = supabase.storage.from('message_attachments').getPublicUrl(fileName)
+        attachmentUrl = urlData.publicUrl
+      } catch (err: any) {
+        alert('Failed to upload file: ' + err.message)
+        setIsUploading(false)
+        setMessages(prev => prev.filter(m => m.id !== tempMsg.id))
+        return
+      }
+      setIsUploading(false)
+    }
+
+    const res = await sendMessage(selectedOwnerId, 'police', content, attachmentUrl)
     if (!res.success) {
       // Revert if failed
       setMessages(prev => prev.filter(m => m.id !== tempMsg.id))
@@ -113,32 +139,12 @@ export default function PoliceMessagesPage() {
     }
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !selectedOwnerId) return
-
-    setIsUploading(true)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `msg-police-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
-      
-      const { error: uploadError } = await supabase.storage
-        .from('message_attachments')
-        .upload(fileName, file)
-
-      if (uploadError) throw uploadError
-
-      const { data: urlData } = supabase.storage.from('message_attachments').getPublicUrl(fileName)
-      
-      const res = await sendMessage(selectedOwnerId, 'police', '📷 Image attached', urlData.publicUrl)
-      if (!res.success) throw new Error(res.error)
-      
-    } catch (err: any) {
-      alert('Failed to upload image: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    if (file) {
+      setSelectedFile(file)
     }
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const selectedOwner = owners.find(o => o.id === selectedOwnerId)
@@ -225,11 +231,18 @@ export default function PoliceMessagesPage() {
                     <div key={msg.id || idx} className={`flex ${isPolice ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[70%] p-3 rounded-2xl ${isPolice ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border text-gray-800 rounded-bl-sm shadow-sm'}`}>
                         {msg.attachment_url && (
-                          <div className="mb-2 rounded-lg overflow-hidden bg-black/5 flex justify-center">
-                            <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-64 object-contain rounded-md" />
+                          <div className="mb-2 rounded-lg overflow-hidden flex justify-center">
+                            {msg.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                              <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-64 object-contain rounded-md bg-black/5" />
+                            ) : (
+                              <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-white/20 rounded-md hover:bg-white/30 transition-colors w-full border border-black/10">
+                                <FileText className="w-8 h-8 shrink-0" />
+                                <span className="text-sm break-all underline">Download Attachment</span>
+                              </a>
+                            )}
                           </div>
                         )}
-                        {msg.content !== '📷 Image attached' && (
+                        {msg.content !== '📷 Image attached' && !msg.content.startsWith('📄 ') && (
                           <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
                         )}
                         <div className={`text-[10px] mt-1 text-right ${isPolice ? 'text-blue-200' : 'text-gray-400'}`}>
@@ -244,13 +257,22 @@ export default function PoliceMessagesPage() {
             </div>
 
             <div className="p-4 border-t bg-white">
+              {selectedFile && (
+                <div className="flex items-center gap-2 mb-2 p-2 bg-blue-50 rounded-lg text-sm text-blue-700 w-fit">
+                  <Paperclip className="w-4 h-4" />
+                  <span className="truncate max-w-[200px]">{selectedFile.name}</span>
+                  <button type="button" onClick={() => setSelectedFile(null)} className="text-blue-400 hover:text-blue-700 font-bold ml-2">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 items-center">
                 <input 
                   type="file" 
-                  accept="image/*" 
+                  accept="image/*,application/pdf,.doc,.docx" 
                   className="hidden" 
                   ref={fileInputRef} 
-                  onChange={handleFileUpload} 
+                  onChange={handleFileSelect} 
                 />
                 <Button 
                   type="button" 
@@ -259,7 +281,7 @@ export default function PoliceMessagesPage() {
                   className="rounded-full h-10 w-10 shrink-0 text-gray-500 hover:bg-gray-100"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  title="Attach Photo"
+                  title="Attach File"
                 >
                   {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                 </Button>
@@ -269,8 +291,9 @@ export default function PoliceMessagesPage() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     className="rounded-full bg-gray-50"
+                    disabled={isUploading}
                   />
-                  <Button type="submit" size="icon" className="rounded-full h-10 w-10 shrink-0 bg-blue-600 hover:bg-blue-700" disabled={!newMessage.trim()}>
+                  <Button type="submit" size="icon" className="rounded-full h-10 w-10 shrink-0 bg-blue-600 hover:bg-blue-700" disabled={(!newMessage.trim() && !selectedFile) || isUploading}>
                     <Send className="w-4 h-4 text-white" />
                   </Button>
                 </form>

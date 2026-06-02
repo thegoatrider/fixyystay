@@ -378,7 +378,7 @@ export async function approveIdentity(identityId: string) {
           config: { temperature: 0.0, responseMimeType: 'application/json' }
         });
         
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 15000));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 45000));
         const aiResponse = await Promise.race([generatePromise, timeoutPromise]) as any;
         const aiText = aiResponse.text || '{}';
         
