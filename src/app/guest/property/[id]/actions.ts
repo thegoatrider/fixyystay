@@ -183,7 +183,7 @@ export async function confirmBooking(
       if (ownerUserId) {
         await supabaseAdmin.from('wallet_transactions').insert({
           user_id: ownerUserId,
-          amount: amount * 0.80,
+          amount: amount * 0.88,
           transaction_type: 'earning',
           booking_id: insertedBooking.id,
           description: `Booking payout for ${guestData.name}`
@@ -213,7 +213,7 @@ export async function confirmBooking(
         }
 
         const { data: inf } = await supabaseAdmin.from('influencers').select('commission_rate, user_id').eq('id', actualInfluencerId).single()
-        const rate = Math.min(Number(inf?.commission_rate || 0), 20)
+        const rate = Math.min(Number(inf?.commission_rate || 0), 12)
         if (rate > 0 && inf?.user_id) {
           const commissionAmount = amount * (rate / 100);
           await supabaseAdmin.from('wallet_transactions').insert({
