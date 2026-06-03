@@ -209,6 +209,12 @@ export default async function Index() {
           </a>
         </div>
 
+        {/* Legal Links */}
+        <div className="flex justify-center gap-6 pb-4 text-xs font-medium text-gray-500">
+          <Link href="/privacy-policy" className="hover:text-blue-600 transition">Privacy Policy</Link>
+          <Link href="/terms-and-conditions" className="hover:text-blue-600 transition">Terms & Conditions</Link>
+        </div>
+
         {/* Copyright */}
         <div className="border-t py-3 text-center text-xs text-gray-400">
           © 2026 Fixy Stays · Most trusted property booking platform
