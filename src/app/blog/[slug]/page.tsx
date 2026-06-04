@@ -11,13 +11,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const post = blogPosts.find(p => p.slug === slug)
   if (!post) return {}
+  
+  const url = `https://www.fixystays.com/blog/${slug}`
+  
   return {
     title: post.title + ' | Fixy Stays',
     description: post.excerpt,
+    keywords: ['Alibag travel', 'Alibag stays', 'luxury villas in Alibag', post.category],
     openGraph: {
       title: post.title,
       description: post.excerpt,
       type: 'article',
+      url,
+      authors: [post.author],
+      publishedTime: post.date,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt,
     }
   }
 }
@@ -104,8 +116,33 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const otherPosts = blogPosts.filter(p => p.slug !== slug)
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt,
+    author: {
+      '@type': 'Person',
+      name: post.author,
+    },
+    datePublished: post.date,
+    url: `https://www.fixystays.com/blog/${slug}`,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Fixy Stays',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://www.fixystays.com/logo.png',
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">

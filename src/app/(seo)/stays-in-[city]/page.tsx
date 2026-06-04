@@ -23,12 +23,25 @@ export async function generateMetadata({ params }: { params: { city: string } })
   if (!location) return {}
   
   const seo = generateSEOContent(location.name)
+  const url = `https://www.fixystays.com/stays-in-${params.city}`
   
   return {
     title: seo.title,
     description: seo.metaDescription,
+    keywords: [`stays in ${location.name}`, `hotels in ${location.name}`, `villas in ${location.name}`, `resorts in ${location.name}`, 'Alibag stays', 'Fixy Stays'],
+    openGraph: {
+      title: seo.title,
+      description: seo.metaDescription,
+      url,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.metaDescription,
+    },
     alternates: {
-      canonical: `https://www.fixystays.com/stays-in-${params.city}`,
+      canonical: url,
     }
   }
 }

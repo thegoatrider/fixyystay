@@ -1,5 +1,14 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Terms and Conditions | Fixy Stays',
+  description: 'Read the terms and conditions for using Fixy Stays. Understand the rules for property booking, cancellation policies, and user agreements.',
+  alternates: {
+    canonical: 'https://www.fixystays.com/terms-and-conditions',
+  }
+};
 
 export default function TermsAndConditionsPage() {
   return (

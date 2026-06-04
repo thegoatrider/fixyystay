@@ -21,12 +21,27 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   
   const title = `${property.name} | ${property.type} in ${property.city_area || property.city || 'India'} | FixyStays`
   const description = `Book ${property.name}, a premium ${property.type.toLowerCase()} in ${property.city_area || property.city}. Starting from ₹${property.base_price}. Amenities: ${(property.amenities || []).slice(0, 3).join(', ')}. Book now on FixyStays!`
+  const url = `https://www.fixystays.com/property/${params.slug}`
   
   return {
     title,
     description,
+    keywords: [property.name, `${property.type} in ${property.city}`, `book ${property.name}`, `hotels in ${property.city}`, `resorts in ${property.city}`, `villas in ${property.city}`, 'Alibag stays', 'Fixy Stays'],
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'website',
+      images: property.image_url ? [{ url: property.image_url }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: property.image_url ? [property.image_url] : [],
+    },
     alternates: {
-      canonical: `https://www.fixystays.com/property/${params.slug}`,
+      canonical: url,
     }
   }
 }

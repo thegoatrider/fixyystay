@@ -1,9 +1,21 @@
 import Link from 'next/link'
+import { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Hero } from '@/components/Hero'
 import { blogPosts } from './blog/data'
 import { Clock, ArrowRight, LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Fixy Stays | Book Premium Stays, Hotels & Luxury Villas in Alibag',
+  description: 'Discover the best luxury villas, premium cottages, hotels, and vacation rentals in Alibag. Book your perfect getaway with Fixy Stays today.',
+  keywords: ['Alibag stays', 'luxury villas in Alibag', 'hotels in Alibag', 'premium cottages Alibag', 'book villa Alibag', 'Alibag resorts', 'vacation rentals Alibag', 'best hotels Alibag', 'weekend getaway Alibag', 'Alibag beach resorts', 'private pool villas Alibag', 'Fixy Stays'],
+  openGraph: {
+    title: 'Fixy Stays | Book Premium Stays, Hotels & Luxury Villas in Alibag',
+    description: 'Discover the best luxury villas, premium cottages, hotels, and vacation rentals in Alibag. Book your perfect getaway with Fixy Stays today.',
+    url: 'https://www.fixystays.com',
+  },
+}
 
 export default async function Index() {
   const supabase = await createClient()
@@ -11,6 +23,22 @@ export default async function Index() {
 
   return (
     <div className="flex-1 w-full flex flex-col items-center pb-32 md:pb-0">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Fixy Stays',
+            url: 'https://www.fixystays.com',
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: 'https://www.fixystays.com/guest?q={search_term_string}',
+              'query-input': 'required name=search_term_string',
+            },
+          }),
+        }}
+      />
       <nav className="w-full flex justify-center border-b border-b-foreground/10 pt-[env(safe-area-inset-top)] min-h-16 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="w-full max-w-4xl flex justify-between items-center px-4 py-3 text-sm">
           <div className="flex items-center gap-6">

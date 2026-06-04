@@ -1,8 +1,25 @@
 import BasePricingClient, { PricingPlan } from '../BasePricingClient'
 
-export const metadata = {
-  title: 'Starter Pricing - FixStay',
-  description: 'Special starter plans for property owners.',
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Starter Pricing for Property Owners | Fixy Stays',
+  description: 'Affordable starter plans for property owners in Alibag. List unlimited properties, get instant lead notifications, and grow your hotel, villa, or resort business with Fixy Stays.',
+  keywords: ['property management software', 'list property Alibag', 'hotel management Alibag', 'villa management Alibag', 'Fixy Stays starter plan', 'owner pricing'],
+  openGraph: {
+    title: 'Starter Pricing for Property Owners | Fixy Stays',
+    description: 'Affordable starter plans for property owners in Alibag. List unlimited properties, get instant lead notifications, and grow your hotel, villa, or resort business with Fixy Stays.',
+    url: 'https://www.fixystays.com/pricing/starter',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Starter Pricing for Property Owners | Fixy Stays',
+    description: 'Affordable starter plans for property owners in Alibag. Grow your hotel, villa, or resort business with Fixy Stays.',
+  },
+  alternates: {
+    canonical: 'https://www.fixystays.com/pricing/starter',
+  }
 }
 
 const SHARED_FEATURES = [

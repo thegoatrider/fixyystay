@@ -1,5 +1,14 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy | Fixy Stays',
+  description: 'Read the privacy policy of Fixy Stays. Learn how we handle your data for property bookings and rentals in Alibag.',
+  alternates: {
+    canonical: 'https://www.fixystays.com/privacy-policy',
+  }
+};
 
 export default function PrivacyPolicyPage() {
   return (

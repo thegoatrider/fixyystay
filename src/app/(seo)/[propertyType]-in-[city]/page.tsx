@@ -33,12 +33,26 @@ export async function generateMetadata({ params }: { params: { propertyType: str
   if (!location) return {}
   
   const seo = generateSEOContent(location.name, params.propertyType)
+  const url = `https://www.fixystays.com/${params.propertyType}-in-${params.city}`
+  const humanReadableType = params.propertyType.replace('-', ' ')
   
   return {
     title: seo.title,
     description: seo.metaDescription,
+    keywords: [`${humanReadableType} in ${location.name}`, `best ${humanReadableType} ${location.name}`, `book ${humanReadableType} Alibag`, 'Alibag stays', 'Fixy Stays'],
+    openGraph: {
+      title: seo.title,
+      description: seo.metaDescription,
+      url,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.metaDescription,
+    },
     alternates: {
-      canonical: `https://www.fixystays.com/${params.propertyType}-in-${params.city}`,
+      canonical: url,
     }
   }
 }
