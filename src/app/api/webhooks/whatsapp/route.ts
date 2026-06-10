@@ -20,9 +20,24 @@ export async function GET(req: Request) {
   return new NextResponse('Not Found', { status: 404 });
 }
 
+import crypto from 'crypto';
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    const signature = req.headers.get('x-hub-signature-256');
+    const APP_SECRET = process.env.META_APP_SECRET;
+
+    // Validate Signature if secret is provided
+    if (APP_SECRET && signature) {
+      const expectedHash = crypto.createHmac('sha256', APP_SECRET).update(rawBody).digest('hex');
+      if (signature !== `sha256=${expectedHash}`) {
+        console.error('Invalid Meta webhook signature');
+        return new NextResponse('Invalid signature', { status: 401 });
+      }
+    }
+
+    const body = JSON.parse(rawBody);
 
     if (body.object !== 'whatsapp_business_account') {
       return new NextResponse('Not Found', { status: 404 });
