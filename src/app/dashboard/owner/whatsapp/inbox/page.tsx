@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Send, Paperclip, Image as ImageIcon, FileText, User, Tag, Clock, ArrowLeft } from 'lucide-react';
+import { Search, Send, Paperclip, Image as ImageIcon, FileText, User, Tag, Clock, ArrowLeft, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 export default function WhatsAppInbox() {
