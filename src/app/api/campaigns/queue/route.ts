@@ -49,6 +49,7 @@ export async function POST(req: Request) {
       .from('campaigns')
       .insert({
         owner_id: ownerId,
+        name: `Campaign ${new Date().toISOString().split('T')[0]}`,
         template_name: template.template_name,
         total_recipients: leads.length,
         status: 'queued'
@@ -60,33 +61,30 @@ export async function POST(req: Request) {
       throw new Error('Failed to create campaign');
     }
 
-    // Create Campaign Logs (The Queue)
-    const logsPayload = leads.map(l => ({
+    // Insert into message_queue for the background worker
+    const queuePayload = leads.map(l => ({
+      owner_id: ownerId,
       campaign_id: campaign.id,
       lead_id: l.id,
-      phone_number: l.phone_number,
-      status: 'queued'
+      type: 'template',
+      payload: {
+        to: l.phone_number,
+        template_name: template.template_name,
+        language: template.language_code || 'en'
+      },
+      status: 'pending'
     }));
 
     // Chunk the insert just in case of large payload
-    const chunkSize = 1000;
-    for (let i = 0; i < logsPayload.length; i += chunkSize) {
-      const chunk = logsPayload.slice(i, i + chunkSize);
-      const { error: logsErr } = await supabase.from('campaign_logs').insert(chunk);
-      if (logsErr) throw new Error('Failed to insert logs: ' + logsErr.message);
+    const chunkSize = 500;
+    for (let i = 0; i < queuePayload.length; i += chunkSize) {
+      const chunk = queuePayload.slice(i, i + chunkSize);
+      const { error: queueErr } = await supabase.from('message_queue').insert(chunk);
+      if (queueErr) throw new Error('Failed to insert into queue: ' + queueErr.message);
     }
 
-    // Update campaign status to processing
+    // Update campaign status to processing (the worker will handle the rest)
     await supabase.from('campaigns').update({ status: 'processing' }).eq('id', campaign.id);
-
-    // *Ideally*, here we would trigger an edge function or Upstash QStash.
-    // For MVP, we will rely on a chron job or a manual trigger loop hitting /api/campaigns/process
-    // We can fire-and-forget a non-blocking fetch call to /api/campaigns/process
-    // NOTE: In Vercel serverless this might get killed before finishing, 
-    // but the db state is safe for true chron retries.
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/campaigns/process`, {
-       method: 'POST' 
-    }).catch(() => {});
 
     return NextResponse.json({ success: true, campaignId: campaign.id, queued: leads.length });
   } catch (err: any) {

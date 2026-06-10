@@ -92,9 +92,10 @@ export default function LeadsImportPage() {
     // Format leads for DB payload
     const payload = preview.map(l => ({
       owner_id: owner.id,
-      guest_name: l.name,
+      name: l.name,
       phone_number: l.phone,
       status: 'Imported',
+      source: 'CSV Upload'
     }));
 
     // In a real production app we'd do batch inserts. Since this is MVP, we just do one large insert 

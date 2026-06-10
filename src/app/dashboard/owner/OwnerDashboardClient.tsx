@@ -21,6 +21,7 @@ const LeadsSection = dynamic(() => import('./LeadsSection'), { loading: () => <D
 const GuestList = dynamic(() => import('./GuestList'), { loading: () => <DashboardSkeleton /> })
 const InfluencerRequestsInbox = dynamic(() => import('./InfluencerRequestsInbox'), { loading: () => <DashboardSkeleton /> })
 const EmployeeSection = dynamic(() => import('./EmployeeSection'), { loading: () => <DashboardSkeleton /> })
+const MarketingSection = dynamic(() => import('./MarketingSection'), { loading: () => <DashboardSkeleton /> })
 
 export default function OwnerDashboardClient({ 
   userId, 
@@ -187,11 +188,7 @@ export default function OwnerDashboardClient({
         )}
 
         {activeTab === 'marketing' && (
-          <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border shadow-sm min-h-[400px]">
-            <TrendingUp className="w-16 h-16 text-blue-500 mb-6" />
-            <h3 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Marketing</h3>
-            <p className="text-gray-500 text-lg font-medium">Coming Soon</p>
-          </div>
+          <MarketingSection ownerId={ownerId} />
         )}
       </div>
 

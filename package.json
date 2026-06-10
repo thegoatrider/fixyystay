@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "worker:campaigns": "npx tsx worker/campaign-worker.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
@@ -24,6 +25,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.4.2",
     "lucide-react": "^0.577.0",
     "mapbox-gl": "^3.20.0",
     "next": "16.1.6",
@@ -35,7 +37,8 @@
     "react-map-gl": "^8.1.0",
     "resend": "^6.9.4",
     "stripe": "^20.4.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "tsx": "^4.22.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
