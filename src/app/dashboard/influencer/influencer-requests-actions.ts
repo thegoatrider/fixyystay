@@ -13,12 +13,40 @@ export async function submitPromotionRequest(propertyId: string, proposalText: s
 
     if (!user) return { error: 'Unauthorized' }
 
+    const normalizedEmail = user.email ? user.email.toLowerCase() : ''
+
     // 1. Get Influencer ID representing this user
-    const { data: existingInfluencer } = await supabase
+    let { data: existingInfluencer } = await supabase
       .from('influencers')
-      .select('id, approved')
+      .select('id, approved, user_id, email')
       .eq('user_id', user.id)
       .maybeSingle()
+
+    // Backup: Find by email if not found by user_id
+    if (!existingInfluencer) {
+      const { data: byEmail } = await supabase
+        .from('influencers')
+        .select('id, approved, user_id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle()
+
+      if (byEmail) {
+        existingInfluencer = byEmail
+        // Update user_id and email format to ensure sync
+        await supabase
+          .from('influencers')
+          .update({ user_id: user.id, email: normalizedEmail })
+          .eq('id', byEmail.id)
+      }
+    } else {
+      // Keep email lowercase
+      if (existingInfluencer.email !== normalizedEmail) {
+        await supabase
+          .from('influencers')
+          .update({ email: normalizedEmail })
+          .eq('id', existingInfluencer.id)
+      }
+    }
 
     let influencerId = existingInfluencer?.id
 
@@ -28,9 +56,10 @@ export async function submitPromotionRequest(propertyId: string, proposalText: s
         const { data: newInfluencer, error: createError } = await supabase
           .from('influencers')
           .insert({
+            id: user.id,
             user_id: user.id,
             name: user.user_metadata?.name || user.email?.split('@')[0],
-            email: user.email,
+            email: normalizedEmail,
             approved: true, // Auto-approve for marketplace flow
             commission_rate: 5 // Standard default
           })

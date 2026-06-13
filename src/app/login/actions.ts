@@ -25,8 +25,16 @@ export async function login(formData: FormData) {
   // Robustness: Verify and sync role metadata on login
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    const { data: owner } = await supabase.from('owners').select('id').eq('email', user.email).maybeSingle()
-    const { data: influencer } = await supabase.from('influencers').select('id').eq('email', user.email).maybeSingle()
+    const normalizedEmail = user.email ? user.email.toLowerCase() : ''
+    const { data: owner } = await supabase.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+    const { data: influencer } = await supabase.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+
+    if (owner && owner.user_id !== user.id) {
+      await supabase.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+    }
+    if (influencer && influencer.user_id !== user.id) {
+      await supabase.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
+    }
 
     let role = user.user_metadata?.role
     if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer' && role !== 'owner' && role !== 'agent')) {
@@ -63,6 +71,8 @@ export async function signup(formData: FormData) {
     redirect(`/signup?message=All fields are required&next=${encodeURIComponent(next)}`)
   }
 
+  const normalizedEmail = email.toLowerCase()
+
   // Prevent users from signing up as admin
   const allowedRoles = ['guest', 'owner', 'influencer']
   if (!allowedRoles.includes(role)) {
@@ -72,7 +82,7 @@ export async function signup(formData: FormData) {
   // 1. Sign up user and store role in user_metadata
   const origin = (await headers()).get('origin')
   const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
+    email: normalizedEmail,
     password,
     options: {
       data: {
@@ -95,20 +105,19 @@ export async function signup(formData: FormData) {
       {
         user_id: userId,
         name,
-        email,
+        email: normalizedEmail,
       },
     ])
     if (dbError) {
       console.error('Failed to create owner record:', dbError)
     }
   } else if (role === 'influencer') {
-    // Note: If influencers table has user_id, it will be added, otherwise we just map by email
-    // I will try to supply id as the userId if the schema allows, or just insert name/email
     const { error: dbError } = await supabase.from('influencers').insert([
       {
-        id: userId, // Assuming id matches user_id for influencers
+        id: userId,
+        user_id: userId,
         name,
-        email,
+        email: normalizedEmail,
       },
     ])
     if (dbError) {

@@ -13,9 +13,17 @@ export async function GET(request: Request) {
     
     if (!sessionError && user) {
       // 1. Dynamic Role Detection (Highest Priority)
-      // Check if this email exists in owners or influencers table
-      const { data: owner } = await supabase.from('owners').select('id').eq('email', user.email).maybeSingle()
-      const { data: influencer } = await supabase.from('influencers').select('id').eq('email', user.email).maybeSingle()
+      // 1. Check if this email exists in owners or influencers table
+      const normalizedEmail = user.email ? user.email.toLowerCase() : ''
+      const { data: owner } = await supabase.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+      const { data: influencer } = await supabase.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+
+      if (owner && owner.user_id !== user.id) {
+        await supabase.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+      }
+      if (influencer && influencer.user_id !== user.id) {
+        await supabase.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
+      }
 
       let role = user.user_metadata?.role
       
