@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updateProperty } from '@/app/actions/property'
-import { X, Upload, Save, CheckCircle, Image as ImageIcon } from 'lucide-react'
+import { X, Upload, Save, CheckCircle, Image as ImageIcon, Plus } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+import { addPropertyRoom, deletePropertyRoom } from '@/app/dashboard/owner/actions'
 
 export default function EditPropertyForm({ property }: { property: any }) {
   const [isLoading, setIsLoading] = useState(false)
@@ -14,6 +16,71 @@ export default function EditPropertyForm({ property }: { property: any }) {
   
   // Track existing photos that user decides to KEEP
   const [existingPhotos, setExistingPhotos] = useState<string[]>(property.image_urls || [])
+
+  const [rooms, setRooms] = useState<any[]>([])
+  const [newRoomNumber, setNewRoomNumber] = useState('')
+  const [isAddingRoom, setIsAddingRoom] = useState(false)
+
+  // Fetch rooms on mount
+  useEffect(() => {
+    const supabase = createClient()
+    
+    const fetchRooms = async () => {
+      const { data } = await supabase
+        .from('property_rooms')
+        .select('*')
+        .eq('property_id', property.id)
+        .order('room_number', { ascending: true })
+      if (data) setRooms(data)
+    }
+
+    fetchRooms()
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel(`rooms_${property.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', filter: `property_id=eq.${property.id}`, schema: 'public', table: 'property_rooms' },
+        () => {
+          fetchRooms()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [property.id])
+
+  const handleAddRoom = async () => {
+    const cleanRoomNum = newRoomNumber.trim()
+    if (!cleanRoomNum) return
+
+    // Check duplicate
+    const exists = rooms.some(r => r.room_number.toLowerCase() === cleanRoomNum.toLowerCase())
+    if (exists) {
+      alert(`Room number ${cleanRoomNum} already exists.`)
+      return
+    }
+
+    setIsAddingRoom(true)
+    const res = await addPropertyRoom(property.id, cleanRoomNum)
+    setIsAddingRoom(false)
+    if (res.success) {
+      setNewRoomNumber('')
+    } else {
+      alert(res.error || 'Failed to add room')
+    }
+  }
+
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!confirm('Are you sure you want to delete this room number?')) return
+    const res = await deletePropertyRoom(roomId)
+    if (!res.success) {
+      alert(res.error || 'Failed to delete room')
+    }
+  }
   
   // Track newly selected photos
   const [newFiles, setNewFiles] = useState<File[]>([])
@@ -262,6 +329,70 @@ export default function EditPropertyForm({ property }: { property: any }) {
               <ImageIcon className="w-8 h-8 opacity-20" />
               <p className="text-xs font-semibold">No photos found. Add some to attract guests!</p>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Room Registry Section */}
+      <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5 flex flex-col gap-4">
+        <div>
+          <h3 className="text-gray-900 font-bold text-base flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse" />
+            Room Registry
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Add or remove individual room numbers (e.g. 101, 302) for stay assignments.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 max-w-sm">
+          <Input
+            placeholder="Room Number (e.g. 101)"
+            value={newRoomNumber}
+            onChange={e => setNewRoomNumber(e.target.value)}
+            className="h-10 rounded-xl bg-white"
+            onKeyDown={async e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                await handleAddRoom()
+              }
+            }}
+          />
+          <Button
+            type="button"
+            onClick={handleAddRoom}
+            disabled={isAddingRoom || !newRoomNumber.trim()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-4 rounded-xl shadow-sm flex items-center gap-1.5 shrink-0"
+          >
+            {isAddingRoom ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            Add Room
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {rooms.length === 0 ? (
+            <p className="text-xs text-gray-400 italic font-medium py-1">No rooms added to this property yet.</p>
+          ) : (
+            rooms.map((r: any) => (
+              <div
+                key={r.id}
+                className="bg-white border border-gray-200 rounded-xl pl-3 pr-2 py-1.5 flex items-center gap-2 text-sm font-bold text-gray-700 hover:border-red-200 hover:bg-red-50/20 transition-all shadow-sm"
+              >
+                <span>Room {r.room_number}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteRoom(r.id)}
+                  className="p-1 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                  title="Remove Room"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
           )}
         </div>
       </div>
