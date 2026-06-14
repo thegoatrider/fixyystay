@@ -186,14 +186,24 @@ export async function uploadAndVerifyFront(formData: FormData) {
       let validFormat = true
 
       if (result.document_type === 'AADHAAR') {
-        if (!num || !/\d{12}/.test(num)) validFormat = false
+        if (!num || !/^\d{12}$/.test(num)) validFormat = false
       } else if (result.document_type === 'PAN') {
-        if (!num || !/[A-Z]{5}\d{4}[A-Z]/i.test(num)) validFormat = false
+        if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
+      } else if (result.document_type === 'PASSPORT') {
+        if (!num || !/^[A-Z]\d{7}$/i.test(num)) validFormat = false
+      } else if (result.document_type === 'DRIVING_LICENSE') {
+        const cleanDl = num.replace(/[\s-]/g, '')
+        if (!cleanDl || !/^[A-Z]{2}\d{13}$/i.test(cleanDl)) validFormat = false
+      } else if (result.document_type === 'VOTER_ID') {
+        const cleanVoter = num.replace(/[\s]/g, '')
+        const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
+        const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(cleanVoter)
+        if (!cleanVoter || (!modernFormat && !legacyFormat)) validFormat = false
       }
 
       if (!validFormat) {
         status = 'MANUAL_REVIEW'
-        finalReason = 'Document number does not match expected format. Saved for manual review.'
+        finalReason = `Document number for ${result.document_type || 'ID'} does not match expected format. Saved for manual review.`
       } else {
         if (result.confidence >= 0.40) {
           status = 'VERIFIED'

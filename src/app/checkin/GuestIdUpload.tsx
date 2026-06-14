@@ -155,8 +155,8 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
-        setFrontStatus(result.status as UploadState)
+      if (result.status === 'VERIFIED') {
+        setFrontStatus('VERIFIED')
         setIdentityId(result.guest_identity_id)
 
         // Only call onVerified if back is already DONE (edge case if back was processed before somehow, though unlikely)
@@ -188,7 +188,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
         }
       } else {
         setFrontStatus('FAILED')
-        setFrontReason(result.reason || 'Could not verify. Please upload a clearer image.')
+        setFrontReason(
+          result.reason && result.reason.includes('format') 
+            ? result.reason 
+            : 'Image blurry or document format not recognized. Please scan a sharp, well-lit image.'
+        )
         onVerified(null)
       }
     } else {
@@ -222,7 +226,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (result.success) {
       setBackStatus('DONE')
       setPendingBackFile(null)
-      if (identityId && (frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW')) onVerified(identityId)
+      if (identityId && frontStatus === 'VERIFIED') onVerified(identityId)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')
@@ -449,6 +453,22 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
           </div>
         </div>
       </div>
+
+      {/* Visual Helper Scan Tips */}
+      {!bothDone && (
+        <div className="bg-blue-50/40 rounded-xl p-3 border border-blue-100/30 text-[10px] text-blue-700 leading-normal flex flex-col gap-1.5 mt-1 animate-in fade-in duration-300">
+          <p className="font-extrabold uppercase tracking-wide text-blue-800 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+            Tips for successful verification:
+          </p>
+          <ul className="list-disc pl-3.5 flex flex-col gap-0.5 font-medium text-blue-600/90">
+            <li>Ensure the ID card is flat, completely visible, and well-lit.</li>
+            <li>Text must be clear and readable (avoid screen glare/camera flash reflections).</li>
+            <li>Do not upload selfies, screenshots, or photos of other screens.</li>
+            <li>Make sure the document number format is fully valid (e.g. 12-digit Aadhaar).</li>
+          </ul>
+        </div>
+      )}
 
       {/* Per-guest status message */}
       {frontReason && frontStatus !== 'FAILED' && (

@@ -26,6 +26,32 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       return { error: `Expected ${numPeople} verified ID(s) but received ${identityIds.length}.` }
     }
 
+    // Server-side recheck of OCR data integrity before completing checkin
+    const { data: identities, error: identityFetchError } = await supabaseAdmin
+      .from('guest_identity')
+      .select('id, full_name, document_number, document_type, is_verified, verification_status')
+      .in('id', identityIds)
+
+    if (identityFetchError || !identities || identities.length !== identityIds.length) {
+      console.error('[CHECKIN-VALIDATE] Failed to fetch identity documents:', identityFetchError)
+      return { error: 'Failed to fetch identity documents for validation. Please try again.' }
+    }
+
+    for (const identity of identities) {
+      if (identity.verification_status !== 'VERIFIED' || !identity.is_verified) {
+        return { error: `Verification is incomplete or failed for ${identity.full_name || 'one of the guests'}. Please re-upload a clearer image.` }
+      }
+      if (!identity.full_name || identity.full_name.trim() === '') {
+        return { error: 'Full Name could not be parsed. Please re-upload a clearer image.' }
+      }
+      if (!identity.document_number || identity.document_number.trim() === '') {
+        return { error: 'Document Number could not be parsed. Please re-upload a clearer image.' }
+      }
+      if (!identity.document_type || identity.document_type === 'UNKNOWN') {
+        return { error: 'Document Type is unrecognized. Please re-upload a clearer image.' }
+      }
+    }
+
     console.log(`[CHECKIN] Submitting check-in for property ${propertyId}, guest ${guestName}, ${numPeople} person(s)`)
 
     const { data: property, error: propError } = await supabaseAdmin
