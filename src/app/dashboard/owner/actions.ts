@@ -418,3 +418,166 @@ export async function approveIdentity(identityId: string) {
     return { success: false, error: err.message || 'Unknown error' }
   }
 }
+
+export async function addPropertyRoom(propertyId: string, roomNumber: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    if (!owner) return { success: false, error: 'Owner profile not found' }
+
+    const { data: property } = await supabaseAdmin
+      .from('properties')
+      .select('id')
+      .eq('id', propertyId)
+      .eq('owner_id', owner.id)
+      .single()
+    if (!property) return { success: false, error: 'Property not found or access denied' }
+
+    const { error } = await supabaseAdmin
+      .from('property_rooms')
+      .insert({ property_id: propertyId, room_number: roomNumber })
+
+    if (error) {
+      console.error('Failed to add property room:', error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function deletePropertyRoom(roomId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    if (!owner) return { success: false, error: 'Owner profile not found' }
+
+    // Fetch the room to verify it belongs to this owner's property
+    const { data: room } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id')
+      .eq('id', roomId)
+      .single()
+
+    if (!room) return { success: false, error: 'Room not found' }
+
+    const { data: property } = await supabaseAdmin
+      .from('properties')
+      .select('id')
+      .eq('id', room.property_id)
+      .eq('owner_id', owner.id)
+      .single()
+
+    if (!property) return { success: false, error: 'Access denied' }
+
+    const { error } = await supabaseAdmin
+      .from('property_rooms')
+      .delete()
+      .eq('id', roomId)
+
+    if (error) {
+      console.error('Failed to delete property room:', error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function assignRoomToGuest(checkinId: string, roomNumber: string | null) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    if (!owner) return { success: false, error: 'Owner profile not found' }
+
+    // Fetch the checkin to ensure it belongs to this owner
+    const { data: checkin } = await supabaseAdmin
+      .from('guest_checkins')
+      .select('id, property_id')
+      .eq('id', checkinId)
+      .eq('owner_id', owner.id)
+      .single()
+
+    if (!checkin) {
+      return { success: false, error: 'Check-in record not found or access denied' }
+    }
+
+    // Update room number
+    const { error } = await supabaseAdmin
+      .from('guest_checkins')
+      .update({ room_number: roomNumber })
+      .eq('id', checkinId)
+
+    if (error) {
+      console.error('Failed to assign room:', error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function checkoutGuest(checkinId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    if (!owner) return { success: false, error: 'Owner profile not found' }
+
+    // Fetch the checkin to ensure it belongs to this owner
+    const { data: checkin } = await supabaseAdmin
+      .from('guest_checkins')
+      .select('id, property_id')
+      .eq('id', checkinId)
+      .eq('owner_id', owner.id)
+      .single()
+
+    if (!checkin) {
+      return { success: false, error: 'Check-in record not found or access denied' }
+    }
+
+    const todayStr = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format (local timezone)
+
+    const { error } = await supabaseAdmin
+      .from('guest_checkins')
+      .update({ 
+        status: 'checked_out',
+        checkout_date: todayStr
+      })
+      .eq('id', checkinId)
+
+    if (error) {
+      console.error('Failed to checkout guest:', error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/dashboard/owner')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

@@ -8,6 +8,7 @@ export type DashboardData = {
   influencer_requests: any[]
   wallet_transactions: any[]
   payout_requests: any[]
+  property_rooms?: any[]
   subscription: {
     plan_name: string
     end_date: string

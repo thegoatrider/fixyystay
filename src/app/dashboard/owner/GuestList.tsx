@@ -2,12 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle, Trash2, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import React from 'react'
-import { approveIdentity } from './actions'
+import React, { useEffect } from 'react'
+import { approveIdentity, addPropertyRoom, deletePropertyRoom, assignRoomToGuest, checkoutGuest } from './actions'
 
 type GuestCheckin = {
   id: string
@@ -23,6 +23,8 @@ type GuestCheckin = {
   uid: string | null
   status?: string
   properties: { name: string }
+  property_id: string
+  room_number?: string | null
 }
 
 const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -39,10 +41,14 @@ function getDaysInMonth(year: number, month: number) {
 
 export default React.memo(function GuestList({ 
   checkins,
-  isFreeTier = false 
+  isFreeTier = false,
+  properties = [],
+  propertyRooms = []
 }: { 
   checkins: GuestCheckin[];
   isFreeTier?: boolean;
+  properties?: any[];
+  propertyRooms?: any[];
 }) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -52,8 +58,103 @@ export default React.memo(function GuestList({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
 
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
+  const [newRoomNumber, setNewRoomNumber] = useState('')
+  const [isAddingRoom, setIsAddingRoom] = useState(false)
+  const [selectedRoomNumberToAssign, setSelectedRoomNumberToAssign] = useState('')
+  const [selectedOccupiedRoom, setSelectedOccupiedRoom] = useState<string | null>(null)
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+
+  // Initialize selectedPropertyId
+  useEffect(() => {
+    if (!selectedPropertyId && properties.length > 0) {
+      setSelectedPropertyId(properties[0].id)
+    }
+  }, [properties, selectedPropertyId])
+
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [printUrl, setPrintUrl] = useState<string | null>(null)
+
+  const roomsForSelectedProperty = useMemo(() => {
+    return propertyRooms.filter((r: any) => r.property_id === selectedPropertyId)
+  }, [propertyRooms, selectedPropertyId])
+
+  const activeCheckinsToday = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString('en-CA')
+    return checkins.filter((c: any) => {
+      if (c.property_id !== selectedPropertyId) return false
+      if (!c.room_number) return false
+      if (c.status === 'checked_out') return false
+      if (!c.checkin_date || !c.checkout_date) return false
+      return todayStr >= c.checkin_date && todayStr < c.checkout_date
+    })
+  }, [checkins, selectedPropertyId])
+
+  const roomOccupancyMap = useMemo(() => {
+    const map: Record<string, any> = {}
+    activeCheckinsToday.forEach((c: any) => {
+      map[c.room_number] = c
+    })
+    return map
+  }, [activeCheckinsToday])
+
+  const availableRoomsForGuest = useMemo(() => {
+    if (!selectedGuest) return []
+    const propRooms = propertyRooms.filter((r: any) => r.property_id === selectedGuest.property_id)
+    
+    const gCheckin = selectedGuest.checkin_date
+    const gCheckout = selectedGuest.checkout_date
+    
+    const overlappingCheckins = checkins.filter((c: any) => {
+      if (c.id === selectedGuest.id) return false
+      if (c.property_id !== selectedGuest.property_id) return false
+      if (!c.room_number) return false
+      if (c.status === 'checked_out') return false
+      if (!c.checkin_date || !c.checkout_date) return false
+      
+      if (gCheckin && gCheckout) {
+        return c.checkin_date < gCheckout && c.checkout_date > gCheckin
+      } else {
+        const todayStr = new Date().toLocaleDateString('en-CA')
+        return todayStr >= c.checkin_date && todayStr < c.checkout_date
+      }
+    })
+    
+    const occupiedRoomNumbers = new Set(overlappingCheckins.map((c: any) => c.room_number))
+    return propRooms.filter((r: any) => !occupiedRoomNumbers.has(r.room_number))
+  }, [selectedGuest, propertyRooms, checkins])
+
+  const handleAddRoom = async () => {
+    if (!selectedPropertyId) {
+      alert('Please select a property first.')
+      return
+    }
+    const cleanRoomNum = newRoomNumber.trim()
+    if (!cleanRoomNum) return
+
+    const exists = roomsForSelectedProperty.some((r: any) => r.room_number.toLowerCase() === cleanRoomNum.toLowerCase())
+    if (exists) {
+      alert(`Room number ${cleanRoomNum} already exists for this property.`)
+      return
+    }
+
+    setIsAddingRoom(true)
+    const res = await addPropertyRoom(selectedPropertyId, cleanRoomNum)
+    setIsAddingRoom(false)
+    if (res.success) {
+      setNewRoomNumber('')
+    } else {
+      alert(res.error || 'Failed to add room')
+    }
+  }
+
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!confirm('Are you sure you want to delete this room? This will not affect existing stay check-ins but will remove the room from the list.')) return
+    const res = await deletePropertyRoom(roomId)
+    if (!res.success) {
+      alert(res.error || 'Failed to delete room')
+    }
+  }
   
   const handleApproveId = async (id: string) => {
     setProcessingId(`approve-${id}`)
@@ -391,6 +492,18 @@ export default React.memo(function GuestList({
                       <p className="text-[11px] text-gray-400 mt-0.5">
                         {guest.properties?.name} · {format(new Date(guest.created_at), 'MMM d, h:mm a')}
                       </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        {guest.room_number && (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-100">
+                            Room {guest.room_number}
+                          </span>
+                        )}
+                        {guest.status === 'checked_out' && (
+                          <span className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-semibold border border-gray-200">
+                            Checked Out
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right">
                       <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -442,6 +555,12 @@ export default React.memo(function GuestList({
                           <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                            {guest.room_number && (
+                              <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-100">Room {guest.room_number}</span>
+                            )}
+                            {guest.status === 'checked_out' && (
+                              <span className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-semibold border border-gray-200">Checked Out</span>
+                            )}
                             {guest.status === 'draft' && (
                               <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
                             )}
@@ -496,6 +615,12 @@ export default React.memo(function GuestList({
                           <p className="text-xs text-gray-400 truncate">{guest.properties?.name || 'Property'}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {guest.uid && <p className="text-[10px] text-indigo-500 font-mono">{guest.uid}</p>}
+                            {guest.room_number && (
+                              <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-100">Room {guest.room_number}</span>
+                            )}
+                            {guest.status === 'checked_out' && (
+                              <span className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-semibold border border-gray-200">Checked Out</span>
+                            )}
                             {guest.status === 'draft' && (
                               <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
                             )}
@@ -591,8 +716,69 @@ export default React.memo(function GuestList({
                   </div>
                 </div>
 
-                {/* ID Documents */}
+                {/* Room Assignment */}
                 <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Room Assignment</p>
+                  {selectedGuest.status === 'checked_out' ? (
+                    <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-medium text-center border border-gray-100">
+                      Guest has checked out. Room: <span className="font-bold">{selectedGuest.room_number || 'None'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {selectedGuest.room_number ? (
+                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] text-indigo-500 font-bold uppercase">Assigned Room</span>
+                            <p className="text-base font-extrabold text-indigo-900">Room {selectedGuest.room_number}</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (confirm('Are you sure you want to remove this room assignment?')) {
+                                const res = await assignRoomToGuest(selectedGuest.id, null)
+                                if (!res.success) alert(res.error)
+                              }
+                            }}
+                            className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100/80 px-2.5 py-1.5 rounded-lg border border-red-100 transition-colors"
+                          >
+                            Unassign
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedRoomNumberToAssign}
+                            onChange={e => setSelectedRoomNumberToAssign(e.target.value)}
+                            className="flex-1 bg-white border border-gray-200 text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                          >
+                            <option value="">Select Room</option>
+                            {availableRoomsForGuest.map((r: any) => (
+                              <option key={r.id} value={r.room_number}>
+                                Room {r.room_number}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            disabled={!selectedRoomNumberToAssign}
+                            onClick={async () => {
+                              const res = await assignRoomToGuest(selectedGuest.id, selectedRoomNumberToAssign)
+                              if (res.success) {
+                                setSelectedRoomNumberToAssign('')
+                              } else {
+                                alert(res.error)
+                              }
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 rounded-xl shadow-sm px-4"
+                          >
+                            Assign
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ID Documents */}
+                <div className="flex flex-col gap-2 font-medium">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">ID Documents</p>
                     {((selectedGuest.identities && selectedGuest.identities.length > 0) || (selectedGuest.id_documents && selectedGuest.id_documents.length > 0)) && (
@@ -811,6 +997,240 @@ export default React.memo(function GuestList({
           )}
         </div>
       </div>
+
+      {/* ── Room Management and Live Visualizer Section ── */}
+      <div className="bg-white border rounded-2xl p-6 shadow-sm flex flex-col gap-6 mt-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              Live Room Visualizer & Registry
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Current Date: {format(new Date(), 'dd MMMM yyyy')} · Manage rooms and live stay occupancy.
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            {properties.length > 0 && (
+              <div className="flex flex-col gap-1 w-full md:w-56">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Select Property</span>
+                <select
+                  value={selectedPropertyId}
+                  onChange={e => setSelectedPropertyId(e.target.value)}
+                  className="bg-white border border-gray-200 text-sm font-semibold text-gray-700 px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm w-full"
+                >
+                  {properties.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 items-start">
+          {/* Room Registry Panel (1/3 width) */}
+          <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 flex flex-col gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">Room Registry</h4>
+              <p className="text-[11px] text-gray-400 mt-0.5">Add your property's room numbers one by one.</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="e.g. 101, 302..."
+                value={newRoomNumber}
+                onChange={e => setNewRoomNumber(e.target.value)}
+                className="h-9 rounded-xl text-sm"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddRoom()
+                }}
+              />
+              <Button
+                onClick={handleAddRoom}
+                disabled={isAddingRoom || !newRoomNumber.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-3.5 rounded-xl shadow-sm flex items-center gap-1"
+              >
+                {isAddingRoom ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                Add
+              </Button>
+            </div>
+
+            {/* Room list */}
+            <div className="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto pr-1">
+              {roomsForSelectedProperty.length === 0 ? (
+                <div className="text-center py-6 text-xs text-gray-400 italic bg-white border border-dashed rounded-xl">
+                  No rooms added yet.
+                </div>
+              ) : (
+                roomsForSelectedProperty.map((r: any) => (
+                  <div key={r.id} className="bg-white border rounded-xl px-3 py-2 flex items-center justify-between shadow-sm hover:border-indigo-100 transition-colors">
+                    <span className="text-sm font-bold text-gray-800">Room {r.room_number}</span>
+                    <button
+                      onClick={() => handleDeleteRoom(r.id)}
+                      className="p-1 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete Room"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Room Visualizer Grid (2/3 width) */}
+          <div className="md:col-span-2 flex flex-col gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">Live Occupancy Grid</h4>
+              <p className="text-[11px] text-gray-400 mt-0.5">Click occupied tiles (red) to view occupant details and check out.</p>
+            </div>
+
+            {roomsForSelectedProperty.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-gray-50/50 text-center gap-2">
+                <Users className="w-8 h-8 text-gray-300 animate-pulse" />
+                <p className="text-xs text-gray-400 font-medium">Add room numbers in the registry panel to see the occupancy grid.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                {roomsForSelectedProperty.map((r: any) => {
+                  const occupant = roomOccupancyMap[r.room_number]
+                  const isOccupied = !!occupant
+
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        if (isOccupied) {
+                          setSelectedOccupiedRoom(r.room_number)
+                        } else {
+                          alert(`Room ${r.room_number} is currently available.`)
+                        }
+                      }}
+                      className={[
+                        'flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm',
+                        isOccupied
+                          ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/70 hover:border-rose-300 cursor-pointer'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70 hover:border-emerald-300 cursor-pointer'
+                      ].join(' ')}
+                    >
+                      <span className="text-sm font-black tracking-tight">{r.room_number}</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider mt-1 px-1.5 py-0.5 rounded-full bg-white/60">
+                        {isOccupied ? 'Occupied' : 'Available'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Occupant Details Modal */}
+      {selectedOccupiedRoom && roomOccupancyMap[selectedOccupiedRoom] && (
+        <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white border rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-rose-50/50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center">
+                  <User className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Room {selectedOccupiedRoom} Occupant</h3>
+                  <p className="text-[10px] text-rose-600 font-bold uppercase tracking-widest">Live Stay Details</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedOccupiedRoom(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              {(() => {
+                const guest = roomOccupancyMap[selectedOccupiedRoom]
+                return (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Primary Guest</span>
+                      <p className="text-base font-bold text-gray-900">{guest.guest_name}</p>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Phone</span>
+                      <a href={`tel:${guest.guest_phone}`} className="text-sm font-semibold text-gray-700 hover:text-indigo-600 flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        {guest.guest_phone}
+                      </a>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">Check In</span>
+                        <span className="text-xs font-bold text-gray-800">{guest.checkin_date || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">Check Out (Till)</span>
+                        <span className="text-xs font-bold text-gray-800">{guest.checkout_date || '—'}</span>
+                      </div>
+                      <div className="col-span-2 border-t pt-2 mt-1 flex justify-between items-center text-xs">
+                        <span className="text-gray-500 font-medium">Pax Count</span>
+                        <span className="font-bold text-indigo-600 flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5" /> {guest.num_people} Pax
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 pt-2">
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to check out ${guest.guest_name} from Room ${selectedOccupiedRoom}?`)) {
+                            setIsCheckingOut(true)
+                            const res = await checkoutGuest(guest.id)
+                            setIsCheckingOut(false)
+                            if (res.success) {
+                              setSelectedOccupiedRoom(null)
+                            } else {
+                              alert(res.error)
+                            }
+                          }
+                        }}
+                        disabled={isCheckingOut}
+                        className="w-full h-11 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-rose-200/50 hover:shadow-rose-300/50 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isCheckingOut ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4.5 h-4.5" />
+                        )}
+                        Check Out Guest
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setSelectedGuest(guest)
+                          setSelectedOccupiedRoom(null)
+                        }}
+                        className="w-full h-11 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                      >
+                        View Full Guest Card
+                      </button>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {checkins.length === 0 && (
         <div className="text-center p-10 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">

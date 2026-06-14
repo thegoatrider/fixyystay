@@ -85,7 +85,7 @@ export default function OwnerDashboardClient({
     </div>
   )
 
-  const { properties, leads, checkins, influencer_requests, wallet_transactions, payout_requests } = data as any
+  const { properties, leads, checkins, influencer_requests, wallet_transactions, payout_requests, property_rooms } = data as any
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
   return (
@@ -163,6 +163,8 @@ export default function OwnerDashboardClient({
           <GuestList 
             checkins={checkins || []} 
             isFreeTier={isFreeTier} 
+            properties={properties || []}
+            propertyRooms={property_rooms || []}
           />
         )}
 
