@@ -40,8 +40,9 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
           setStatus('VERIFIED')
           onVerified(result.guest_identity_id)
         } else if (result.status === 'MANUAL_REVIEW') {
-          setStatus('FAILED')
-          setReason("Could not verify automatically. Please upload a clearer image of your ID.")
+          setStatus('MANUAL_REVIEW')
+          setReason(result.reason || 'Verification saved for manual review.')
+          onVerified(result.guest_identity_id)
         } else {
           setStatus('FAILED')
           setReason(result.reason || 'Verification failed. Please try again with a clearer image.')
@@ -64,7 +65,7 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
     setReason('')
   }
 
-  const isLocked = status === 'VERIFIED'
+  const isLocked = status === 'VERIFIED' || status === 'MANUAL_REVIEW'
 
   return (
     <div className="space-y-2 relative group">

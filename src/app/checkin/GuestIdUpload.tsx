@@ -155,8 +155,9 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED') {
-        setFrontStatus('VERIFIED')
+      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
+        const nextStatus = result.status === 'VERIFIED' ? 'VERIFIED' : 'MANUAL_REVIEW'
+        setFrontStatus(nextStatus)
         setIdentityId(result.guest_identity_id)
 
         // Only call onVerified if back is already DONE (edge case if back was processed before somehow, though unlikely)
