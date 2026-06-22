@@ -38,7 +38,8 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     }
 
     for (const identity of identities) {
-      if (identity.verification_status !== 'VERIFIED' || !identity.is_verified) {
+      const isAllowedStatus = identity.verification_status === 'VERIFIED' || identity.verification_status === 'MANUAL_REVIEW';
+      if (!isAllowedStatus) {
         return { error: `Verification is incomplete or failed for ${identity.full_name || 'one of the guests'}. Please re-upload a clearer image.` }
       }
       if (!identity.full_name || identity.full_name.trim() === '') {
