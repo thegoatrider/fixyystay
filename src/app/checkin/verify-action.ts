@@ -6,71 +6,70 @@ import { GoogleGenAI } from '@google/genai'
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.5-flash'
 
-const SYSTEM_PROMPT = `
-You are an expert Government ID verification AI for a hotel check-in system.
-Analyze the provided image and extract information strictly in JSON format.
-Your task is to identify if it is a real government ID, extract fields if legible, and detect abuse.
+const OCR_PROMPT = `
+You are a document OCR extraction engine. Your only job is to extract text and structured data from ID documents. You must NEVER refuse, NEVER ask for re-upload, and NEVER return an error message.
 
-Note: E-Aadhaar or long-format printouts are valid Aadhaar cards. Scan the whole document to find the ID card section, usually at the bottom.
+ABSOLUTE RULES:
+1. Always return a valid JSON response — no exceptions.
+2. If a field is unclear, make your best guess and mark it with a confidence flag.
+3. If a section is partially visible, extract whatever is visible.
+4. Never say "I cannot", "please re-upload", "image quality", or any failure message.
+5. Treat every image as processable, regardless of angle, lighting, or partial obstruction.
 
-Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
+EXTRACTION TASK:
+Extract the following fields from the uploaded government ID image:
 
-Rules for abuse detection (set suspicious: true if any are met):
-- It is a selfie, meme, cartoon, or random picture of a wall.
-- It is clearly a handwritten note or forged text.
-- It only contains random numbers without the structural layout of a real ID.
-
-Guidelines for cropped digital layouts and photographed physical cards:
-- Direct screenshots of digital IDs, electronic card printouts (like PDF e-Aadhaar downloads), cropped electronic documents, or DigiLocker cards are COMPLETELY VALID government IDs. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
-- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
-- If the document is valid and the text is legible and readable, set the confidence to at least 0.85. Only set confidence below 0.50 if the text is completely unreadable, blurry beyond recognition, or obviously fake.
-
-Calculate confidence score (0.0 to 1.0) based on:
-- 0.80-1.0: Good clarity, standard format matches, text is legible.
-- 0.50-0.79: Blurry, low light, or lower quality camera, but still looks like a real ID and text is mostly legible.
-- Below 0.50: Completely unrecognizable, totally blank, or obviously fake.
-
-Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
 {
-  "is_government_id": boolean,
-  "document_type": string,
-  "document_number": string,
-  "full_name": string,
-  "date_of_birth": string,
-  "confidence": number,
-  "suspicious": boolean,
-  "reason": string,
-  "raw_ocr_text": string
-}
-`
-
-const BACK_SYSTEM_PROMPT = `
-You are an expert Government ID verification AI for a hotel check-in system.
-Analyze the back side of the provided ID image and extract information strictly in JSON format.
-Your task is to identify and extract the address.
-
-Guidelines for cropped digital layouts and photographed physical cards:
-- Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
-- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
-- If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
-
-Return STRICTLY this JSON format (no markdown code blocks, just raw JSON):
-{
-  "is_government_id": boolean,
-  "confidence": number,
-  "suspicious": boolean,
-  "reason": string,
-  "address": string,
-  "raw_ocr_text_back": string
+  "full_name": "",
+  "date_of_birth": "",
+  "id_number": "",
+  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence | Other",
+  "address": "",
+  "gender": "",
+  "expiry_date": "",
+  "confidence": {
+    "overall": "high | medium | low",
+    "notes": "any field-level uncertainty notes here"
+  }
 }
 
-Rules for abuse detection (set suspicious: true if any are met):
-- It is a selfie, meme, cartoon, or random picture.
-- It is clearly a handwritten note or forged text.
+FALLBACK BEHAVIOR (follow strictly):
+- If a field cannot be read at all: use null, do not omit the key.
+- If text is partially readable: extract the readable portion and add "[partial]" suffix.
+- If you are guessing: add "[inferred]" suffix to that field's value.
+- Never leave the response blank or return plain text — always return the JSON object.
 
-Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
-If a field cannot be read, leave it as an empty string "".
+Return ONLY the JSON. No explanations, no preamble, no markdown.
 `
+
+const SYSTEM_PROMPT = OCR_PROMPT
+const BACK_SYSTEM_PROMPT = OCR_PROMPT
+
+// Helper functions for cleaning and mapping OCR fields
+function cleanFieldValue(val: string | null | undefined): string {
+  if (!val) return ''
+  return val.replace(/\[\s*(inferred|partial)\s*\]/gi, '').trim()
+}
+
+function mapIdType(idType: string | null | undefined): string {
+  if (!idType) return 'UNKNOWN'
+  const normalized = idType.toLowerCase().replace(/[\s_]/g, '')
+  if (normalized.includes('aadhaar')) return 'AADHAAR'
+  if (normalized.includes('pan')) return 'PAN'
+  if (normalized.includes('passport')) return 'PASSPORT'
+  if (normalized.includes('voterid') || normalized.includes('voter')) return 'VOTER_ID'
+  if (normalized.includes('drivinglicence') || normalized.includes('drivinglicense') || normalized.includes('driving')) return 'DRIVING_LICENSE'
+  return 'UNKNOWN'
+}
+
+function mapConfidenceToNumeric(overall: string | null | undefined): number {
+  if (!overall) return 0.50
+  const normalized = overall.toLowerCase().trim()
+  if (normalized === 'high') return 0.90
+  if (normalized === 'medium') return 0.70
+  if (normalized === 'low') return 0.35
+  return 0.50
+}
 
 // ─── Helper: upload a file to Supabase storage and return public URL ───────────
 async function uploadToStorage(file: File, folder: string): Promise<string | null> {
@@ -177,32 +176,59 @@ export async function uploadAndVerifyFront(formData: FormData) {
       }
     }
 
-    console.log('[VERIFY-FRONT] AI Result:', result.document_type, 'Confidence:', result.confidence)
+    // 3.5 Normalize and map the fields if parsing succeeded
+    let normalizedResult: any = {}
+    if (parseFailed) {
+      normalizedResult = result
+    } else {
+      const mappedDocType = mapIdType(result.id_type)
+      const cleanNum = cleanFieldValue(result.id_number)
+      const cleanName = cleanFieldValue(result.full_name)
+      const cleanDob = cleanFieldValue(result.date_of_birth)
+      const numericConfidence = mapConfidenceToNumeric(result.confidence?.overall)
+      
+      const isGovtId = mappedDocType !== 'UNKNOWN'
+      const suspicious = numericConfidence < 0.40
+      
+      normalizedResult = {
+        is_government_id: isGovtId,
+        document_type: mappedDocType,
+        document_number: cleanNum,
+        full_name: cleanName,
+        date_of_birth: cleanDob,
+        confidence: numericConfidence,
+        suspicious: suspicious,
+        reason: result.confidence?.notes || '',
+        raw_ocr_text: aiResponseText
+      }
+    }
+
+    console.log('[VERIFY-FRONT] AI Result:', normalizedResult.document_type, 'Confidence:', normalizedResult.confidence)
 
     // 4. Validation
     let status = 'MANUAL_REVIEW'
-    let finalReason = result.reason
+    let finalReason = normalizedResult.reason
 
     if (parseFailed) {
       status = 'MANUAL_REVIEW'
-      finalReason = result.reason || 'AI extraction failed. Saved for manual review.'
-    } else if (result.suspicious || !result.is_government_id) {
+      finalReason = normalizedResult.reason || 'AI extraction failed. Saved for manual review.'
+    } else if (normalizedResult.suspicious || !normalizedResult.is_government_id) {
       status = 'MANUAL_REVIEW'
-      finalReason = result.reason || 'Document flagged. Saved for manual review.'
+      finalReason = normalizedResult.reason || 'Document flagged or type unrecognized. Saved for manual review.'
     } else {
-      const num = result.document_number?.trim().replace(/\s/g, '')
+      const num = normalizedResult.document_number?.trim().replace(/\s/g, '')
       let validFormat = true
 
-      if (result.document_type === 'AADHAAR') {
+      if (normalizedResult.document_type === 'AADHAAR') {
         if (!num || !/^\d{12}$/.test(num)) validFormat = false
-      } else if (result.document_type === 'PAN') {
+      } else if (normalizedResult.document_type === 'PAN') {
         if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
-      } else if (result.document_type === 'PASSPORT') {
+      } else if (normalizedResult.document_type === 'PASSPORT') {
         if (!num || !/^[A-Z]\d{7}$/i.test(num)) validFormat = false
-      } else if (result.document_type === 'DRIVING_LICENSE') {
+      } else if (normalizedResult.document_type === 'DRIVING_LICENSE') {
         const cleanDl = num.replace(/[\s-]/g, '')
         if (!cleanDl || !/^[A-Z]{2}\d{13}$/i.test(cleanDl)) validFormat = false
-      } else if (result.document_type === 'VOTER_ID') {
+      } else if (normalizedResult.document_type === 'VOTER_ID') {
         const cleanVoter = num.replace(/[\s]/g, '')
         const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
         const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(cleanVoter)
@@ -211,13 +237,13 @@ export async function uploadAndVerifyFront(formData: FormData) {
 
       if (!validFormat) {
         status = 'MANUAL_REVIEW'
-        finalReason = `Document number for ${result.document_type || 'ID'} does not match expected format. Saved for manual review.`
+        finalReason = `Document number for ${normalizedResult.document_type || 'ID'} does not match expected format. Saved for manual review.`
       } else {
-        if (result.confidence >= 0.40) {
+        if (normalizedResult.confidence >= 0.40) {
           status = 'VERIFIED'
         } else {
           status = 'MANUAL_REVIEW'
-          finalReason = 'Image quality too poor. Saved for manual review.'
+          finalReason = 'Image quality too poor or confidence too low. Saved for manual review.'
         }
       }
     }
@@ -225,16 +251,16 @@ export async function uploadAndVerifyFront(formData: FormData) {
     // 5. Save to guest_identity (front only, back_image_url will be updated later)
     const supabaseAdmin = createAdminClient()
     const identityRecord = {
-      document_type: result.document_type || 'UNKNOWN',
-      document_number: result.document_number,
-      full_name: result.full_name,
-      date_of_birth: result.date_of_birth,
-      document_confidence: result.confidence || 0,
+      document_type: normalizedResult.document_type || 'UNKNOWN',
+      document_number: normalizedResult.document_number,
+      full_name: normalizedResult.full_name,
+      date_of_birth: normalizedResult.date_of_birth,
+      document_confidence: normalizedResult.confidence || 0,
       is_verified: status === 'VERIFIED',
       verification_status: status,
       document_image_url: imageUrl,    // front image
       back_image_url: null,            // will be filled by uploadBackImage
-      raw_ocr_text: result.raw_ocr_text || aiResponseText || '',
+      raw_ocr_text: normalizedResult.raw_ocr_text || aiResponseText || '',
       ocr_json: result,
       verification_reason: finalReason
     }
@@ -310,11 +336,11 @@ export async function uploadBackImage(formData: FormData) {
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         const jsonStr = aiResponseText.substring(firstBrace, lastBrace + 1)
         const result = JSON.parse(jsonStr)
-        address = result.address || ''
-        rawOcrTextBack = result.raw_ocr_text_back || aiResponseText
-        confidence = result.confidence || 0
-        suspicious = result.suspicious || false
-        isGovtId = result.is_government_id !== false
+        address = cleanFieldValue(result.address)
+        rawOcrTextBack = aiResponseText
+        confidence = mapConfidenceToNumeric(result.confidence?.overall)
+        suspicious = confidence < 0.40
+        isGovtId = mapIdType(result.id_type) !== 'UNKNOWN'
       } else {
         console.warn('[VERIFY-BACK] No JSON found in response. Skipping address extraction.')
       }

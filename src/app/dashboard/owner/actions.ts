@@ -8,18 +8,66 @@ import { GoogleGenAI } from '@google/genai'
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
 const OCR_SYSTEM_PROMPT = `
-You are an expert Government ID verification AI.
-Analyze the provided image and extract information strictly in JSON format.
-Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
-Return STRICTLY this JSON format (no markdown):
+You are a document OCR extraction engine. Your only job is to extract text and structured data from ID documents. You must NEVER refuse, NEVER ask for re-upload, and NEVER return an error message.
+
+ABSOLUTE RULES:
+1. Always return a valid JSON response — no exceptions.
+2. If a field is unclear, make your best guess and mark it with a confidence flag.
+3. If a section is partially visible, extract whatever is visible.
+4. Never say "I cannot", "please re-upload", "image quality", or any failure message.
+5. Treat every image as processable, regardless of angle, lighting, or partial obstruction.
+
+EXTRACTION TASK:
+Extract the following fields from the uploaded government ID image:
+
 {
-  "document_type": string,
-  "document_number": string,
-  "full_name": string,
-  "date_of_birth": string,
-  "raw_ocr_text": string
+  "full_name": "",
+  "date_of_birth": "",
+  "id_number": "",
+  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence | Other",
+  "address": "",
+  "gender": "",
+  "expiry_date": "",
+  "confidence": {
+    "overall": "high | medium | low",
+    "notes": "any field-level uncertainty notes here"
+  }
 }
+
+FALLBACK BEHAVIOR (follow strictly):
+- If a field cannot be read at all: use null, do not omit the key.
+- If text is partially readable: extract the readable portion and add "[partial]" suffix.
+- If you are guessing: add "[inferred]" suffix to that field's value.
+- Never leave the response blank or return plain text — always return the JSON object.
+
+Return ONLY the JSON. No explanations, no preamble, no markdown.
 `
+
+// Helper functions for cleaning and mapping OCR fields
+function cleanFieldValue(val: string | null | undefined): string {
+  if (!val) return ''
+  return val.replace(/\[\s*(inferred|partial)\s*\]/gi, '').trim()
+}
+
+function mapIdType(idType: string | null | undefined): string {
+  if (!idType) return 'UNKNOWN'
+  const normalized = idType.toLowerCase().replace(/[\s_]/g, '')
+  if (normalized.includes('aadhaar')) return 'AADHAAR'
+  if (normalized.includes('pan')) return 'PAN'
+  if (normalized.includes('passport')) return 'PASSPORT'
+  if (normalized.includes('voterid') || normalized.includes('voter')) return 'VOTER_ID'
+  if (normalized.includes('drivinglicence') || normalized.includes('drivinglicense') || normalized.includes('driving')) return 'DRIVING_LICENSE'
+  return 'UNKNOWN'
+}
+
+function mapConfidenceToNumeric(overall: string | null | undefined): number {
+  if (!overall) return 0.50
+  const normalized = overall.toLowerCase().trim()
+  if (normalized === 'high') return 0.90
+  if (normalized === 'medium') return 0.70
+  if (normalized === 'low') return 0.35
+  return 0.50
+}
 
 async function generatePropertyUid(supabaseAdmin: any, city: string) {
   const prefixes: Record<string, string> = {
@@ -384,11 +432,21 @@ export async function approveIdentity(identityId: string) {
         
         const result = JSON.parse(aiText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
         
-        if (result.document_number) ocrUpdates.document_number = result.document_number
-        if (result.full_name) ocrUpdates.full_name = result.full_name
-        if (result.document_type && result.document_type !== 'UNKNOWN') ocrUpdates.document_type = result.document_type
-        if (result.date_of_birth) ocrUpdates.date_of_birth = result.date_of_birth
-        if (result.raw_ocr_text) ocrUpdates.raw_ocr_text = result.raw_ocr_text
+        const mappedDocType = mapIdType(result.id_type)
+        const cleanNum = cleanFieldValue(result.id_number)
+        const cleanName = cleanFieldValue(result.full_name)
+        const cleanDob = cleanFieldValue(result.date_of_birth)
+        const confidenceScore = mapConfidenceToNumeric(result.confidence?.overall)
+        const cleanAddress = cleanFieldValue(result.address)
+
+        if (cleanNum) ocrUpdates.document_number = cleanNum
+        if (cleanName) ocrUpdates.full_name = cleanName
+        if (mappedDocType && mappedDocType !== 'UNKNOWN') ocrUpdates.document_type = mappedDocType
+        if (cleanDob) ocrUpdates.date_of_birth = cleanDob
+        if (cleanAddress) ocrUpdates.address = cleanAddress
+        ocrUpdates.document_confidence = confidenceScore
+        ocrUpdates.raw_ocr_text = aiText
+        ocrUpdates.ocr_json = result
         
         console.log('[APPROVE] Background scan successful.')
       } catch (ocrErr) {
