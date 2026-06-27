@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fixystays.app",
+      "sha256_cert_fingerprints": [
+        "4A:BA:F8:6F:5B:29:B1:FC:C8:0B:92:33:D0:15:3C:DE:16:0B:4A:83:EF:A9:4F:4A:7F:C5:7C:B6:3C:ED:B9:CB"
+      ]
+    }
+  }
+]

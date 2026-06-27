@@ -227,7 +227,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (result.success) {
       setBackStatus('DONE')
       setPendingBackFile(null)
-      if (identityId && frontStatus === 'VERIFIED') onVerified(identityId)
+      if (identityId && (frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW')) onVerified(identityId)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')
