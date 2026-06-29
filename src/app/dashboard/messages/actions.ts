@@ -115,10 +115,10 @@ export async function getOwnersWithProperties() {
 
     if (ownersError) throw ownersError
     
-    // Fetch properties
+    // Fetch properties with area_name
     const { data: properties, error: propError } = await supabaseAdmin
       .from('properties')
-      .select('id, name, owner_id')
+      .select('id, name, owner_id, area_name')
 
     if (propError) throw propError
 
@@ -136,6 +136,51 @@ export async function getOwnersWithProperties() {
     return { success: true, owners: ownersData }
   } catch (err: any) {
     console.error('Unexpected error fetching owners:', err)
+    return { success: false, error: 'An unexpected error occurred.' }
+  }
+}
+
+export async function sendBroadcastMessage(ownerIds: string[], senderType: 'police', content: string, attachmentUrl?: string) {
+  try {
+    const supabase = await createClient()
+    const { data: user, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user?.user) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    const role = user.user.user_metadata?.role;
+    if (role !== 'police' || senderType !== 'police') {
+      return { success: false, error: 'Unauthorized role' }
+    }
+
+    if (!ownerIds || ownerIds.length === 0) {
+      return { success: false, error: 'No recipients specified' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    
+    // Batch insert message records for each owner
+    const insertRows = ownerIds.map(ownerId => ({
+      owner_id: ownerId,
+      sender_type: senderType,
+      content: content,
+      attachment_url: attachmentUrl || null,
+      is_read: false
+    }))
+
+    const { error } = await supabaseAdmin
+      .from('messages')
+      .insert(insertRows)
+
+    if (error) {
+      console.error('Error sending broadcast messages:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Unexpected error sending broadcast message:', err)
     return { success: false, error: 'An unexpected error occurred.' }
   }
 }
