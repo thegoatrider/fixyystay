@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/utils/supabase/admin'
+import { backupCheckinToGoogleDrive } from '@/lib/google-drive'
 
 /**
  * submitCheckin — handles multi-guest check-in.
@@ -107,6 +108,11 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       console.error('[CHECKIN] Failed to link identities to checkin:', updateError)
       // Non-fatal — checkin is still created
     }
+
+    // Trigger Google Drive Cloud Backup in the background
+    backupCheckinToGoogleDrive(insertedCheckin.id).catch((err) => {
+      console.error('[CHECKIN-GOOGLE-DRIVE-BACKUP] Background sync error:', err)
+    })
 
     console.log(`[CHECKIN] Successfully completed check-in: ${insertedCheckin.id}, linked ${identityIds.length} identity record(s)`)
 

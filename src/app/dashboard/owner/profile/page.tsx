@@ -9,6 +9,7 @@ import { updatePassword } from '../actions'
 import { format } from 'date-fns'
 import ChangePasswordForm from './ChangePasswordForm'
 import CreatePropertyForm from '../CreatePropertyForm'
+import GoogleDriveSyncCard from './GoogleDriveSyncCard'
 import { cn } from '@/lib/utils'
 
 export default async function OwnerProfilePage() {
@@ -28,6 +29,12 @@ export default async function OwnerProfilePage() {
   const { data: subscription } = await supabase
     .from('owner_subscriptions')
     .select('*')
+    .eq('owner_id', owner.id)
+    .maybeSingle()
+
+  const { data: googleToken } = await supabase
+    .from('owner_google_tokens')
+    .select('google_email')
     .eq('owner_id', owner.id)
     .maybeSingle()
 
@@ -238,6 +245,8 @@ export default async function OwnerProfilePage() {
             </div>
 
             <ChangePasswordForm />
+
+            <GoogleDriveSyncCard initialGoogleEmail={googleToken?.google_email || null} />
 
             <div className="bg-blue-50 p-8 rounded-[32px] border border-blue-100 flex flex-col gap-4">
                <div>
