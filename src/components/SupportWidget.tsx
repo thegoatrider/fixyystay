@@ -168,7 +168,7 @@ export default function SupportWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 group focus:outline-none flex items-center justify-center cursor-pointer"
+          className="fixed bottom-24 right-6 md:bottom-6 md:right-6 z-[60] bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-95 group focus:outline-none flex items-center justify-center cursor-pointer"
           title="Contact Support"
         >
           <HelpCircle className="w-6 h-6 animate-pulse group-hover:scale-110 transition-transform" />
@@ -182,7 +182,7 @@ export default function SupportWidget() {
 
       {/* Support Chat Dialog */}
       {isOpen && (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[520px] bg-white sm:rounded-2xl border-0 sm:border border-gray-200 shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-300 ease-out origin-bottom-right">
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[520px] bg-white sm:rounded-2xl border-0 sm:border border-gray-200 shadow-2xl flex flex-col overflow-hidden z-[60] transition-all duration-300 ease-out origin-bottom-right">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center justify-between text-white shadow-md">
             <div className="flex items-center gap-3">
