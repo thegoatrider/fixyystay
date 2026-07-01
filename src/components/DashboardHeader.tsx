@@ -56,6 +56,20 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
               </Link>
             )}
 
+            {/* Support Chats Link for Admins */}
+            {userRole === 'admin' && (
+              <Link 
+                href="/dashboard/admin/messages"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all group"
+                title="Support Chats"
+              >
+                <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Support Chats</span>
+              </Link>
+            )}
+
             {/* Profile Link */}
             <Link 
               href="/guest/profile"
