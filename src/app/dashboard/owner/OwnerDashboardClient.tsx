@@ -27,12 +27,16 @@ export default function OwnerDashboardClient({
   userId, 
   email,
   ownerId, 
-  isSuperAdmin 
+  isSuperAdmin,
+  hasGoogleDrive = false,
+  googleEmail = null
 }: { 
   userId: string; 
   email: string;
   ownerId: string; 
   isSuperAdmin: boolean; 
+  hasGoogleDrive?: boolean;
+  googleEmail?: string | null;
 }) {
   console.log('OwnerDashboardClient Rendered:', { userId, email, ownerId, isSuperAdmin })
   
@@ -127,6 +131,28 @@ export default function OwnerDashboardClient({
       <div className="space-y-6">
         {activeTab === 'properties' && (
           <div className="flex flex-col gap-6 items-start w-full">
+            {/* Google Drive Sync Banner */}
+            <div className={`w-full p-4 rounded-2xl border flex items-center justify-between gap-4 text-xs font-semibold shadow-sm ${
+              hasGoogleDrive 
+                ? 'bg-green-50/50 border-green-200 text-green-800' 
+                : 'bg-blue-50/50 border-blue-100 text-blue-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-base">☁️</span>
+                <span>
+                  {hasGoogleDrive 
+                    ? `Google Drive Sync is Active: Saving guest check-in PDF records to ${googleEmail}` 
+                    : 'Google Drive Sync is Offline: Save copies of guest check-ins directly to your personal cloud.'
+                  }
+                </span>
+              </div>
+              {!hasGoogleDrive && (
+                <Link href="/dashboard/owner/profile" className="text-blue-600 hover:underline shrink-0 font-bold uppercase tracking-wider text-[10px]">
+                  Set Up Sync &rarr;
+                </Link>
+              )}
+            </div>
+
             <div className="flex flex-col w-full gap-2 lg:bg-white lg:border lg:p-4 lg:shadow-sm lg:rounded-xl">
               <AddLeadTile ownerId={ownerId} properties={properties || []} />
               <QuickCheckin properties={properties || []} />

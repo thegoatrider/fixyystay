@@ -27,8 +27,21 @@ export default async function OwnerDashboard() {
     
     if (updatedOwner) owner = updatedOwner
   }
+
+  // 3. Fetch Google token status
+  let hasGoogleDrive = false
+  let googleEmail: string | null = null
+  if (owner) {
+    const { data: googleToken } = await supabase
+      .from('owner_google_tokens')
+      .select('google_email')
+      .eq('owner_id', owner.id)
+      .maybeSingle()
+    hasGoogleDrive = !!googleToken?.google_email
+    googleEmail = googleToken?.google_email || null
+  }
   
-  // 3. Render the Client Dashboard
+  // 4. Render the Client Dashboard
   return (
     <Suspense fallback={<DashboardSkeleton />}>
       <OwnerDashboardClient 
@@ -36,6 +49,8 @@ export default async function OwnerDashboard() {
         email={user.email || ''}
         ownerId={owner?.id || ''} 
         isSuperAdmin={isSuperAdmin} 
+        hasGoogleDrive={hasGoogleDrive}
+        googleEmail={googleEmail}
       />
     </Suspense>
   )

@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { ArrowLeft, CreditCard, ShieldCheck, Zap, History, ExternalLink, Calendar, CheckCircle2, Home, Users, List, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -246,7 +247,9 @@ export default async function OwnerProfilePage() {
 
             <ChangePasswordForm />
 
-            <GoogleDriveSyncCard initialGoogleEmail={googleToken?.google_email || null} />
+            <Suspense fallback={<div className="p-8 bg-white border rounded-[32px] text-xs text-gray-400">Loading sync settings...</div>}>
+              <GoogleDriveSyncCard initialGoogleEmail={googleToken?.google_email || null} />
+            </Suspense>
 
             <div className="bg-blue-50 p-8 rounded-[32px] border border-blue-100 flex flex-col gap-4">
                <div>
