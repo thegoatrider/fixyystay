@@ -109,10 +109,12 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       // Non-fatal — checkin is still created
     }
 
-    // Trigger Google Drive Cloud Backup in the background
-    backupCheckinToGoogleDrive(insertedCheckin.id).catch((err) => {
-      console.error('[CHECKIN-GOOGLE-DRIVE-BACKUP] Background sync error:', err)
-    })
+    // Trigger Google Drive Cloud Backup (awaited so serverless function does not terminate prematurely)
+    try {
+      await backupCheckinToGoogleDrive(insertedCheckin.id)
+    } catch (err) {
+      console.error('[CHECKIN-GOOGLE-DRIVE-BACKUP] Sync error:', err)
+    }
 
     console.log(`[CHECKIN] Successfully completed check-in: ${insertedCheckin.id}, linked ${identityIds.length} identity record(s)`)
 
