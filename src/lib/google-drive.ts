@@ -280,6 +280,51 @@ export async function generateCheckinPDF(
   return pdfBytes
 }
 
+export async function getActiveAccessToken(ownerId: string): Promise<string | null> {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { data: tokens, error: tokensError } = await supabaseAdmin
+      .from('owner_google_tokens')
+      .select('*')
+      .eq('owner_id', ownerId)
+      .maybeSingle()
+
+    if (tokensError || !tokens) {
+      return null
+    }
+
+    let currentAccessToken = tokens.access_token
+    const now = new Date()
+    const expiry = new Date(tokens.expiry_date)
+
+    // Refresh token 5 minutes before actual expiry just in case
+    if (now.getTime() >= expiry.getTime() - 5 * 60 * 1000) {
+      console.log(`[GOOGLE-DRIVE] Refreshing access token for owner ${ownerId}`)
+      const refreshResult = await refreshAccessToken(tokens.refresh_token)
+      currentAccessToken = refreshResult.access_token
+      const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
+
+      const { error: updateError } = await supabaseAdmin
+        .from('owner_google_tokens')
+        .update({
+          access_token: currentAccessToken,
+          expiry_date: newExpiryDate.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('owner_id', ownerId)
+
+      if (updateError) {
+        console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
+      }
+    }
+
+    return currentAccessToken
+  } catch (err) {
+    console.error('[GOOGLE-DRIVE] Error obtaining active token:', err)
+    return null
+  }
+}
+
 // 4. Main Sync Orchestrator Action
 export async function backupCheckinToGoogleDrive(checkinId: string) {
   try {
@@ -297,48 +342,10 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
       return { success: false, error: 'Checkin record not found' }
     }
 
-    // 2. Fetch owner's google oauth credentials
-    const { data: tokens, error: tokensError } = await supabaseAdmin
-      .from('owner_google_tokens')
-      .select('*')
-      .eq('owner_id', checkin.owner_id)
-      .maybeSingle()
-
-    // If owner hasn't connected Google Drive, skip sync gracefully
-    if (tokensError || !tokens) {
-      return { success: true, message: 'Google Drive not connected for this owner' }
-    }
-
-    // 3. Resolve active access token (refresh if expired)
-    let currentAccessToken = tokens.access_token
-    const now = new Date()
-    const expiry = new Date(tokens.expiry_date)
-
-    // Refresh token 5 minutes before actual expiry just in case
-    if (now.getTime() >= expiry.getTime() - 5 * 60 * 1000) {
-      console.log(`[GOOGLE-DRIVE-SYNC] Refreshing access token for owner ${checkin.owner_id}`)
-      try {
-        const refreshResult = await refreshAccessToken(tokens.refresh_token)
-        currentAccessToken = refreshResult.access_token
-        const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
-
-        // Save updated tokens
-        const { error: updateError } = await supabaseAdmin
-          .from('owner_google_tokens')
-          .update({
-            access_token: currentAccessToken,
-            expiry_date: newExpiryDate.toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('owner_id', checkin.owner_id)
-
-        if (updateError) {
-          console.error('[GOOGLE-DRIVE-SYNC] Failed to update refreshed token in DB:', updateError)
-        }
-      } catch (err: any) {
-        console.error('[GOOGLE-DRIVE-SYNC] Failed to refresh Google credentials:', err)
-        return { success: false, error: 'Google credentials expired and could not be refreshed' }
-      }
+    // 2. Fetch active credentials using helper
+    const currentAccessToken = await getActiveAccessToken(checkin.owner_id)
+    if (!currentAccessToken) {
+      return { success: true, message: 'Google Drive not connected or token expired for this owner' }
     }
 
     // 4. Fetch associated guest identities
@@ -362,7 +369,13 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
     const propertyName = property?.name || 'Unknown Property'
 
     // 6. Find or create root folder "Fixy Stays Guest Records"
-    let rootFolderId = tokens.root_folder_id
+    const { data: tokenRecord } = await supabaseAdmin
+      .from('owner_google_tokens')
+      .select('root_folder_id')
+      .eq('owner_id', checkin.owner_id)
+      .maybeSingle()
+
+    let rootFolderId = tokenRecord?.root_folder_id
     if (!rootFolderId) {
       rootFolderId = await findGoogleFolder(currentAccessToken, 'Fixy Stays Guest Records')
       if (!rootFolderId) {
