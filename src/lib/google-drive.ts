@@ -281,49 +281,48 @@ export async function generateCheckinPDF(
 }
 
 export async function getActiveAccessToken(ownerId: string): Promise<string | null> {
-  try {
-    const supabaseAdmin = createAdminClient()
-    const { data: tokens, error: tokensError } = await supabaseAdmin
-      .from('owner_google_tokens')
-      .select('*')
-      .eq('owner_id', ownerId)
-      .maybeSingle()
+  const supabaseAdmin = createAdminClient()
+  const { data: tokens, error: tokensError } = await supabaseAdmin
+    .from('owner_google_tokens')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .maybeSingle()
 
-    if (tokensError || !tokens) {
-      return null
-    }
+  if (tokensError) {
+    throw new Error(`Database error reading owner tokens: ${tokensError.message}`)
+  }
 
-    let currentAccessToken = tokens.access_token
-    const now = new Date()
-    const expiry = new Date(tokens.expiry_date)
-
-    // Refresh token 5 minutes before actual expiry just in case
-    if (now.getTime() >= expiry.getTime() - 5 * 60 * 1000) {
-      console.log(`[GOOGLE-DRIVE] Refreshing access token for owner ${ownerId}`)
-      const refreshResult = await refreshAccessToken(tokens.refresh_token)
-      currentAccessToken = refreshResult.access_token
-      const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
-
-      const { error: updateError } = await supabaseAdmin
-        .from('owner_google_tokens')
-        .update({
-          access_token: currentAccessToken,
-          expiry_date: newExpiryDate.toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('owner_id', ownerId)
-
-      if (updateError) {
-        console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
-        throw new Error(`DB_UPDATE_FAILED: ${JSON.stringify(updateError)}`)
-      }
-    }
-
-    return currentAccessToken
-  } catch (err) {
-    console.error('[GOOGLE-DRIVE] Error obtaining active token:', err)
+  if (!tokens) {
     return null
   }
+
+  let currentAccessToken = tokens.access_token
+  const now = new Date()
+  const expiry = new Date(tokens.expiry_date)
+
+  // Refresh token 5 minutes before actual expiry just in case
+  if (now.getTime() >= expiry.getTime() - 5 * 60 * 1000) {
+    console.log(`[GOOGLE-DRIVE] Refreshing access token for owner ${ownerId}`)
+    const refreshResult = await refreshAccessToken(tokens.refresh_token)
+    currentAccessToken = refreshResult.access_token
+    const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
+
+    const { error: updateError } = await supabaseAdmin
+      .from('owner_google_tokens')
+      .update({
+        access_token: currentAccessToken,
+        expiry_date: newExpiryDate.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('owner_id', ownerId)
+
+    if (updateError) {
+      console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
+      throw new Error(`DB_UPDATE_FAILED: ${JSON.stringify(updateError)}`)
+    }
+  }
+
+  return currentAccessToken
 }
 
 // 4. Main Sync Orchestrator Action
