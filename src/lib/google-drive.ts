@@ -315,6 +315,7 @@ export async function getActiveAccessToken(ownerId: string): Promise<string | nu
 
       if (updateError) {
         console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
+        throw new Error(`DB_UPDATE_FAILED: ${JSON.stringify(updateError)}`)
       }
     }
 

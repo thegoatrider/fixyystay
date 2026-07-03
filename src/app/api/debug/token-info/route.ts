@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getActiveAccessToken } from '@/lib/google-drive'
+import { getActiveAccessToken, refreshAccessToken } from '@/lib/google-drive'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -50,8 +50,49 @@ export async function GET(request: NextRequest) {
       ? `${tokenRecord.refresh_token.substring(0, 10)}... (length: ${tokenRecord.refresh_token.length})` 
       : 'null'
 
-    // Let's attempt the getActiveAccessToken call to see if it succeeds or returns null
-    const activeTokenResult = await getActiveAccessToken(owner.id)
+    // Replicate getActiveAccessToken step-by-step
+    let refreshAttemptStatus = "skipped"
+    let refreshAttemptError: any = null
+    let refreshResultObject: any = null
+    let dbUpdateStatus = "skipped"
+    let dbUpdateError: any = null
+
+    if (needsRefresh) {
+      refreshAttemptStatus = "started"
+      try {
+        const refreshResult = await refreshAccessToken(tokenRecord.refresh_token)
+        refreshAttemptStatus = "success"
+        refreshResultObject = {
+          expires_in: refreshResult.expires_in,
+          has_access_token: !!refreshResult.access_token,
+          token_length: refreshResult.access_token?.length || 0
+        }
+
+        dbUpdateStatus = "started"
+        const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
+        const { error: updateError } = await supabaseAdmin
+          .from('owner_google_tokens')
+          .update({
+            access_token: refreshResult.access_token,
+            expiry_date: newExpiryDate.toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('owner_id', owner.id)
+
+        if (updateError) {
+          dbUpdateStatus = "failed"
+          dbUpdateError = updateError
+        } else {
+          dbUpdateStatus = "success"
+        }
+      } catch (err: any) {
+        refreshAttemptStatus = "failed"
+        refreshAttemptError = err.message || String(err)
+      }
+    }
+
+    // Call actual production helper to see final output
+    const productionHelperToken = await getActiveAccessToken(owner.id)
 
     return NextResponse.json({
       serverTime: now.toISOString(),
@@ -63,8 +104,15 @@ export async function GET(request: NextRequest) {
       googleEmail: tokenRecord.google_email,
       maskedAccessToken,
       maskedRefreshToken,
-      activeTokenResult: activeTokenResult 
-        ? `${activeTokenResult.substring(0, 10)}... (length: ${activeTokenResult.length})`
+      diagnostics: {
+        refreshAttemptStatus,
+        refreshAttemptError,
+        refreshResultObject,
+        dbUpdateStatus,
+        dbUpdateError
+      },
+      productionHelperToken: productionHelperToken
+        ? `${productionHelperToken.substring(0, 10)}... (length: ${productionHelperToken.length})`
         : 'null'
     })
 
