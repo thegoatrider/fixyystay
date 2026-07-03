@@ -53,7 +53,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
             }
             .container {
               border: 12px solid #2563eb;
-              padding: 40px 30px;
+              padding: 50px 30px;
               border-radius: 50px;
               display: flex;
               flex-direction: column;
@@ -62,27 +62,29 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               max-width: 650px;
               box-sizing: border-box;
             }
-            .logo-text {
-              font-size: 48px;
-              font-weight: 900;
-              color: #2563eb;
-              margin-bottom: 5px;
-              letter-spacing: -1.5px;
+            .welcome-text {
+              font-size: 18px;
+              font-weight: 800;
+              color: #4b5563;
+              letter-spacing: 4px;
+              margin-bottom: 8px;
+              text-transform: uppercase;
             }
             .property-name {
-              font-size: 24px;
-              font-weight: 700;
+              font-size: 32px;
+              font-weight: 900;
               color: #1f2937;
-              margin-bottom: 30px;
+              margin-bottom: 35px;
               max-width: 500px;
               line-height: 1.2;
+              letter-spacing: -0.5px;
             }
             .qr-wrapper {
               background: white;
               padding: 25px;
               border-radius: 25px;
               box-shadow: 0 15px 40px rgba(0,0,0,0.06);
-              margin-bottom: 30px;
+              margin-bottom: 35px;
               border: 1px solid #f3f4f6;
             }
             .instruction {
@@ -99,26 +101,31 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               font-weight: 500;
             }
             .footer {
-              margin-top: 40px;
-              font-size: 14px;
+              margin-top: 45px;
+              font-size: 12px;
               color: #9ca3af;
-              font-weight: 600;
-              letter-spacing: 1.5px;
+              font-weight: 700;
+              letter-spacing: 2px;
               text-transform: uppercase;
+              display: flex;
+              align-items: center;
+              justify-content: center;
             }
           </style>
         </head>
         <body>
           <div class="container">
-            <img src="/logo.png" style="width: 80px; height: 80px; margin-bottom: 15px;" />
-            <div class="logo-text">Fixy Stays</div>
+            <div class="welcome-text">WELCOME TO</div>
             <div class="property-name">${propertyName}</div>
             <div class="qr-wrapper">
               <img src="${qrDataUrl}" style="width: 320px; height: 320px;" />
             </div>
             <div class="instruction">Scan to Check-in</div>
             <div class="sub-instruction">Please keep your ID proofs ready for scanning</div>
-            <div class="footer">Powered by Fixy Stays</div>
+            <div class="footer">
+              <img src="/logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; opacity: 0.5;" />
+              Powered by Fixy Stays
+            </div>
           </div>
           <script>
             window.onload = () => {
