@@ -14,6 +14,7 @@ import { CreateAgentForm } from './CreateAgentForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 import FreeTierToggle from './FreeTierToggle'
+import OrganizationsManagement from './OrganizationsManagement'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -161,6 +162,15 @@ export default async function AdminDashboard() {
   // Basic counts for top-level cards (actual users vs total)
   const leadFormOwnersCount = leadUsageBreakdown.filter(i => i.total_leads > 0).length
   const guestFormOwnersCount = checkinUsageBreakdown.filter(i => i.total_checkins > 0).length
+
+  // 9. Organizations (White-Label)
+  let organizations: any[] = []
+  try {
+    const { data: orgs } = await supabase.from('organizations').select('*').order('created_at', { ascending: false })
+    organizations = orgs || []
+  } catch (e) {
+    console.warn('Organizations table not found.')
+  }
 
   return (
     <div className="flex flex-col gap-10">
@@ -617,6 +627,11 @@ export default async function AdminDashboard() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* SECTION 5: White-Label Organizations */}
+      <section>
+        <OrganizationsManagement organizations={organizations} />
       </section>
 
     </div>

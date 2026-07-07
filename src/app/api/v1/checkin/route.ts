@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { uploadAndVerifyFront, uploadBackImage } from '@/app/checkin/verify-action'
 import { submitCheckin } from '@/app/checkin/actions'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 // Handle CORS preflight requests
 export async function OPTIONS() {
@@ -16,6 +17,7 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
+    const supabaseAdmin = createAdminClient()
     const formData = await req.formData()
     
     // 1. Extract required fields
@@ -37,6 +39,39 @@ export async function POST(req: Request) {
         { error: 'Missing required fields: propertyId, guestName, guestPhone, or frontImage' }, 
         { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       )
+    }
+
+    // 2.5 Verify API Key and Organization if Authorization header is present
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const apiKey = authHeader.split(' ')[1]
+      
+      const { data: org, error: orgError } = await supabaseAdmin
+        .from('organizations')
+        .select('id')
+        .eq('api_key', apiKey)
+        .single()
+        
+      if (orgError || !org) {
+        return NextResponse.json(
+          { error: 'Invalid API Key' }, 
+          { status: 401, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      }
+      
+      // Verify that the property belongs to this organization
+      const { data: prop, error: propErr } = await supabaseAdmin
+        .from('properties')
+        .select('organization_id')
+        .eq('id', propertyId)
+        .single()
+        
+      if (propErr || !prop || prop.organization_id !== org.id) {
+        return NextResponse.json(
+          { error: 'Property does not exist or does not belong to your organization.' }, 
+          { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      }
     }
 
     // 3. Verify Front Image

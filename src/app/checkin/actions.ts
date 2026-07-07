@@ -58,7 +58,7 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
 
     const { data: property, error: propError } = await supabaseAdmin
       .from('properties')
-      .select('owner_id, name, helpdesk_number')
+      .select('owner_id, name, helpdesk_number, organization_id')
       .eq('id', propertyId)
       .single()
 
@@ -76,6 +76,7 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     const checkinRecord = {
       property_id: propertyId,
       owner_id: property.owner_id,
+      organization_id: property.organization_id || null,
       guest_phone: guestPhone,
       guest_name: guestName,
       num_people: numPeople,
