@@ -91,9 +91,13 @@ function CheckinForm({ org }: { org: Organization }) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl border max-w-md text-center">
-          <HelpCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          {org.logo_url ? (
+            <img src={org.logo_url} alt={org.name} className="h-16 mx-auto mb-4 object-contain opacity-50 grayscale" />
+          ) : (
+            <HelpCircle className="w-16 h-16 mx-auto mb-4" style={{ color: org.primary_color, opacity: 0.5 }} />
+          )}
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Link</h1>
-          <p className="text-gray-500">This check-in link is invalid or expired. Please contact the property owner.</p>
+          <p className="text-gray-500">This check-in link is missing a property ID. Please use the complete link provided by {org.name}.</p>
         </div>
       </div>
     )
