@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2, Key, Link as LinkIcon, RefreshCw, Plus, Copy } from 'lucide-react'
-import { createOrganization, regenerateApiKey } from './org-actions'
+import { Building2, Key, Link as LinkIcon, RefreshCw, Plus, Copy, Zap } from 'lucide-react'
+import { createOrganization, regenerateApiKey, createSkeletonProperty } from './org-actions'
 
 export default function OrganizationsManagement({ organizations }: { organizations: any[] }) {
   const [isCreating, setIsCreating] = useState(false)
@@ -37,6 +37,23 @@ export default function OrganizationsManagement({ organizations }: { organizatio
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     alert('Copied to clipboard!')
+  }
+
+  const handleCreateProperty = async (orgId: string) => {
+    const propertyName = prompt('Enter a name for the new property/branch (e.g., "Ocean View - Downtown")')
+    if (!propertyName) return
+
+    setLoading(true)
+    const res = await createSkeletonProperty(orgId, propertyName)
+    if (res?.error) {
+      alert(`Error: ${res.error}`)
+    } else {
+      alert('Property Generated successfully! ID copied to clipboard.')
+      if (res?.property?.id) {
+        navigator.clipboard.writeText(res.property.id)
+      }
+    }
+    setLoading(false)
   }
 
   return (
@@ -89,6 +106,7 @@ export default function OrganizationsManagement({ organizations }: { organizatio
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Organization</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Branding</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">API Key & Links</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest bg-indigo-50/30">API Properties</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -131,6 +149,33 @@ export default function OrganizationsManagement({ organizations }: { organizatio
                         </a>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 border-l border-gray-100 min-w-[250px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Properties ({org.properties?.length || 0})</p>
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 py-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50" onClick={() => handleCreateProperty(org.id)} disabled={loading}>
+                        <Zap className="w-3 h-3 mr-1" /> Generate
+                      </Button>
+                    </div>
+                    {org.properties && org.properties.length > 0 ? (
+                      <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+                        {org.properties.map((p: any) => (
+                          <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5 border border-gray-100">
+                            <span className="text-[11px] font-medium text-gray-700 truncate mr-2" title={p.name}>{p.name}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <code className="text-[9px] text-gray-400 bg-white px-1 py-0.5 rounded border">
+                                {p.id.split('-')[0]}...
+                              </code>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 hover:bg-gray-200" onClick={() => copyToClipboard(p.id)} title="Copy Full ID">
+                                <Copy className="w-2.5 h-2.5 text-gray-600" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic bg-gray-50/50 p-2 rounded text-center">No properties generated yet.</p>
+                    )}
                   </td>
                 </tr>
               ))}

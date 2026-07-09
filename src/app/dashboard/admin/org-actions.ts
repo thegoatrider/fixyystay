@@ -61,3 +61,30 @@ export async function regenerateApiKey(orgId: string) {
     return { error: err.message || 'Failed to regenerate API key' }
   }
 }
+
+export async function createSkeletonProperty(orgId: string, propertyName: string) {
+  try {
+    const supabase = createAdminClient()
+    
+    const { data, error } = await supabase
+      .from('properties')
+      .insert([{
+        name: propertyName,
+        organization_id: orgId,
+        type: 'B2B API Integration',
+        approved: true,
+        helpdesk_number: 'N/A'
+      }])
+      .select('id, name')
+      .single()
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    revalidatePath('/dashboard/admin')
+    return { success: true, property: data }
+  } catch (err: any) {
+    return { error: err.message || 'Failed to generate property' }
+  }
+}

@@ -166,7 +166,7 @@ export default async function AdminDashboard() {
   // 9. Organizations (White-Label)
   let organizations: any[] = []
   try {
-    const { data: orgs } = await supabase.from('organizations').select('*').order('created_at', { ascending: false })
+    const { data: orgs } = await supabase.from('organizations').select('*, properties(id, name)').order('created_at', { ascending: false })
     organizations = orgs || []
   } catch (e) {
     console.warn('Organizations table not found.')
