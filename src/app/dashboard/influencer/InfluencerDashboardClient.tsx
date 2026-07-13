@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { submitPromotionRequest } from './influencer-requests-actions'
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 
 export default function InfluencerDashboardClient({ 
   influencerId, 
@@ -52,7 +52,10 @@ export default function InfluencerDashboardClient({
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.fixystays.com'
+  const [appOrigin, setAppOrigin] = useState('https://www.fixystays.com')
+  useEffect(() => {
+    setAppOrigin(window.location.origin)
+  }, [])
 
   const handleRequestPromotion = async () => {
     if (!selectedProperty || !proposalText) return
