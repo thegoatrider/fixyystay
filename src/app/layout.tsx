@@ -5,6 +5,9 @@ import { CapacitorBackButton } from '@/components/CapacitorBackButton'
 import { BottomNav } from '@/components/BottomNav'
 import { PullToRefresh } from '@/components/PullToRefresh'
 import Providers from "@/components/Providers";
+import { cookies } from 'next/headers'
+import { getDictionary } from '@/lib/i18n'
+import { TranslationProvider } from '@/components/TranslationProvider'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -62,22 +65,28 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies()
+  const currentLocale = cookieStore.get('NEXT_LOCALE')?.value || 'en'
+  const dict = await getDictionary(currentLocale)
+
   return (
-    <html lang="en">
+    <html lang={currentLocale}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
-        <Providers>
-          <PullToRefresh />
-          <CapacitorBackButton />
-          {children}
-          <BottomNav />
-        </Providers>
+        <TranslationProvider dictionary={dict}>
+          <Providers>
+            <PullToRefresh />
+            <CapacitorBackButton />
+            {children}
+            <BottomNav />
+          </Providers>
+        </TranslationProvider>
       </body>
     </html>
   );

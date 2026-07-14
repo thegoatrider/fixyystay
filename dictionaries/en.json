@@ -31,5 +31,32 @@
     "privacy": "Privacy Policy",
     "terms": "Terms & Conditions",
     "copyright": "© 2026 Fixy Stays · Most trusted property booking platform"
+  },
+  "checkin": {
+    "title": "Welcome to",
+    "subtitle": "Guest Check-in",
+    "instructions": "Please fill in your details and upload both sides of a government ID for",
+    "everyGuest": "every guest",
+    "phone": "Phone Number",
+    "fullName": "Full Name (Primary Guest)",
+    "checkinDate": "Check-in Date",
+    "checkoutDate": "Check-out Date",
+    "vehicleNumber": "Vehicle Number",
+    "optional": "(Optional)",
+    "numGuests": "Number of People Staying",
+    "formC": "I am a foreign national (Requires Form C)",
+    "passport": "Passport Number",
+    "visaNum": "Visa Number",
+    "visaExpiry": "Visa Expiry Date",
+    "country": "Country of Origin",
+    "idVerification": "Identity Verification",
+    "idInstructions": "Upload front & back of a government ID for each guest.",
+    "ready": "Ready",
+    "allVerified": "All guests verified — ready to check in!",
+    "moreNeeded": "more guest IDs needed.",
+    "completeBtn": "Complete Check-in for",
+    "completing": "Completing Check-in...",
+    "invalidLink": "Invalid Link",
+    "invalidDesc": "This check-in link is invalid or expired. Please contact the property owner."
   }
 }

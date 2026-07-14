@@ -13,21 +13,23 @@ import {
 import { submitCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 import { Suspense } from 'react'
+import { useTranslation } from '@/components/TranslationProvider'
 import { GuestIdUpload } from './GuestIdUpload'
 
 export default function CheckinPage() {
+  const dict = useTranslation()
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <div className="text-blue-600 font-bold animate-pulse">Loading Check-in Form...</div>
       </div>
     }>
-      <CheckinForm />
+      <CheckinForm dict={dict} />
     </Suspense>
   )
 }
 
-function CheckinForm() {
+function CheckinForm({ dict }: { dict: any }) {
   const searchParams = useSearchParams()
   const propertyId = searchParams.get('p')
   const prefilledPhone = searchParams.get('pn')
@@ -90,8 +92,8 @@ function CheckinForm() {
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl border max-w-md text-center">
           <HelpCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Link</h1>
-          <p className="text-gray-500">This check-in link is invalid or expired. Please contact the property owner.</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{dict.checkin?.invalidLink || 'Invalid Link'}</h1>
+          <p className="text-gray-500">{dict.checkin?.invalidDesc || 'This check-in link is invalid or expired. Please contact the property owner.'}</p>
         </div>
       </div>
     )
@@ -111,6 +113,13 @@ function CheckinForm() {
       formData.append('checkinDate', checkinDate)
       formData.append('checkoutDate', checkoutDate)
       formData.append('vehicleNumber', (e.currentTarget.elements.namedItem('vehicleNumber') as HTMLInputElement)?.value || '')
+      if (showFormC) {
+        formData.append('isForeigner', 'on')
+        formData.append('passportNumber', (e.currentTarget.elements.namedItem('passportNumber') as HTMLInputElement)?.value || '')
+        formData.append('visaNumber', (e.currentTarget.elements.namedItem('visaNumber') as HTMLInputElement)?.value || '')
+        formData.append('visaExpiry', (e.currentTarget.elements.namedItem('visaExpiry') as HTMLInputElement)?.value || '')
+        formData.append('countryOfOrigin', (e.currentTarget.elements.namedItem('countryOfOrigin') as HTMLInputElement)?.value || '')
+      }
 
       const result = await submitCheckin(formData, verifiedIds as string[])
 
@@ -193,12 +202,13 @@ function CheckinForm() {
           <Link href="/" className="font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition">
             Fixy Stays
           </Link>
-          <h1 className="text-4xl font-extrabold text-gray-900 leading-tight">
-            Welcome to <br />
-            <span className="text-blue-600 drop-shadow-sm">{propertyInfo?.name || 'Guest Check-in'}</span>
-          </h1>
-          <p className="text-gray-500 mt-3 font-medium">
-            Please fill in your details and upload both sides of a government ID for <strong>every guest</strong>.
+          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{dict.checkin?.title || 'Welcome to'} <span className="text-blue-600 block">{propertyInfo?.name || 'Property'}</span></h1>
+          <p className="text-lg font-medium text-gray-500">{dict.checkin?.subtitle || 'Guest Check-in'}</p>
+        </div>
+
+        <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mb-8">
+          <p className="text-sm text-blue-800 font-medium">
+            {dict.checkin?.instructions || 'Please fill in your details and upload both sides of a government ID for'} <span className="font-bold">{dict.checkin?.everyGuest || 'every guest'}</span>.
           </p>
         </div>
 
@@ -208,7 +218,7 @@ function CheckinForm() {
             {/* Phone + Name */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="w-4 h-4" /> Phone Number</Label>
+                <Label htmlFor="phone">{dict.checkin?.phone || 'Phone Number'}</Label>
                 <div className="flex gap-2">
                   <select
                     value={countryCode}
@@ -260,7 +270,6 @@ function CheckinForm() {
               <div 
                 className="flex items-center gap-2 cursor-pointer" 
                 onClick={(e) => {
-                  // Prevent double toggling if clicking directly on the input or label
                   if (e.target !== e.currentTarget && (e.target as HTMLElement).tagName !== 'DIV') return;
                   setShowFormC(!showFormC);
                 }}
@@ -273,25 +282,25 @@ function CheckinForm() {
                   onChange={(e) => setShowFormC(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
-                <Label htmlFor="isForeigner" className="font-bold text-gray-700 cursor-pointer">I am a foreign national (Requires Form C)</Label>
+                <Label htmlFor="isForeigner" className="font-bold text-gray-700 cursor-pointer">{dict.checkin?.formC || 'I am a foreign national (Requires Form C)'}</Label>
               </div>
               
               {showFormC && (
                 <div id="formCFields" className="grid md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-2">
-                    <Label htmlFor="passportNumber">Passport Number</Label>
+                    <Label htmlFor="passportNumber">{dict.checkin?.passport || 'Passport Number'}</Label>
                     <Input id="passportNumber" name="passportNumber" placeholder="e.g. A1234567" className="bg-white" required={showFormC} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="visaNumber">Visa Number</Label>
+                    <Label htmlFor="visaNumber">{dict.checkin?.visaNum || 'Visa Number'}</Label>
                     <Input id="visaNumber" name="visaNumber" placeholder="e.g. V1234567" className="bg-white" required={showFormC} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="visaExpiry">Visa Expiry Date</Label>
+                    <Label htmlFor="visaExpiry">{dict.checkin?.visaExpiry || 'Visa Expiry Date'}</Label>
                     <Input id="visaExpiry" name="visaExpiry" type="date" className="bg-white" required={showFormC} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="countryOfOrigin">Country of Origin</Label>
+                    <Label htmlFor="countryOfOrigin">{dict.checkin?.country || 'Country of Origin'}</Label>
                     <Input id="countryOfOrigin" name="countryOfOrigin" placeholder="e.g. United Kingdom" className="bg-white" required={showFormC} />
                   </div>
                 </div>
@@ -299,40 +308,28 @@ function CheckinForm() {
             </div>
 
             {/* Number of Guests */}
-            <div className="space-y-2">
-              <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4" /> Number of People Staying</Label>
-              <select
-                id="pax"
-                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                value={numPeople}
-                onChange={(e) => setNumPeople(parseInt(e.target.value))}
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                  <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
-                ))}
-              </select>
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex justify-between items-center mb-4">
+                <Label>{dict.checkin?.numGuests || 'Number of People Staying'}</Label>
+                <select
+                  id="pax"
+                  className="w-20 h-10 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  value={numPeople}
+                  onChange={(e) => setNumPeople(parseInt(e.target.value))}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* ── ID Verification — one GuestIdUpload per guest ── */}
-            <div className="mt-2 pt-6 border-t border-gray-100 flex flex-col gap-5">
-              {/* Header with progress */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-bold text-gray-900">Identity Verification</h3>
-                    <p className="text-xs text-gray-500">
-                      Upload <span className="font-bold text-blue-600">front & back</span> of a government ID for each guest.
-                    </p>
-                  </div>
-                </div>
-                <div className={cn(
-                  'text-xs font-bold px-3 py-1.5 rounded-full transition-colors',
-                  allVerified ? 'bg-green-100 text-green-700' : 'bg-amber-50 text-amber-700'
-                )}>
-                  {verifiedCount}/{numPeople} Ready
-                </div>
+            <div className="bg-gray-50 -mx-6 -mb-6 p-6 border-t mt-8">
+              <div className="mb-4">
+                <h3 className="font-bold text-gray-900 mb-1">{dict.checkin?.idVerification || 'Identity Verification'}</h3>
+                <p className="text-sm text-gray-500 mb-4">{dict.checkin?.idInstructions || 'Upload front & back of a government ID for each guest.'}</p>
               </div>
 
               {/* One card per guest */}
@@ -346,36 +343,37 @@ function CheckinForm() {
                 ))}
               </div>
 
-              {/* All done banner */}
-              {allVerified && (
-                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <p className="text-sm font-bold text-green-800">
-                    All {numPeople} guest{numPeople > 1 ? 's' : ''} verified — ready to check in!
-                  </p>
-                </div>
-              )}
-
-              {!allVerified && verifiedCount > 0 && (
-                <p className="text-xs text-amber-600 font-medium text-center">
-                  {numPeople - verifiedCount} more guest ID{numPeople - verifiedCount > 1 ? 's' : ''} needed.
-                </p>
-              )}
+              {/* Submit — only shows when all verified */}
+              <div className="mt-6 flex flex-col gap-3">
+                {allVerified ? (
+                  <div className="bg-green-50 text-green-700 text-sm p-3 rounded-xl border border-green-200 flex items-center justify-center gap-2 font-medium">
+                    <CheckCircle className="w-4 h-4" />
+                    {dict.checkin?.allVerified || 'All guests verified — ready to check in!'}
+                  </div>
+                ) : (
+                  <div className="text-sm text-center text-gray-500 bg-white p-3 rounded-xl border">
+                    {numPeople - verifiedCount} {dict.checkin?.moreNeeded || 'more guest IDs needed.'}
+                  </div>
+                )}
+                <Button 
+                  type="submit" 
+                  size="lg"
+                  disabled={!allVerified || isLoading} 
+                  className={cn("w-full py-6 text-lg rounded-xl shadow-lg transition-all", 
+                    allVerified ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-300"
+                  )}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {dict.checkin?.completing || 'Completing Check-in...'}
+                    </div>
+                  ) : (
+                    `${dict.checkin?.completeBtn || 'Complete Check-in for'} ${propertyInfo?.name || 'Property'}`
+                  )}
+                </Button>
+              </div>
             </div>
-
-            {/* Submit — only shows when all verified */}
-            {allVerified && (
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 mt-2 shadow-lg shadow-green-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                disabled={isLoading}
-              >
-                {isLoading
-                  ? 'Completing Check-in...'
-                  : `Complete Check-in for ${numPeople} Guest${numPeople > 1 ? 's' : ''}`}
-              </Button>
-            )}
           </form>
         )}
       </div>
