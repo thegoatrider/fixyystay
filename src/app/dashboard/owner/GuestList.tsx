@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle, Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -682,6 +682,33 @@ export default React.memo(function GuestList({
                   </div>
                 </div>
 
+                {/* Form C Details (If Foreign National) */}
+                {selectedGuest.form_c_details && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 flex items-center gap-1">
+                      <Globe className="w-3 h-3" /> Form C (Foreign Tourist)
+                    </p>
+                    <div className="bg-blue-50/50 rounded-xl p-3 flex flex-col gap-2 text-sm border border-blue-100">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-xs">Passport No.</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedGuest.form_c_details.passport_number || '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-xs">Visa No.</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedGuest.form_c_details.visa_number || '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-xs">Visa Expiry</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedGuest.form_c_details.visa_expiry || '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-xs">Country</span>
+                        <span className="font-bold text-gray-900 text-xs">{selectedGuest.form_c_details.country_of_origin || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Room Assignment */}
                 <div className="flex flex-col gap-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Room Assignment</p>
@@ -830,9 +857,11 @@ export default React.memo(function GuestList({
                               <div className={`w-9 h-9 border rounded-xl flex items-center justify-center flex-shrink-0 ${doc.is_verified ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
                                 <FileText className={`w-4 h-4 ${doc.is_verified ? 'text-green-600' : 'text-indigo-500'}`} />
                               </div>
-                              <div>
-                                <p className="text-sm font-bold text-gray-800">{doc.document_type || 'ID Document'}</p>
-                                <p className="text-[11px] text-gray-500 font-bold">{doc.document_number || '—'}{doc.full_name ? ` · ${doc.full_name}` : ''}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-gray-800 truncate">{doc.document_type || 'ID Document'}</p>
+                                <p className="text-[11px] text-gray-500 font-bold break-words whitespace-normal leading-tight">
+                                  {doc.document_number || '—'}{doc.full_name ? ` · ${doc.full_name}` : ''}
+                                </p>
                               </div>
                             </div>
 

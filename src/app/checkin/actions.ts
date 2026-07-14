@@ -73,6 +73,14 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     // Store identity IDs as an array for reference
     const idDocuments = identityIds.map((id, i) => ({ personIndex: i + 1, identityId: id }))
 
+    const isForeigner = formData.get('isForeigner') === 'on'
+    const formCData = isForeigner ? {
+      passport_number: formData.get('passportNumber'),
+      visa_number: formData.get('visaNumber'),
+      visa_expiry: formData.get('visaExpiry'),
+      country_of_origin: formData.get('countryOfOrigin'),
+    } : null
+
     const checkinRecord = {
       property_id: propertyId,
       owner_id: property.owner_id,
@@ -85,7 +93,8 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       vehicle_number: (formData.get('vehicleNumber') as string) || null,
       id_documents: idDocuments,
       uid,
-      status: 'completed'
+      status: 'completed',
+      form_c_details: formCData
     }
 
     const { data: insertedCheckin, error: insertError } = await supabaseAdmin

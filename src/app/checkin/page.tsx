@@ -254,6 +254,44 @@ function CheckinForm() {
                 className="bg-gray-50/50 focus:bg-white transition-colors" />
             </div>
 
+            {/* Form C (Foreign Tourists) */}
+            <div className="space-y-4 border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => document.getElementById('isForeigner')?.click()}>
+                <input 
+                  type="checkbox" 
+                  id="isForeigner" 
+                  name="isForeigner"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  onChange={(e) => {
+                    const formCFields = document.getElementById('formCFields');
+                    if (formCFields) {
+                      formCFields.style.display = e.target.checked ? 'grid' : 'none';
+                    }
+                  }}
+                />
+                <Label htmlFor="isForeigner" className="font-bold text-gray-700 cursor-pointer">I am a foreign national (Requires Form C)</Label>
+              </div>
+              
+              <div id="formCFields" className="hidden md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 animate-in fade-in slide-in-from-top-2" style={{ display: 'none' }}>
+                <div className="space-y-2">
+                  <Label htmlFor="passportNumber">Passport Number</Label>
+                  <Input id="passportNumber" name="passportNumber" placeholder="e.g. A1234567" className="bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visaNumber">Visa Number</Label>
+                  <Input id="visaNumber" name="visaNumber" placeholder="e.g. V1234567" className="bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visaExpiry">Visa Expiry Date</Label>
+                  <Input id="visaExpiry" name="visaExpiry" type="date" className="bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="countryOfOrigin">Country of Origin</Label>
+                  <Input id="countryOfOrigin" name="countryOfOrigin" placeholder="e.g. United Kingdom" className="bg-white" />
+                </div>
+              </div>
+            </div>
+
             {/* Number of Guests */}
             <div className="space-y-2">
               <Label htmlFor="pax" className="flex items-center gap-1"><Users className="w-4 h-4" /> Number of People Staying</Label>
