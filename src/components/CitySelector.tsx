@@ -15,9 +15,35 @@ export function CitySelector({ onCityChange, initialCity = 'Alibag' }: CitySelec
 
   const cities = [
     { name: 'Alibag', active: true },
+    { name: 'Nagothane', active: true },
+    { name: 'Pali', active: true },
+    { name: 'Roha', active: true },
+    { name: 'Kolad', active: true },
+    { name: 'Mangaon', active: true },
+    { name: 'Goregaon', active: true },
+    { name: 'Tala', active: true },
+    { name: 'Mhasla', active: true },
+    { name: 'Shrivardhan', active: true },
+    { name: 'Dighi Sagari', active: true },
+    { name: 'Mahad City', active: true },
+    { name: 'Mahad Taluka', active: true },
+    { name: 'Mahad MIDC', active: true },
+    { name: 'Poladpur', active: true },
+    { name: 'Karjat', active: true },
+    { name: 'Neral', active: true },
+    { name: 'Matheran', active: true },
+    { name: 'Khopoli', active: true },
+    { name: 'Khalapur', active: true },
+    { name: 'Rasayani', active: true },
+    { name: 'Pen', active: true },
+    { name: 'Vadkhal', active: true },
+    { name: 'Poynad', active: true },
+    { name: 'Dadar Sagari', active: true },
+    { name: 'Mandwa Sagari', active: true },
+    { name: 'Revdanda', active: true },
+    { name: 'Murud', active: true },
     { name: 'Lonavala', active: false },
     { name: 'Khandala', active: false },
-    { name: 'Matheran', active: false },
     { name: 'Mahableshwar', active: false },
     { name: 'Mumbai', active: false },
     { name: 'Goa', active: false },
@@ -49,7 +75,7 @@ export function CitySelector({ onCityChange, initialCity = 'Alibag' }: CitySelec
             className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)} 
           />
-          <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-gray-100 shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute left-0 mt-2 w-56 max-h-[300px] rounded-2xl bg-white border border-gray-100 shadow-xl z-50 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="py-2">
               <div className="px-4 py-2 mb-1">
                 <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Select Destination</span>

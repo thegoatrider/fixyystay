@@ -55,7 +55,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     .eq('approved', true)
 
   if (selectedCity && selectedCity !== 'All') {
-    query = query.eq('city', selectedCity)
+    query = query.or(`city.eq.${selectedCity},city_area.eq.${selectedCity}`)
   }
 
   const { data: properties, error } = await query

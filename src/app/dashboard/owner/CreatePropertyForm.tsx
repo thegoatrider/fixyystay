@@ -361,6 +361,32 @@ export default function CreatePropertyForm() {
             <option value="Shekhadi">Shekhadi</option>
             <option value="Sarve">Sarve</option>
           </optgroup>
+          <optgroup label="── Extended Raigad Locations ──">
+            <option value="Nagothane">Nagothane</option>
+            <option value="Pali">Pali</option>
+            <option value="Roha">Roha</option>
+            <option value="Kolad">Kolad</option>
+            <option value="Mangaon">Mangaon</option>
+            <option value="Goregaon">Goregaon</option>
+            <option value="Tala">Tala</option>
+            <option value="Mhasla">Mhasla</option>
+            <option value="Dighi Sagari">Dighi Sagari</option>
+            <option value="Mahad City">Mahad City</option>
+            <option value="Mahad Taluka">Mahad Taluka</option>
+            <option value="Mahad MIDC">Mahad MIDC</option>
+            <option value="Poladpur">Poladpur</option>
+            <option value="Karjat">Karjat</option>
+            <option value="Neral">Neral</option>
+            <option value="Matheran">Matheran</option>
+            <option value="Khopoli">Khopoli</option>
+            <option value="Khalapur">Khalapur</option>
+            <option value="Rasayani">Rasayani</option>
+            <option value="Pen">Pen</option>
+            <option value="Vadkhal">Vadkhal</option>
+            <option value="Poynad">Poynad</option>
+            <option value="Dadar Sagari">Dadar Sagari</option>
+            <option value="Mandwa Sagari">Mandwa Sagari</option>
+          </optgroup>
         </select>
       </div>
 
