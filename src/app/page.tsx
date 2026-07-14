@@ -3,11 +3,8 @@ import { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Hero } from '@/components/Hero'
-import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { blogPosts } from './blog/data'
 import { Clock, ArrowRight, LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react'
-import { cookies } from 'next/headers'
-import { getDictionary } from '@/lib/i18n'
 
 export const metadata: Metadata = {
   title: 'Fixy Stays | Book Premium Stays, Hotels & Luxury Villas in Alibag',
@@ -23,10 +20,6 @@ export const metadata: Metadata = {
 export default async function Index() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
-  const cookieStore = await cookies()
-  const currentLocale = cookieStore.get('NEXT_LOCALE')?.value || 'en'
-  const dict = await getDictionary(currentLocale)
 
   return (
     <div className="flex-1 w-full flex flex-col items-center pb-32 md:pb-0">
@@ -55,8 +48,6 @@ export default async function Index() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            <LanguageSwitcher currentLocale={currentLocale} />
-            
             {user ? (
               <>
                 <div className="hidden lg:block text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
@@ -68,7 +59,7 @@ export default async function Index() {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-blue-600 bg-blue-50 font-bold hover:bg-blue-100 transition-all text-xs sm:text-sm"
                 >
                   <LayoutDashboard className="w-4 h-4" />
-                  <span className="hidden xs:inline">{dict.nav.dashboard}</span>
+                  <span className="hidden xs:inline">Dashboard</span>
                 </Link>
 
                 <form action="/auth/signout" method="post">
@@ -84,10 +75,10 @@ export default async function Index() {
             ) : (
               <div className="flex gap-2">
                 <Link href="/login" className="px-3 py-2 text-gray-600 hover:text-blue-600 font-bold text-xs sm:text-sm">
-                  {dict.nav.login}
+                  Log in
                 </Link>
                 <Link href="/signup" className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs sm:text-sm shadow-md">
-                  {dict.nav.signup}
+                  Sign up
                 </Link>
               </div>
             )}
@@ -98,12 +89,12 @@ export default async function Index() {
       <div className="flex-1 flex flex-col max-w-4xl px-4 py-12 md:p-20 w-full mt-4 md:mt-10">
         <main className="flex flex-col gap-10 items-center text-center w-full">
           
-          <Hero title1={dict.hero.title1} title2={dict.hero.title2} />
+          <Hero />
 
           <div className="flex flex-col gap-4 mt-8 w-full max-w-2xl items-center">
             <div className="flex items-center gap-4 w-full my-4">
               <div className="h-px bg-gray-200 flex-1"></div>
-              <span className="text-sm text-gray-400 font-medium uppercase">{dict.home.managePlatform}</span>
+              <span className="text-sm text-gray-400 font-medium uppercase">Or manage the platform</span>
               <div className="h-px bg-gray-200 flex-1"></div>
             </div>
 
@@ -111,12 +102,12 @@ export default async function Index() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
               <Link href="/owner-contact" className="w-full">
                 <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight shadow-sm hover:shadow-md transition-all border-gray-100 hover:border-blue-200">
-                  {dict.home.ownerContact} <br/> <span className="text-blue-600 font-bold">{dict.home.contactHere}</span>
+                  Are you a property owner? <br/> <span className="text-blue-600 font-bold">Contact us here</span>
                 </Button>
               </Link>
               <Link href="/login?role=influencer" className="w-full">
                 <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight">
-                  {dict.home.influencerCheck} <br/> <span className="text-blue-600 font-bold">{dict.home.clickHere}</span>
+                  Are you an influencer? <br/> <span className="text-blue-600 font-bold">Click here</span>
                 </Button>
               </Link>
             </div>
@@ -125,7 +116,7 @@ export default async function Index() {
               <div className="mt-8 border-t pt-8 w-full flex justify-center">
                 <Link href={`/dashboard/${user.email === 'superadmin@fixstay.com' ? 'admin' : (user.user_metadata?.role || 'guest')}`}>
                   <Button variant="secondary" size="lg">
-                    {dict.home.goToDashboard} ({user.email === 'superadmin@fixstay.com' ? 'Admin' : (user.user_metadata?.role || 'guest')})
+                    Go to your Dashboard ({user.email === 'superadmin@fixstay.com' ? 'Admin' : (user.user_metadata?.role || 'guest')})
                   </Button>
                 </Link>
               </div>
@@ -140,12 +131,12 @@ export default async function Index() {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{dict.blog.tag}</span>
-              <h2 className="text-3xl font-extrabold text-gray-900 mt-3">{dict.blog.title}</h2>
-              <p className="text-gray-500 mt-1">{dict.blog.subtitle}</p>
+              <span className="text-xs font-bold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Blog</span>
+              <h2 className="text-3xl font-extrabold text-gray-900 mt-3">Alibag Travel Guides</h2>
+              <p className="text-gray-500 mt-1">Tips, guides, and inspiration for your next Alibag escape.</p>
             </div>
             <Link href="/blog" className="hidden md:flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold text-sm">
-              {dict.blog.allPosts} <ArrowRight className="w-4 h-4" />
+              All posts <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
@@ -171,7 +162,7 @@ export default async function Index() {
                       <Clock className="w-3 h-3" /> {post.readTime}
                     </span>
                     <span className="text-sm font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                      {dict.blog.readMore} <ArrowRight className="w-3.5 h-3.5" />
+                      Read more <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
@@ -181,7 +172,7 @@ export default async function Index() {
 
           <div className="text-center mt-8 md:hidden">
             <Link href="/blog" className="inline-flex items-center gap-2 text-blue-600 font-semibold">
-              {dict.blog.viewAll} <ArrowRight className="w-4 h-4" />
+              View all posts <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -193,7 +184,7 @@ export default async function Index() {
         <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Social Links */}
           <div className="flex items-center gap-4">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">{dict.footer.followUs}</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">Follow us</span>
             {/* Instagram */}
             <a
               href="https://www.instagram.com/fixystays"
@@ -242,19 +233,19 @@ export default async function Index() {
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
             </svg>
-            {dict.footer.helpSupport}
+            Help & Support
           </a>
         </div>
 
         {/* Legal Links */}
         <div className="flex justify-center gap-6 pb-4 text-xs font-medium text-gray-500">
-          <Link href="/privacy-policy" className="hover:text-blue-600 transition">{dict.footer.privacy}</Link>
-          <Link href="/terms-and-conditions" className="hover:text-blue-600 transition">{dict.footer.terms}</Link>
+          <Link href="/privacy-policy" className="hover:text-blue-600 transition">Privacy Policy</Link>
+          <Link href="/terms-and-conditions" className="hover:text-blue-600 transition">Terms & Conditions</Link>
         </div>
 
         {/* Copyright */}
         <div className="border-t py-3 text-center text-xs text-gray-400">
-          {dict.footer.copyright}
+          © 2026 Fixy Stays · Most trusted property booking platform
         </div>
       </footer>
     </div>
