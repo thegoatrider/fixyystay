@@ -46,8 +46,8 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
 
     const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
     const baseUrl = window.location.origin
-    const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}&pn=${phone}&gn=${encodeURIComponent(guestName)}`
-    const message = `Hello ${guestName}! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form: ${checkinUrl}`
+    const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}&pn=${encodeURIComponent(phone)}&gn=${encodeURIComponent(guestName)}`
+    const message = `Hello ${guestName}! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form:\n\n${checkinUrl}`
     
     const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phone, countryCode)}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, '_blank')
