@@ -42,20 +42,20 @@ function SuccessContent() {
       )}
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-        <a href={apkDownloadLink} download="fixystays.apk" className="w-full sm:w-auto">
-          <Button className="w-full h-12 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2 transition-all">
+        <Button asChild className="w-full sm:w-auto h-12 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2 transition-all">
+          <a href={apkDownloadLink} download="fixystays.apk">
             <Download className="w-5 h-5" />
             Download APK
-          </Button>
-        </a>
+          </a>
+        </Button>
         
-        <Link href="/dashboard/owner" className="w-full sm:w-auto">
-          <Button variant="outline" className="w-full h-12 px-8 border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-white flex items-center justify-center gap-2 transition-all">
+        <Button asChild variant="outline" className="w-full sm:w-auto h-12 px-8 border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-white flex items-center justify-center gap-2 transition-all">
+          <Link href="/dashboard/owner">
             <LayoutDashboard className="w-5 h-5" />
             Go to Dashboard
             <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     </div>
   )
