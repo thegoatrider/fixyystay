@@ -3,6 +3,7 @@ import { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Hero } from '@/components/Hero'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { blogPosts } from './blog/data'
 import { Clock, ArrowRight, LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react'
 
@@ -48,6 +49,7 @@ export default async function Index() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
+            <LanguageSwitcher />
             {user ? (
               <>
                 <div className="hidden lg:block text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
@@ -100,9 +102,9 @@ export default async function Index() {
 
             {/* Role-specific Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-              <Link href="/owner-contact" className="w-full">
+              <Link href="/onboarding" className="w-full">
                 <Button variant="outline" className="w-full h-auto py-4 bg-white text-sm whitespace-normal leading-tight shadow-sm hover:shadow-md transition-all border-gray-100 hover:border-blue-200">
-                  Are you a property owner? <br/> <span className="text-blue-600 font-bold">Contact us here</span>
+                  Are you a property owner? <br/> <span className="text-blue-600 font-bold">Become a partner</span>
                 </Button>
               </Link>
               <Link href="/login?role=influencer" className="w-full">

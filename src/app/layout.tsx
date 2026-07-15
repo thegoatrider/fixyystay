@@ -62,6 +62,8 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+import Script from "next/script";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -72,6 +74,23 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
+        <div id="google_translate_element" style={{ display: 'none' }}></div>
+        <Script id="google-translate-init" strategy="beforeInteractive">
+          {`
+            function googleTranslateElementInit() {
+              new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'en,hi,mr',
+                autoDisplay: false
+              }, 'google_translate_element');
+            }
+          `}
+        </Script>
+        <Script 
+          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" 
+          strategy="beforeInteractive" 
+        />
+
         <Providers>
           <PullToRefresh />
           <CapacitorBackButton />

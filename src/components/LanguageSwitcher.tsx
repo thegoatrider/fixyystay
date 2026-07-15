@@ -2,15 +2,39 @@
 
 import { useRouter } from 'next/navigation'
 import { Languages } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
-export function LanguageSwitcher({ currentLocale }: { currentLocale: string }) {
-  const router = useRouter()
+export function LanguageSwitcher() {
+  const [currentLocale, setCurrentLocale] = useState('en')
+
+  useEffect(() => {
+    // Read the googtrans cookie to set initial state
+    const match = document.cookie.match(new RegExp('(^| )googtrans=([^;]+)'))
+    if (match) {
+      const val = match[2]
+      if (val.includes('/hi')) setCurrentLocale('hi')
+      else if (val.includes('/mr')) setCurrentLocale('mr')
+      else setCurrentLocale('en')
+    }
+  }, [])
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLocale = e.target.value
-    // Set cookie for 1 year
-    document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000; SameSite=Lax`
-    router.refresh() // Refresh the current page to apply new locale
+    setCurrentLocale(newLocale)
+    
+    const domain = window.location.hostname
+    
+    // Set cookie for 1 year for current domain
+    if (newLocale === 'en') {
+      document.cookie = `googtrans=/auto/en; path=/; max-age=31536000; SameSite=Lax; domain=${domain}`
+      document.cookie = `googtrans=/auto/en; path=/; max-age=31536000; SameSite=Lax`
+    } else {
+      document.cookie = `googtrans=/en/${newLocale}; path=/; max-age=31536000; SameSite=Lax; domain=${domain}`
+      document.cookie = `googtrans=/en/${newLocale}; path=/; max-age=31536000; SameSite=Lax`
+    }
+    
+    // Force a full reload so Google Translate script re-initializes and scans the DOM
+    window.location.reload()
   }
 
   return (
