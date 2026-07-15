@@ -39,7 +39,7 @@ export async function submitOnboarding(formData: FormData) {
   const userId = authData.user.id
 
   // 2. Insert into owners table
-  const { error: dbError } = await supabase.from('owners').insert([
+  const { error: dbError } = await supabaseAdmin.from('owners').insert([
     {
       user_id: userId,
       name,

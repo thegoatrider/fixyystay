@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import OwnerDashboardClient from './OwnerDashboardClient'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -17,15 +18,33 @@ export default async function OwnerDashboard() {
   let { data: owner } = await supabase.from('owners').select('id, created_at').eq('user_id', user?.id).maybeSingle()
   
   if (!owner && user?.email) {
-    // Self-healing: if role is owner but not linked to user_id, link by email
-    const { data: updatedOwner } = await supabase
+    const supabaseAdmin = createAdminClient()
+    
+    // Self-healing step 1: try to link by email if row exists
+    const { data: updatedOwner } = await supabaseAdmin
       .from('owners')
       .update({ user_id: user.id })
       .eq('email', user.email)
       .select('id, created_at')
       .maybeSingle()
     
-    if (updatedOwner) owner = updatedOwner
+    if (updatedOwner) {
+      owner = updatedOwner
+    } else {
+      // Self-healing step 2: row doesn't exist at all, create it!
+      const { data: newOwner } = await supabaseAdmin
+        .from('owners')
+        .insert({
+          user_id: user.id,
+          email: user.email,
+          name: user.user_metadata?.name || user.email.split('@')[0],
+          phone_number: ''
+        })
+        .select('id, created_at')
+        .single()
+        
+      if (newOwner) owner = newOwner
+    }
   }
 
   // 3. Fetch Google token status
