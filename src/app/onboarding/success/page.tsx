@@ -4,19 +4,32 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, LayoutDashboard, ChevronRight } from 'lucide-react'
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 function SuccessContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [mounted, setMounted] = useState(false)
-
-  // Use a placeholder link for now. The user can update this later.
-  const apkDownloadLink = 'https://fixystays.com/downloads/fixystays-owner.apk'
+  const [countdown, setCountdown] = useState(5)
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    
+    // Auto redirect after 5 seconds
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          router.push('/dashboard/owner')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [router])
 
   if (!mounted) return null
 
@@ -41,18 +54,15 @@ function SuccessContent() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href={apkDownloadLink} download>
-          <Button className="w-full sm:w-auto h-12 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2">
-            <Download className="w-5 h-5" />
-            Download APK
-          </Button>
-        </a>
+      <div className="flex flex-col gap-4 justify-center items-center">
+        <p className="text-neutral-500 text-sm">
+          Redirecting to your dashboard in {countdown} seconds...
+        </p>
         
-        <Link href="/dashboard/owner">
-          <Button variant="outline" className="w-full sm:w-auto h-12 px-6 border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-white flex items-center justify-center gap-2">
+        <Link href="/dashboard/owner" className="w-full sm:w-auto">
+          <Button className="w-full h-12 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2 transition-all">
             <LayoutDashboard className="w-5 h-5" />
-            Go to Dashboard
+            Go to Dashboard Now
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </Link>

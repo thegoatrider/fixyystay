@@ -7,7 +7,7 @@ import { addMonths, addYears } from 'date-fns'
 
 export async function createOwnerOrder(planName: string, amount: number, email: string) {
   try {
-    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
 
     // 0. Verify Keys
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -34,7 +34,7 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
     const order = await razorpay.orders.create(options)
 
     // 2. Log payment request in DB (Manual Onboarding tracking)
-    const { error } = await supabase.from('owner_payments').insert([{
+    const { error } = await supabaseAdmin.from('owner_payments').insert([{
       email,
       plan_name: planName,
       amount,
