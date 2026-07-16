@@ -21,7 +21,7 @@ export async function submitOnboarding(formData: FormData) {
 
   // 1. Sign up the user as an owner
   const origin = (await headers()).get('origin')
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  let { data: authData, error: authError } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
     options: {
@@ -33,36 +33,63 @@ export async function submitOnboarding(formData: FormData) {
     },
   })
 
-  if (authError || !authData.user) {
+  // Recovery logic for users who dropped off before payment
+  if (authError?.message?.toLowerCase().includes('already registered')) {
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    })
+    
+    if (signInError) {
+      return { error: 'Email already registered. If this is you, please enter your correct password to continue onboarding.' }
+    }
+    
+    authData = signInData
+    authError = null
+  }
+
+  if (authError || !authData?.user) {
     return { error: authError?.message || 'Failed to create account' }
   }
 
   const userId = authData.user.id
   const supabaseAdmin = createAdminClient()
 
-  // 2. Insert into owners table
-  const { error: dbError } = await supabaseAdmin.from('owners').insert([
-    {
-      user_id: userId,
-      name,
-      email: normalizedEmail,
-    },
-  ])
+  // 2. Get or Insert into owners table
+  const { data: existingOwner } = await supabaseAdmin.from('owners').select('id').eq('email', normalizedEmail).maybeSingle()
+  let ownerId = existingOwner?.id
 
-  if (dbError) {
-    console.error('Failed to create owner record:', dbError)
+  if (!existingOwner) {
+    const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
+      {
+        user_id: userId,
+        name,
+        email: normalizedEmail,
+      },
+    ]).select('id').single()
+
+    if (dbError) {
+      console.error('Failed to create owner record:', dbError)
+    } else if (newOwner) {
+      ownerId = newOwner.id
+    }
   }
 
   // Also create a dummy property if propertyName is provided
-  if (propertyName) {
-    await supabase.from('properties').insert([
-      {
-        owner_id: userId,
-        name: propertyName,
-        city: 'Pending',
-        type: 'hotel',
-      }
-    ])
+  if (propertyName && ownerId) {
+    // Check if property exists first (for recovering users)
+    const { data: existingProp } = await supabaseAdmin.from('properties').select('id').eq('owner_id', ownerId).eq('name', propertyName).maybeSingle()
+    if (!existingProp) {
+      // Use supabaseAdmin to ensure bypass of RLS on property creation
+      await supabaseAdmin.from('properties').insert([
+        {
+          owner_id: ownerId,
+          name: propertyName,
+          city: 'Pending',
+          type: 'hotel',
+        }
+      ])
+    }
   }
 
   // 3. Send the Welcome Email via Resend
