@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -99,9 +100,11 @@ export async function signup(formData: FormData) {
 
   const userId = authData.user.id
 
+  const supabaseAdmin = createAdminClient()
+
   // 2. Insert into respective tables based on role
   if (role === 'owner') {
-    const { error: dbError } = await supabase.from('owners').insert([
+    const { error: dbError } = await supabaseAdmin.from('owners').insert([
       {
         user_id: userId,
         name,
@@ -112,7 +115,7 @@ export async function signup(formData: FormData) {
       console.error('Failed to create owner record:', dbError)
     }
   } else if (role === 'influencer') {
-    const { error: dbError } = await supabase.from('influencers').insert([
+    const { error: dbError } = await supabaseAdmin.from('influencers').insert([
       {
         id: userId,
         user_id: userId,
