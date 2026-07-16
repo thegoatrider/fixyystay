@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -15,14 +16,15 @@ export async function GET(request: Request) {
       // 1. Dynamic Role Detection (Highest Priority)
       // 1. Check if this email exists in owners or influencers table
       const normalizedEmail = user.email ? user.email.toLowerCase() : ''
-      const { data: owner } = await supabase.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
-      const { data: influencer } = await supabase.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+      const supabaseAdmin = createAdminClient()
+      const { data: owner } = await supabaseAdmin.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+      const { data: influencer } = await supabaseAdmin.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
 
       if (owner && owner.user_id !== user.id) {
-        await supabase.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', owner.id)
       }
       if (influencer && influencer.user_id !== user.id) {
-        await supabase.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
+        await supabaseAdmin.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
       }
 
       let role = user.user_metadata?.role
@@ -32,8 +34,8 @@ export async function GET(request: Request) {
         role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
         
         // Use admin client if needed or just public client if allowed (signup typically allows this)
-        await supabase.auth.updateUser({
-          data: { role }
+        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          user_metadata: { role }
         })
       }
 
