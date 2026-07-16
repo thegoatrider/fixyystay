@@ -8,6 +8,7 @@ import { addMonths, addYears } from 'date-fns'
 export async function createOwnerOrder(planName: string, amount: number, email: string) {
   try {
     const supabaseAdmin = createAdminClient()
+    const normalizedEmail = email.toLowerCase()
 
     // 0. Verify Keys
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -27,7 +28,7 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
       receipt: `receipt_owner_${Date.now()}`,
       notes: {
         plan: planName,
-        email: email
+        email: normalizedEmail
       }
     }
 
@@ -35,7 +36,7 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
 
     // 2. Log payment request in DB (Manual Onboarding tracking)
     const { error } = await supabaseAdmin.from('owner_payments').insert([{
-      email,
+      email: normalizedEmail,
       plan_name: planName,
       amount,
       razorpay_order_id: order.id,
@@ -75,22 +76,24 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
       return { error: 'Payment record not found.' }
     }
     
+    const normalizedEmail = payment.email.toLowerCase()
+    
     // 2. Get owner by email OR create if missing
     let ownerId: string | null = null
     const { data: owner } = await supabaseAdmin
       .from('owners')
       .select('id')
-      .eq('email', payment.email)
+      .eq('email', normalizedEmail)
       .single()
       
     if (!owner) {
-      console.log('Owner not found for email:', payment.email, 'Creating placeholder owner record.')
+      console.log('Owner not found for email:', normalizedEmail, 'Creating placeholder owner record.')
       // Create a placeholder owner record for this email
       const { data: newOwner, error: createError } = await supabaseAdmin
         .from('owners')
         .insert({
-          email: payment.email,
-          name: payment.email.split('@')[0],
+          email: normalizedEmail,
+          name: normalizedEmail.split('@')[0],
           phone_number: ''
         })
         .select('id')
