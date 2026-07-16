@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 
@@ -37,6 +38,7 @@ export async function submitOnboarding(formData: FormData) {
   }
 
   const userId = authData.user.id
+  const supabaseAdmin = createAdminClient()
 
   // 2. Insert into owners table
   const { error: dbError } = await supabaseAdmin.from('owners').insert([
