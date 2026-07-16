@@ -86,7 +86,7 @@ export async function submitOnboarding(formData: FormData) {
           owner_id: ownerId,
           name: propertyName,
           city: 'Pending',
-          type: 'hotel',
+          type: 'multi-room property',
         }
       ])
     }

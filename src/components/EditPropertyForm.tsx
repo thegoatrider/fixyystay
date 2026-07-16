@@ -20,6 +20,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
   const [rooms, setRooms] = useState<any[]>([])
   const [newRoomNumber, setNewRoomNumber] = useState('')
   const [isAddingRoom, setIsAddingRoom] = useState(false)
+  const [propertyType, setPropertyType] = useState(property.type || 'multi-room property')
 
   // Fetch rooms on mount
   useEffect(() => {
@@ -176,6 +177,20 @@ export default function EditPropertyForm({ property }: { property: any }) {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="type" className="text-gray-700 font-bold">Property Type</Label>
+        <select 
+          name="type" 
+          value={propertyType}
+          onChange={(e) => setPropertyType(e.target.value)}
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+          required
+        >
+          <option value="multi-room property">Multi-room Property</option>
+          <option value="villa">Villa</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="description" className="text-gray-700 font-bold">Description</Label>
         <textarea 
           name="description" 
@@ -234,7 +249,175 @@ export default function EditPropertyForm({ property }: { property: any }) {
             className="bg-gray-50/50 border-dashed focus:border-solid transition-all"
           />
           <p className="text-[10px] text-gray-400 mt-1 italic">Separate multiple entries with commas</p>
-        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="priceBucket" className="text-gray-700 font-bold">Maximum Price Cap / Category</Label>
+        <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" defaultValue={property.price_bucket || ""} required>
+          <option value="" disabled>Select max price bucket...</option>
+          {propertyType === 'villa' ? (
+            <>
+              <option value="₹4999">₹4999</option>
+              <option value="₹6999">₹6999</option>
+              <option value="₹7999">₹7999</option>
+              <option value="₹9999">₹9999</option>
+              <option value="₹12999">₹12999</option>
+              <option value="₹14999">₹14999</option>
+              <option value="₹17999">₹17999</option>
+              <option value="₹19999">₹19999</option>
+              <option value="₹24999">₹24999</option>
+              <option value="₹29999">₹29999</option>
+              <option value="₹34999">₹34999</option>
+              <option value="₹39999">₹39999</option>
+              <option value="₹44999">₹44999</option>
+              <option value="₹49999">₹49999</option>
+            </>
+          ) : (
+            <>
+              <option value="₹799">₹799</option>
+              <option value="₹999">₹999</option>
+              <option value="₹1299">₹1299</option>
+              <option value="₹1499">₹1499</option>
+              <option value="₹1999">₹1999</option>
+              <option value="₹2499">₹2499</option>
+              <option value="₹2999">₹2999</option>
+              <option value="₹3499">₹3499</option>
+              <option value="₹3999">₹3999</option>
+              <option value="₹4499">₹4499</option>
+              <option value="₹4999">₹4999</option>
+              <option value="₹5499">₹5499</option>
+              <option value="₹6999">₹6999</option>
+            </>
+          )}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="extra_per_pax" className="text-gray-700 font-bold">Extra Cost Per Additional Guest (₹)</Label>
+        <Input
+          name="extra_per_pax"
+          type="number"
+          min="0"
+          step="1"
+          defaultValue={property.extra_per_pax || 0}
+          placeholder="e.g. 2999"
+        />
+        <p className="text-[10px] text-gray-400 font-medium">₹0 = no extra charge beyond base guests</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="city" className="text-gray-700 font-bold">City</Label>
+        <select
+          name="city"
+          required
+          defaultValue={property.city || "Alibag"}
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+        >
+          <option value="Alibag">Alibag</option>
+          <option value="Lonavala" disabled>Lonavala (Coming Soon)</option>
+          <option value="Khandala" disabled>Khandala (Coming Soon)</option>
+          <option value="Matheran" disabled>Matheran (Coming Soon)</option>
+          <option value="Mahableshwar" disabled>Mahableshwar (Coming Soon)</option>
+          <option value="Mumbai" disabled>Mumbai (Coming Soon)</option>
+          <option value="Goa" disabled>Goa (Coming Soon)</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cityArea" className="text-gray-700 font-bold">Area / Sub-locality</Label>
+        <select
+          name="cityArea"
+          required
+          defaultValue={property.city_area || ""}
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+        >
+          <option value="" disabled>Select area...</option>
+          <optgroup label="── Alibag Raigad ──">
+            <option value="Rewas">Rewas</option>
+            <option value="Bodni">Bodni</option>
+            <option value="Karmale / Hashivare">Karmale / Hashivare</option>
+            <option value="Saral">Saral</option>
+            <option value="Chondhi">Chondhi</option>
+            <option value="Awas">Awas</option>
+            <option value="Sasawane">Sasawane</option>
+            <option value="Mandwa">Mandwa</option>
+            <option value="Kihim">Kihim</option>
+            <option value="Zirad">Zirad</option>
+            <option value="Thal">Thal</option>
+            <option value="Alibag">Alibag</option>
+            <option value="Varsoli">Varsoli</option>
+            <option value="Akshi">Akshi</option>
+            <option value="Nagaon">Nagaon</option>
+            <option value="Chaul">Chaul</option>
+            <option value="Revdanda">Revdanda</option>
+            <option value="Salav">Salav</option>
+            <option value="Korlai">Korlai</option>
+            <option value="Kashid">Kashid</option>
+            <option value="Nandgaon">Nandgaon</option>
+            <option value="Murud">Murud</option>
+            <option value="Rajpuri">Rajpuri</option>
+          </optgroup>
+          <optgroup label="── Shrivardhan Raigad ──">
+            <option value="Agardanda">Agardanda</option>
+            <option value="Dighi">Dighi</option>
+            <option value="Diveagar">Diveagar</option>
+            <option value="Borli Panchatan">Borli Panchatan</option>
+            <option value="Bagmandala">Bagmandala</option>
+            <option value="Shrivardhan">Shrivardhan</option>
+            <option value="Harihareshwar">Harihareshwar</option>
+            <option value="Velas">Velas</option>
+            <option value="Bharadkhol">Bharadkhol</option>
+            <option value="Shekhadi">Shekhadi</option>
+            <option value="Sarve">Sarve</option>
+          </optgroup>
+          <optgroup label="── Extended Raigad Locations ──">
+            <option value="Nagothane">Nagothane</option>
+            <option value="Pali">Pali</option>
+            <option value="Roha">Roha</option>
+            <option value="Kolad">Kolad</option>
+            <option value="Mangaon">Mangaon</option>
+            <option value="Goregaon">Goregaon</option>
+            <option value="Tala">Tala</option>
+            <option value="Mhasla">Mhasla</option>
+            <option value="Dighi Sagari">Dighi Sagari</option>
+            <option value="Mahad City">Mahad City</option>
+            <option value="Mahad Taluka">Mahad Taluka</option>
+            <option value="Mahad MIDC">Mahad MIDC</option>
+            <option value="Poladpur">Poladpur</option>
+            <option value="Karjat">Karjat</option>
+            <option value="Neral">Neral</option>
+            <option value="Matheran">Matheran</option>
+            <option value="Khopoli">Khopoli</option>
+            <option value="Khalapur">Khalapur</option>
+            <option value="Rasayani">Rasayani</option>
+            <option value="Pen">Pen</option>
+            <option value="Vadkhal">Vadkhal</option>
+            <option value="Poynad">Poynad</option>
+            <option value="Dadar Sagari">Dadar Sagari</option>
+            <option value="Mandwa Sagari">Mandwa Sagari</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="pincode" className="text-gray-700 font-bold">Area Pincode</Label>
+        <Input
+          name="pincode"
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          pattern="\d{6}"
+          required
+          defaultValue={property.pincode || ""}
+          placeholder="e.g. 402201"
+          className="tracking-widest font-mono"
+        />
+        <p className="text-[10px] text-gray-400 font-medium">Guests will see an approximate map of this pincode area.</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="helpdeskNumber" className="text-gray-700 font-bold">Helpdesk Number</Label>
+        <Input name="helpdeskNumber" required defaultValue={property.helpdesk_number || ""} placeholder="e.g. +91 98765 43210" />
       </div>
 
       <div className="space-y-4 bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5">

@@ -7,7 +7,6 @@ import { addMonths, addYears } from 'date-fns'
 
 export async function createOwnerOrder(planName: string, amount: number, email: string) {
   try {
-    const supabaseAdmin = createAdminClient()
     const normalizedEmail = email.toLowerCase()
 
     // 0. Verify Keys
@@ -34,20 +33,6 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
 
     const order = await razorpay.orders.create(options)
 
-    // 2. Log payment request in DB (Manual Onboarding tracking)
-    const { error } = await supabaseAdmin.from('owner_payments').insert([{
-      email: normalizedEmail,
-      plan_name: planName,
-      amount,
-      razorpay_order_id: order.id,
-      status: 'pending'
-    }])
-
-    if (error) {
-       console.error('Failed to log owner payment request', error)
-       // We still return the order so the user can pay
-    }
-
     return { 
       orderId: order.id, 
       amount: order.amount, 
@@ -64,19 +49,30 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
   try {
     const supabaseAdmin = createAdminClient()
     
-    // 1. Get payment record
-    const { data: payment, error: pError } = await supabaseAdmin
-      .from('owner_payments')
-      .select('*')
-      .eq('razorpay_order_id', razorpayOrderId)
-      .single()
-      
-    if (pError || !payment) {
-      console.error('Payment record not found:', razorpayOrderId, pError)
-      return { error: 'Payment record not found.' }
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return { error: 'Payment system keys missing.' }
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+    
+    // 1. Fetch Order from Razorpay (Source of Truth)
+    const order = await razorpay.orders.fetch(razorpayOrderId)
+    if (!order) {
+       return { error: 'Razorpay order not found.' }
     }
     
-    const normalizedEmail = payment.email.toLowerCase()
+    const planName = (order.notes as any)?.plan as string
+    const email = (order.notes as any)?.email as string
+    const amount = (order.amount as number) / 100
+    
+    if (!planName || !email) {
+       return { error: 'Order notes missing plan or email.' }
+    }
+    
+    const normalizedEmail = email.toLowerCase()
     
     // 2. Get owner by email OR create if missing
     let ownerId: string | null = null
@@ -88,7 +84,6 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
       
     if (!owner) {
       console.log('Owner not found for email:', normalizedEmail, 'Creating placeholder owner record.')
-      // Create a placeholder owner record for this email
       const { data: newOwner, error: createError } = await supabaseAdmin
         .from('owners')
         .insert({
@@ -110,25 +105,36 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
     
     // 3. Calculate Expiry
     let monthsToAdd = 0
-    if (payment.plan_name.includes('Monthly')) monthsToAdd = 1
-    else if (payment.plan_name.includes('Quarterly')) monthsToAdd = 3
-    else if (payment.plan_name.includes('6 Months')) monthsToAdd = 6
-    else if (payment.plan_name.includes('Yearly')) monthsToAdd = 12
+    if (planName.includes('Monthly')) monthsToAdd = 1
+    else if (planName.includes('Quarterly')) monthsToAdd = 3
+    else if (planName.includes('6 Months')) monthsToAdd = 6
+    else if (planName.includes('Yearly')) monthsToAdd = 12
     
     const end_date = monthsToAdd > 0 ? addMonths(new Date(), monthsToAdd).toISOString() : addYears(new Date(), 99).toISOString()
     
-    // 4. Update Payment Status
-    await supabaseAdmin
+    // 4. Log Payment in DB (Matching exact production schema)
+    const { data: existingPayment } = await supabaseAdmin
       .from('owner_payments')
-      .update({ status: 'completed' })
-      .eq('id', payment.id)
+      .select('id')
+      .eq('payment_ref', razorpayOrderId)
+      .maybeSingle()
+      
+    if (!existingPayment) {
+       await supabaseAdmin.from('owner_payments').insert({
+         owner_id: ownerId,
+         amount: amount,
+         payment_method: 'Razorpay',
+         payment_ref: razorpayOrderId,
+         plan_duration_months: monthsToAdd || 1
+       })
+    }
       
     // 5. Upsert Subscription
     const { error: subError } = await supabaseAdmin
       .from('owner_subscriptions')
       .upsert({
         owner_id: ownerId,
-        plan_name: payment.plan_name,
+        plan_name: planName,
         status: 'active',
         end_date: end_date,
         start_date: new Date().toISOString()

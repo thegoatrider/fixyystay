@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { logClick, createBookingOrder, confirmBooking } from './actions'
 import Script from 'next/script'
 import { Button } from '@/components/ui/button'
@@ -41,11 +42,35 @@ export default function PropertyDetailClient({
   initialGuests: string | null,
   isLoggedIn: boolean
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   // Room Quantities State: { [roomCategoryId]: quantity }
   const [roomQuantities, setRoomQuantities] = useState<Record<string, number>>({})
   const [checkin, setCheckin] = useState(initialCheckin || '')
   const [checkout, setCheckout] = useState(initialCheckout || '')
   const [guests, setGuests] = useState(initialGuests || (property.type === 'villa' ? String(property.max_guests) : '2'))
+
+  useEffect(() => {
+    setCheckin(initialCheckin || '')
+    setCheckout(initialCheckout || '')
+  }, [initialCheckin, initialCheckout])
+
+  useEffect(() => {
+    // Re-verify room quantities against newly fetched availableRooms
+    setRoomQuantities(prev => {
+      const newQty = { ...prev }
+      let changed = false
+      availableRooms.forEach(r => {
+        if (newQty[r.category] > r.availableRoomIds.length) {
+          newQty[r.category] = r.availableRoomIds.length
+          changed = true
+        }
+      })
+      return changed ? newQty : prev
+    })
+  }, [availableRooms])
   const [activeImage, setActiveImage] = useState<string | null>(null)
   
   const [success, setSuccess] = useState(false)
@@ -619,13 +644,27 @@ export default function PropertyDetailClient({
                         to: checkout ? new Date(checkout) : undefined
                       }}
                       onSelect={(range) => {
-                        if (range?.from) setCheckin(format(range.from, 'yyyy-MM-dd'))
+                        let newCheckin = checkin
+                        let newCheckout = checkout
+                        if (range?.from) newCheckin = format(range.from, 'yyyy-MM-dd')
                         if (range?.to) {
-                          setCheckout(format(range.to, 'yyyy-MM-dd'))
+                          newCheckout = format(range.to, 'yyyy-MM-dd')
                           setIsCalendarOpen(false)
                         } else {
-                          setCheckout('')
+                          newCheckout = ''
                         }
+                        
+                        setCheckin(newCheckin)
+                        setCheckout(newCheckout)
+                        
+                        const params = new URLSearchParams(searchParams.toString())
+                        if (newCheckin) params.set('checkin', newCheckin)
+                        else params.delete('checkin')
+                        
+                        if (newCheckout) params.set('checkout', newCheckout)
+                        else params.delete('checkout')
+                        
+                        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
                       }}
                       numberOfMonths={1}
                       disabled={{ before: new Date() }}

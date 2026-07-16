@@ -120,18 +120,23 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     }
   }) || []
 
+  // If specific dates are provided, only show properties that have at least 1 room available
+  if (hasDates) {
+    availableProperties = availableProperties.filter(prop => prop.available_rooms > 0)
+  }
+
   // Apply Price Bucket Filter or See All Types
   const isRoomFilter = selectedBucket?.startsWith('room-')
   const isVillaFilter = selectedBucket?.startsWith('villa-')
   const rawBucket = selectedBucket?.replace('room-', '').replace('villa-', '')
 
   if (selectedBucket === 'room-See All Rooms') {
-    availableProperties = availableProperties.filter(prop => prop.type === 'multi-room property')
+    availableProperties = availableProperties.filter(prop => prop.type === 'multi-room property' || prop.type === 'hotel')
   } else if (selectedBucket === 'villa-See All Villas') {
     availableProperties = availableProperties.filter(prop => prop.type === 'villa')
   } else if (selectedBucket) {
     availableProperties = availableProperties.filter(prop => {
-      const typeMatch = isRoomFilter ? prop.type === 'multi-room property' : (isVillaFilter ? prop.type === 'villa' : true)
+      const typeMatch = isRoomFilter ? (prop.type === 'multi-room property' || prop.type === 'hotel') : (isVillaFilter ? prop.type === 'villa' : true)
       if (!typeMatch) return false
       return prop.rooms?.some((r: any) => r.price_bucket === rawBucket)
     })

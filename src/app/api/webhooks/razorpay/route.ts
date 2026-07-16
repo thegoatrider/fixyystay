@@ -45,35 +45,21 @@ export async function POST(req: NextRequest) {
           .update({ payment_status: 'paid', razorpay_payment_id: event.payload.payment.entity.id })
           .eq('id', booking.id)
         
-        // Trigger post-booking logic if not already done by client
-        // (Notifications, Wallet splits, Leads are ideally handled in confirmBooking but we can re-run or use DB triggers)
         console.log(`Booking ${booking.id} confirmed via Webhook`)
       }
 
       // Case B: Owner Standalone Payment
-      const { data: ownerPay } = await supabaseAdmin
-        .from('owner_payments')
-        .select('*')
-        .eq('razorpay_order_id', orderId)
-        .maybeSingle()
-
-      if (ownerPay && ownerPay.status !== 'paid' && ownerPay.status !== 'completed') {
-        await supabaseAdmin
-          .from('owner_payments')
-          .update({ status: 'paid', razorpay_payment_id: event.payload.payment.entity.id })
-          .eq('id', ownerPay.id)
-        
-        console.log(`Owner payment for ${ownerPay.email} confirmed via Webhook`)
+      // Differentiate by checking if `notes` contains `plan` and `email`
+      if (notes && notes.plan && notes.email) {
+        console.log(`Owner payment for ${notes.email} confirmed via Webhook`)
 
         // IMPORT verifyAndUpgrade to execute the upgrade logic robustly from the webhook
-        // We will dynamically import it to avoid circular dependency issues if any exist,
-        // or we can just run the equivalent logic here. Since it's a server action, we can import it.
         const { verifyAndUpgrade } = require('@/app/pricing/business/actions')
         const upgradeResult = await verifyAndUpgrade(orderId)
         if (upgradeResult.error) {
           console.error('Webhook Upgrade Failed:', upgradeResult.error)
         } else {
-          console.log(`Owner ${ownerPay.email} upgraded successfully via Webhook!`)
+          console.log(`Owner ${notes.email} upgraded successfully via Webhook!`)
         }
       }
     }

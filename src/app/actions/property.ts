@@ -27,8 +27,15 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const name = formData.get('name') as string
   const description = formData.get('description') as string
   const house_rules = formData.get('houseRules') as string
+  const type = formData.get('type') as string
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
+  const extra_per_pax = parseInt(formData.get('extra_per_pax') as string) || 0
+  const price_bucket = formData.get('priceBucket') as string
+  const city = formData.get('city') as string
+  const city_area = formData.get('cityArea') as string
+  const pincode = formData.get('pincode') as string
+  const helpdesk_number = formData.get('helpdeskNumber') as string
   const amenities = formData.getAll('amenities') as string[]
   const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
   const otherAmenities = otherAmenitiesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
@@ -88,11 +95,18 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const updatePayload: any = {
     name,
     description,
+    type: type || undefined,
     house_rules,
     amenities: allAmenities,
     image_urls,
     max_guests,
     max_capacity,
+    extra_per_pax,
+    price_bucket,
+    city,
+    city_area,
+    pincode,
+    helpdesk_number,
   }
   
   if (newCoverImageUrl) {
