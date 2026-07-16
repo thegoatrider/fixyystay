@@ -75,7 +75,8 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
       return { error: 'Payment record not found.' }
     }
     
-    // 2. Get owner by email
+    // 2. Get owner by email OR create if missing
+    let ownerId: string | null = null
     const { data: owner } = await supabaseAdmin
       .from('owners')
       .select('id')
@@ -83,8 +84,25 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
       .single()
       
     if (!owner) {
-      console.error('Owner not found for email:', payment.email)
-      return { error: 'Owner profile not found for this email.' }
+      console.log('Owner not found for email:', payment.email, 'Creating placeholder owner record.')
+      // Create a placeholder owner record for this email
+      const { data: newOwner, error: createError } = await supabaseAdmin
+        .from('owners')
+        .insert({
+          email: payment.email,
+          name: payment.email.split('@')[0],
+          phone_number: ''
+        })
+        .select('id')
+        .single()
+        
+      if (createError || !newOwner) {
+        console.error('Failed to create placeholder owner:', createError)
+        return { error: 'Failed to create owner profile during payment verification.' }
+      }
+      ownerId = newOwner.id
+    } else {
+      ownerId = owner.id
     }
     
     // 3. Calculate Expiry
@@ -106,7 +124,7 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
     const { error: subError } = await supabaseAdmin
       .from('owner_subscriptions')
       .upsert({
-        owner_id: owner.id,
+        owner_id: ownerId,
         plan_name: payment.plan_name,
         status: 'active',
         end_date: end_date,
