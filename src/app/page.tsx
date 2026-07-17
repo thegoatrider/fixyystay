@@ -79,11 +79,13 @@ export default async function Index() {
                 <Link href="/login" className="px-3 py-2 text-gray-600 hover:text-blue-600 font-bold text-xs sm:text-sm">
                   Log in
                 </Link>
-                <Link href="/signup?role=guest" className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 font-bold text-xs sm:text-sm transition-colors whitespace-nowrap">
-                  Signup as Guest
+                <Link href="/signup?role=guest" className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 font-bold text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center">
+                  <span className="sm:hidden">Guest</span>
+                  <span className="hidden sm:inline">Signup as Guest</span>
                 </Link>
-                <Link href="/onboarding" className="hidden md:inline-flex px-2.5 py-1.5 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs sm:text-sm shadow-sm transition-colors whitespace-nowrap items-center">
-                  Signup as Property Owner
+                <Link href="/onboarding" className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs sm:text-sm shadow-sm transition-colors whitespace-nowrap flex items-center">
+                  <span className="sm:hidden">Partner</span>
+                  <span className="hidden sm:inline">Signup as Property Owner</span>
                 </Link>
               </div>
             )}
