@@ -22,36 +22,19 @@ export default function EditPropertyForm({ property }: { property: any }) {
   const [isAddingRoom, setIsAddingRoom] = useState(false)
   const [propertyType, setPropertyType] = useState(property.type || 'multi-room property')
 
+  const fetchRooms = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('property_rooms')
+      .select('*')
+      .eq('property_id', property.id)
+      .order('room_number', { ascending: true })
+    if (data) setRooms(data)
+  }
+
   // Fetch rooms on mount
   useEffect(() => {
-    const supabase = createClient()
-    
-    const fetchRooms = async () => {
-      const { data } = await supabase
-        .from('property_rooms')
-        .select('*')
-        .eq('property_id', property.id)
-        .order('room_number', { ascending: true })
-      if (data) setRooms(data)
-    }
-
     fetchRooms()
-
-    // Set up realtime subscription
-    const channel = supabase
-      .channel(`rooms_${property.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', filter: `property_id=eq.${property.id}`, schema: 'public', table: 'property_rooms' },
-        () => {
-          fetchRooms()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [property.id])
 
   const handleAddRoom = async () => {
@@ -70,6 +53,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
     setIsAddingRoom(false)
     if (res.success) {
       setNewRoomNumber('')
+      fetchRooms() // Refresh the list
     } else {
       alert(res.error || 'Failed to add room')
     }
@@ -80,6 +64,8 @@ export default function EditPropertyForm({ property }: { property: any }) {
     const res = await deletePropertyRoom(roomId)
     if (!res.success) {
       alert(res.error || 'Failed to delete room')
+    } else {
+      fetchRooms() // Refresh the list
     }
   }
   
