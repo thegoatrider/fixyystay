@@ -249,6 +249,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
             className="bg-gray-50/50 border-dashed focus:border-solid transition-all"
           />
           <p className="text-[10px] text-gray-400 mt-1 italic">Separate multiple entries with commas</p>
+        </div>
       </div>
 
       <div className="space-y-2">
