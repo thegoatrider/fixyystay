@@ -105,10 +105,9 @@ export async function verifyAndUpgrade(razorpayOrderId: string) {
     
     // 3. Calculate Expiry
     let monthsToAdd = 0
-    if (planName.includes('Monthly')) monthsToAdd = 1
-    else if (planName.includes('Quarterly')) monthsToAdd = 3
+    if (planName.includes('3 Months') || planName.includes('Quarterly')) monthsToAdd = 3
     else if (planName.includes('6 Months')) monthsToAdd = 6
-    else if (planName.includes('Yearly')) monthsToAdd = 12
+    else if (planName.includes('12 Months') || planName.includes('Yearly')) monthsToAdd = 12
     
     const end_date = monthsToAdd > 0 ? addMonths(new Date(), monthsToAdd).toISOString() : addYears(new Date(), 99).toISOString()
     

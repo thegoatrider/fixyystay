@@ -99,18 +99,18 @@ export function CreatePartnerForm() {
               name="plan" 
               id="plan" 
               required 
-              defaultValue="Monthly"
+              defaultValue="6 Months"
               onChange={(e) => {
                 const amountInput = document.getElementById('amount') as HTMLInputElement
                 const val = e.target.value
                 if (val === '7-Day Free Trial') {
                   if (amountInput) amountInput.value = '0'
-                } else if (val === 'Monthly' || val === 'Starter Monthly') {
-                  if (amountInput) amountInput.value = '99'
-                } else if (val === '6-Months' || val === '6 Months' || val === 'Starter 6 Months') {
-                  if (amountInput) amountInput.value = '500'
-                } else if (val === 'Yearly' || val === 'Starter Yearly') {
-                  if (amountInput) amountInput.value = '1000'
+                } else if (val === '3 Months' || val === 'Starter 3 Months') {
+                  if (amountInput) amountInput.value = '300'
+                } else if (val === '6 Months' || val === 'Starter 6 Months') {
+                  if (amountInput) amountInput.value = '600'
+                } else if (val === '12 Months' || val === 'Starter 12 Months') {
+                  if (amountInput) amountInput.value = '1200'
                 }
               }}
               className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500"
@@ -119,20 +119,20 @@ export function CreatePartnerForm() {
                 <option value="7-Day Free Trial">7-Day Free Trial - ₹0</option>
               </optgroup>
               <optgroup label="Standard Business Tiers">
-                <option value="Monthly">Business Monthly - ₹99</option>
-                <option value="6 Months">Business 6 Months - ₹500</option>
-                <option value="Yearly">Business Yearly - ₹1000</option>
+                <option value="3 Months">Business 3 Months - ₹300</option>
+                <option value="6 Months">Business 6 Months - ₹600</option>
+                <option value="12 Months">Business 12 Months - ₹1200</option>
               </optgroup>
               <optgroup label="Starter Partner Tiers">
-                <option value="Starter Monthly">Starter Monthly - ₹99</option>
-                <option value="Starter 6 Months">Starter 6 Months - ₹500</option>
-                <option value="Starter Yearly">Starter Yearly - ₹1000</option>
+                <option value="Starter 3 Months">Starter 3 Months - ₹300</option>
+                <option value="Starter 6 Months">Starter 6 Months - ₹600</option>
+                <option value="Starter 12 Months">Starter 12 Months - ₹1200</option>
               </optgroup>
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount Paid (₹)</Label>
-            <Input id="amount" name="amount" type="number" defaultValue="99" placeholder="99, 500, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
+            <Input id="amount" name="amount" type="number" defaultValue="600" placeholder="300, 600, 1200, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
           </div>
         </div>
 

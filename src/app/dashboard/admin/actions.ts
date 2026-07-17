@@ -336,14 +336,11 @@ export async function onboardPartner(formData: FormData) {
     // 3. Calculate Expiry Date
     const expiryDate = new Date()
     let months = 1
-    
-    if (planName.includes('Monthly')) {
-      months = 1
-    } else if (planName.includes('Quarterly')) {
+    if (planName.includes('3 Months') || planName.includes('Quarterly')) {
       months = 3
     } else if (planName.includes('6-Months') || planName.includes('6 Months')) {
       months = 6
-    } else if (planName.includes('Yearly')) {
+    } else if (planName.includes('12 Months') || planName.includes('Yearly')) {
       months = 12
     } else if (planName === '7-Day Free Trial') {
       expiryDate.setDate(expiryDate.getDate() + 7)

@@ -18,9 +18,9 @@ const SHARED_FEATURES = [
 ]
 
 const PLANS = [
-  { name: "Monthly", price: 99, discount: 0, bestValue: false, icon: Zap },
-  { name: "6 Months", price: 500, discount: 16, bestValue: true, icon: ShieldCheck },
-  { name: "Yearly", price: 1000, discount: 16, bestValue: false, icon: Crown }
+  { name: "3 Months", price: 300, discount: 0, bestValue: false, icon: Zap },
+  { name: "6 Months", price: 600, discount: 0, bestValue: true, icon: ShieldCheck },
+  { name: "12 Months", price: 1200, discount: 0, bestValue: false, icon: Crown }
 ]
 
 export default function OnboardingPage() {

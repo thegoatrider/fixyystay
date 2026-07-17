@@ -12,9 +12,9 @@ const SHARED_FEATURES = [
 
 const PLANS: PricingPlan[] = [
   {
-    name: "Monthly",
-    price: 99,
-    originalPrice: 99,
+    name: "3 Months",
+    price: 300,
+    originalPrice: 300,
     discount: 0,
     features: SHARED_FEATURES,
     bestValue: false,
@@ -22,18 +22,18 @@ const PLANS: PricingPlan[] = [
   },
   {
     name: "6 Months",
-    price: 500,
-    originalPrice: 594,
-    discount: 16,
+    price: 600,
+    originalPrice: 600,
+    discount: 0,
     features: SHARED_FEATURES,
     bestValue: true,
     icon: "ShieldCheck"
   },
   {
-    name: "Yearly",
-    price: 1000,
-    originalPrice: 1188,
-    discount: 16,
+    name: "12 Months",
+    price: 1200,
+    originalPrice: 1200,
+    discount: 0,
     features: SHARED_FEATURES,
     bestValue: false,
     icon: "Crown"
