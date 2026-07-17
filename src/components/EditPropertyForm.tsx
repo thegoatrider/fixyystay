@@ -253,47 +253,6 @@ export default function EditPropertyForm({ property }: { property: any }) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="priceBucket" className="text-gray-700 font-bold">Maximum Price Cap / Category</Label>
-        <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" defaultValue={property.price_bucket || ""} required>
-          <option value="" disabled>Select max price bucket...</option>
-          {propertyType === 'villa' ? (
-            <>
-              <option value="₹4999">₹4999</option>
-              <option value="₹6999">₹6999</option>
-              <option value="₹7999">₹7999</option>
-              <option value="₹9999">₹9999</option>
-              <option value="₹12999">₹12999</option>
-              <option value="₹14999">₹14999</option>
-              <option value="₹17999">₹17999</option>
-              <option value="₹19999">₹19999</option>
-              <option value="₹24999">₹24999</option>
-              <option value="₹29999">₹29999</option>
-              <option value="₹34999">₹34999</option>
-              <option value="₹39999">₹39999</option>
-              <option value="₹44999">₹44999</option>
-              <option value="₹49999">₹49999</option>
-            </>
-          ) : (
-            <>
-              <option value="₹799">₹799</option>
-              <option value="₹999">₹999</option>
-              <option value="₹1299">₹1299</option>
-              <option value="₹1499">₹1499</option>
-              <option value="₹1999">₹1999</option>
-              <option value="₹2499">₹2499</option>
-              <option value="₹2999">₹2999</option>
-              <option value="₹3499">₹3499</option>
-              <option value="₹3999">₹3999</option>
-              <option value="₹4499">₹4499</option>
-              <option value="₹4999">₹4999</option>
-              <option value="₹5499">₹5499</option>
-              <option value="₹6999">₹6999</option>
-            </>
-          )}
-        </select>
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor="extra_per_pax" className="text-gray-700 font-bold">Extra Cost Per Additional Guest (₹)</Label>
         <Input
           name="extra_per_pax"

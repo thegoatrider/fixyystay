@@ -31,7 +31,6 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
   const extra_per_pax = parseInt(formData.get('extra_per_pax') as string) || 0
-  const price_bucket = formData.get('priceBucket') as string
   const city = formData.get('city') as string
   const city_area = formData.get('cityArea') as string
   const pincode = formData.get('pincode') as string
@@ -102,7 +101,6 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     max_guests,
     max_capacity,
     extra_per_pax,
-    price_bucket,
     city,
     city_area,
     pincode,
