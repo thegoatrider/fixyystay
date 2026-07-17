@@ -187,14 +187,36 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
         <Button 
           variant="outline" 
           className="h-12 border-2 border-gray-100 hover:border-blue-200 hover:bg-blue-50 font-black text-xs uppercase tracking-wider transition-all rounded-2xl"
-          onClick={() => {
+          onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
               const url = canvas.toDataURL('image/png')
+              const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
+              
+              try {
+                // Try modern Web Share API for mobile (iOS/Android)
+                if (navigator.share && navigator.canShare) {
+                  const blob = await (await fetch(url)).blob()
+                  const file = new File([blob], filename, { type: 'image/png' })
+                  if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                      title: 'FixyStays Check-in QR',
+                      files: [file]
+                    })
+                    return;
+                  }
+                }
+              } catch (err) {
+                console.error("Share failed", err)
+              }
+
+              // Fallback to traditional download for desktop
               const link = document.createElement('a')
               link.href = url
-              link.download = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
+              link.download = filename
+              document.body.appendChild(link) // Required for Firefox/some mobile browsers
               link.click()
+              document.body.removeChild(link)
             }
           }}
         >
