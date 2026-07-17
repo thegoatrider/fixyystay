@@ -9,7 +9,10 @@ import { X, Upload, Save, CheckCircle, Image as ImageIcon, Plus } from 'lucide-r
 import { createClient } from '@/utils/supabase/client'
 import { addPropertyRoom, deletePropertyRoom } from '@/app/dashboard/owner/actions'
 
-export default function EditPropertyForm({ property }: { property: any }) {
+import { useRouter } from 'next/navigation'
+
+export default function EditPropertyForm({ property, initialRooms = [] }: { property: any, initialRooms?: any[] }) {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -141,7 +144,7 @@ export default function EditPropertyForm({ property }: { property: any }) {
         setSuccess(true)
         setNewFiles([])
         setNewPreviews([])
-        // Optionally update existingPhotos to reflect the new state, but a page reload usually handles this.
+        router.refresh()
         setTimeout(() => setSuccess(false), 3000)
       }
     } catch (err: any) {
@@ -153,9 +156,6 @@ export default function EditPropertyForm({ property }: { property: any }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 pb-24">
-      
-      {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-semibold">{error}</div>}
-      {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Updates saved successfully!</div>}
 
       <div className="space-y-2">
         <Label htmlFor="name" className="text-gray-700 font-bold">Property Name</Label>
@@ -237,6 +237,49 @@ export default function EditPropertyForm({ property }: { property: any }) {
           <p className="text-[10px] text-gray-400 mt-1 italic">Separate multiple entries with commas</p>
         </div>
       </div>
+
+      {(initialRooms.length === 0 || propertyType === 'villa') && (
+        <div className="space-y-2">
+          <Label htmlFor="priceBucket" className="text-gray-700 font-bold">Maximum Price Cap / Category</Label>
+          <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" defaultValue={initialRooms[0]?.price_bucket || ""} required>
+            <option value="" disabled>Select max price bucket...</option>
+            {propertyType === 'villa' ? (
+              <>
+                <option value="₹4999">₹4999</option>
+                <option value="₹6999">₹6999</option>
+                <option value="₹7999">₹7999</option>
+                <option value="₹9999">₹9999</option>
+                <option value="₹12999">₹12999</option>
+                <option value="₹14999">₹14999</option>
+                <option value="₹17999">₹17999</option>
+                <option value="₹19999">₹19999</option>
+                <option value="₹24999">₹24999</option>
+                <option value="₹29999">₹29999</option>
+                <option value="₹34999">₹34999</option>
+                <option value="₹39999">₹39999</option>
+                <option value="₹44999">₹44999</option>
+                <option value="₹49999">₹49999</option>
+              </>
+            ) : (
+              <>
+                <option value="₹799">₹799</option>
+                <option value="₹999">₹999</option>
+                <option value="₹1299">₹1299</option>
+                <option value="₹1499">₹1499</option>
+                <option value="₹1999">₹1999</option>
+                <option value="₹2499">₹2499</option>
+                <option value="₹2999">₹2999</option>
+                <option value="₹3499">₹3499</option>
+                <option value="₹3999">₹3999</option>
+                <option value="₹4499">₹4499</option>
+                <option value="₹4999">₹4999</option>
+                <option value="₹5499">₹5499</option>
+                <option value="₹6999">₹6999</option>
+              </>
+            )}
+          </select>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="extra_per_pax" className="text-gray-700 font-bold">Extra Cost Per Additional Guest (₹)</Label>
@@ -526,10 +569,15 @@ export default function EditPropertyForm({ property }: { property: any }) {
         </div>
       </div>
 
-      <div className="border-t pt-6 flex justify-end">
-        <Button type="submit" disabled={isLoading} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl h-14 text-lg">
-          {isLoading ? 'Processing Images & Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Changes</>}
-        </Button>
+      <div className="flex flex-col gap-3 pt-6 border-t mt-4">
+        {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-semibold">{error}</div>}
+        {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Changes saved successfully!</div>}
+        
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isLoading} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl h-14 text-lg">
+            {isLoading ? 'Processing Images & Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Changes</>}
+          </Button>
+        </div>
       </div>
     </form>
   )

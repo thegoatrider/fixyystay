@@ -90,6 +90,39 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     }
   }
 
+  // 3.8 Check and generate UID if missing (for dummy properties)
+  const { data: currentProp } = await supabaseAdmin.from('properties').select('uid, city').eq('id', propertyId).single()
+  let uid = currentProp?.uid
+
+  if (!uid && city) {
+    const prefixes: Record<string, string> = {
+      'Alibag': 'ALB',
+      'Lonavala': 'LON',
+      'Khandala': 'KHA',
+      'Matheran': 'MAT',
+      'Mahableshwar': 'MAH',
+      'Mumbai': 'MUM',
+      'Goa': 'GOA'
+    }
+    const prefix = prefixes[city] || 'PRP'
+    const { data: properties } = await supabaseAdmin
+      .from('properties')
+      .select('uid')
+      .like('uid', `${prefix}%`)
+      .order('uid', { ascending: false })
+      .limit(1)
+      
+    let nextNum = 1
+    if (properties && properties.length > 0 && properties[0].uid) {
+      const lastUid = properties[0].uid
+      const match = lastUid.match(/\d+$/)
+      if (match) {
+        nextNum = parseInt(match[0], 10) + 1
+      }
+    }
+    uid = `${prefix}${nextNum.toString().padStart(4, '0')}`
+  }
+
   // 4. Update property
   const updatePayload: any = {
     name,
@@ -105,6 +138,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     city_area,
     pincode,
     helpdesk_number,
+    ...(uid ? { uid } : {})
   }
   
   if (newCoverImageUrl) {
@@ -124,13 +158,48 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     return { error: `Update failed: ${updateError.message}` }
   }
 
-  // 4.5 Sync villa capacity if it's a villa
-  const { data: propData } = await supabaseAdmin.from('properties').select('type').eq('id', propertyId).single()
-  if (propData?.type === 'villa') {
-    await supabaseAdmin.from('rooms').update({
-      base_capacity: max_guests,
-      max_capacity: max_capacity,
-    }).eq('property_id', propertyId).eq('category', 'Villa')
+  // 4.5 Handle initial room creation or villa sync
+  const priceBucket = formData.get('priceBucket') as string
+  const basePrice = priceBucket ? (parseInt(priceBucket.replace(/[^0-9]/g, ''), 10) || 0) : 0
+
+  const { data: rooms } = await supabaseAdmin.from('rooms').select('id, category').eq('property_id', propertyId)
+  
+  if (type === 'villa') {
+    if (rooms && rooms.length > 0) {
+      // Update existing villa room
+      const updateData: any = {
+        base_capacity: max_guests,
+        max_capacity: max_capacity,
+      }
+      if (priceBucket) {
+        updateData.price_bucket = priceBucket
+        updateData.base_price = basePrice
+      }
+      await supabaseAdmin.from('rooms').update(updateData).eq('property_id', propertyId).eq('category', 'Villa')
+    } else if (priceBucket) {
+      // Create initial villa room if missing (e.g. converted from dummy)
+      await supabaseAdmin.from('rooms').insert({
+        property_id: propertyId,
+        name: 'Entire Villa',
+        category: 'Villa',
+        base_price: basePrice,
+        price_bucket: priceBucket,
+        base_capacity: max_guests,
+        max_capacity: max_capacity,
+      })
+    }
+  } else {
+    // Multi-room property
+    if ((!rooms || rooms.length === 0) && priceBucket) {
+      // Create initial standard room if it's a dummy property being setup
+      await supabaseAdmin.from('rooms').insert({
+        property_id: propertyId,
+        name: 'Standard Room',
+        category: 'Standard',
+        base_price: basePrice,
+        price_bucket: priceBucket,
+      })
+    }
   }
 
   // 5. Revalidate paths to reflect changes

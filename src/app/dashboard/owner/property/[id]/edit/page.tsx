@@ -26,6 +26,11 @@ export default async function EditPropertyPage(
 
   if (error || !property) redirect('/dashboard/owner')
 
+  const { data: rooms } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('property_id', propertyId)
+
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
       <div>
@@ -41,7 +46,7 @@ export default async function EditPropertyPage(
       </div>
 
       <div className="w-full">
-        <EditPropertyForm property={property} />
+        <EditPropertyForm property={property} initialRooms={rooms || []} />
       </div>
     </div>
   )
