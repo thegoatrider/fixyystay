@@ -181,11 +181,11 @@ export async function uploadAndVerifyFront(formData: FormData) {
     if (parseFailed) {
       normalizedResult = result
     } else {
-      const mappedDocType = mapIdType(result.id_type)
-      const cleanNum = cleanFieldValue(result.id_number)
-      const cleanName = cleanFieldValue(result.full_name)
-      const cleanDob = cleanFieldValue(result.date_of_birth)
-      const numericConfidence = mapConfidenceToNumeric(result.confidence?.overall)
+      const mappedDocType = mapIdType(result.id_type || result.idType)
+      const cleanNum = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
+      const cleanName = cleanFieldValue(result.full_name || result.fullName || result.name)
+      const cleanDob = cleanFieldValue(result.date_of_birth || result.dateOfBirth || result.dob)
+      const numericConfidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
       
       const isGovtId = mappedDocType !== 'UNKNOWN'
       const suspicious = numericConfidence < 0.40
@@ -364,10 +364,10 @@ export async function uploadBackImage(formData: FormData) {
         suspicious = confidence < 0.40
         isGovtId = mapIdType(result.id_type) !== 'UNKNOWN'
 
-        backFullName = cleanFieldValue(result.full_name)
-        backIdNumber = cleanFieldValue(result.id_number)
-        backIdType = mapIdType(result.id_type)
-        backDob = cleanFieldValue(result.date_of_birth)
+        backFullName = cleanFieldValue(result.full_name || result.fullName || result.name)
+        backIdNumber = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
+        backIdType = mapIdType(result.id_type || result.idType)
+        backDob = cleanFieldValue(result.date_of_birth || result.dateOfBirth || result.dob)
       } else {
         console.warn('[VERIFY-BACK] No JSON found in response. Skipping address extraction.')
       }

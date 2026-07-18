@@ -43,14 +43,28 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       if (!isAllowedStatus) {
         return { error: `Verification is incomplete or failed for ${identity.full_name || 'one of the guests'}. Please re-upload a clearer image.` }
       }
+      
+      let needsUpdate = false
       if (!identity.full_name || identity.full_name.trim() === '') {
-        return { error: 'Full Name could not be parsed. Please re-upload a clearer image.' }
+        identity.full_name = 'Guest (Needs Review)'
+        needsUpdate = true
       }
       if (!identity.document_number || identity.document_number.trim() === '') {
-        return { error: 'Document Number could not be parsed. Please re-upload a clearer image.' }
+        identity.document_number = 'PENDING_REVIEW'
+        needsUpdate = true
       }
       if (!identity.document_type || identity.document_type === 'UNKNOWN') {
-        return { error: 'Document Type is unrecognized. Please re-upload a clearer image.' }
+        identity.document_type = 'OTHER'
+        needsUpdate = true
+      }
+
+      // If we provided fallbacks, save them back to the DB so the admin dashboard doesn't break
+      if (needsUpdate) {
+        await supabaseAdmin.from('guest_identity').update({
+          full_name: identity.full_name,
+          document_number: identity.document_number,
+          document_type: identity.document_type
+        }).eq('id', identity.id)
       }
     }
 
