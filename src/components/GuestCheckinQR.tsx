@@ -61,6 +61,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               width: 90%;
               max-width: 650px;
               box-sizing: border-box;
+              margin-top: 40px;
             }
             .welcome-text {
               font-size: 18px;
@@ -183,10 +184,10 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 w-full">
+      <div className="flex flex-col sm:flex-row gap-4 w-full">
         <Button 
           variant="outline" 
-          className="h-12 border-2 border-gray-100 hover:border-blue-200 hover:bg-blue-50 font-black text-xs uppercase tracking-wider transition-all rounded-2xl"
+          className="h-12 w-full sm:flex-1 border-2 border-gray-100 hover:border-blue-200 hover:bg-blue-50 font-black text-xs uppercase tracking-wider transition-all rounded-2xl"
           onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
@@ -232,7 +233,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
           <Download className="w-4 h-4 mr-2" /> ID QR Image
         </Button>
         <Button 
-          className="h-12 bg-blue-600 hover:bg-blue-700 font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-100 transition-all active:scale-95 rounded-2xl"
+          className="h-12 w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-100 transition-all active:scale-95 rounded-2xl"
           onClick={handlePrint}
         >
           <Printer className="w-4 h-4 mr-2" /> Print A4 Card

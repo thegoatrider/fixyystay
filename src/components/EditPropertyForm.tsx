@@ -148,7 +148,8 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         setTimeout(() => setSuccess(false), 3000)
       }
     } catch (err: any) {
-      setError('An unexpected error occurred.')
+      console.error(err)
+      setError(err.message || 'An unexpected error occurred while saving.')
     } finally {
       setIsLoading(false)
     }
@@ -569,7 +570,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 pt-6 border-t mt-4">
+      <div className="flex flex-col gap-3 pt-6 border-t mt-4 pb-20 sm:pb-4">
         {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-semibold">{error}</div>}
         {success && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Changes saved successfully!</div>}
         
