@@ -57,7 +57,6 @@ export default React.memo(function GuestList({
   const [showRecent, setShowRecent] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
-  const [processingId, setProcessingId] = useState<string | null>(null)
   const [approveModalId, setApproveModalId] = useState<string | null>(null)
   const [manualName, setManualName] = useState('')
   const [manualDocNumber, setManualDocNumber] = useState('')
