@@ -396,7 +396,7 @@ export async function claimFreeTrial() {
   }
 }
 
-export async function approveIdentity(identityId: string) {
+export async function approveIdentity(identityId: string, manualName?: string, manualDocNumber?: string) {
   try {
     const supabaseAdmin = createAdminClient()
 
@@ -409,7 +409,21 @@ export async function approveIdentity(identityId: string) {
 
     let ocrUpdates: any = {}
 
-    if (identity && identity.document_image_url && (!identity.document_number || !identity.full_name)) {
+    // Apply manual overrides if provided by the owner
+    if (manualName && manualName.trim()) {
+      ocrUpdates.full_name = manualName.trim()
+    }
+    if (manualDocNumber && manualDocNumber.trim()) {
+      ocrUpdates.document_number = manualDocNumber.trim()
+    }
+
+    const isMissingData = !identity?.document_number || 
+                          !identity?.full_name || 
+                          identity?.document_number === 'PENDING_REVIEW' || 
+                          identity?.full_name === 'Guest (Manual Review)';
+
+    // Only run background scan if no manual overrides were provided and data is missing
+    if (identity && identity.document_image_url && isMissingData && (!manualName || !manualDocNumber)) {
       try {
         console.log('[APPROVE] Missing OCR data. Running background scan...')
         const response = await fetch(identity.document_image_url)
@@ -432,15 +446,15 @@ export async function approveIdentity(identityId: string) {
         
         const result = JSON.parse(aiText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
         
-        const mappedDocType = mapIdType(result.id_type)
-        const cleanNum = cleanFieldValue(result.id_number)
-        const cleanName = cleanFieldValue(result.full_name)
-        const cleanDob = cleanFieldValue(result.date_of_birth)
+        const mappedDocType = mapIdType(result.id_type || result.idType)
+        const cleanNum = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
+        const cleanName = cleanFieldValue(result.full_name || result.fullName || result.name)
+        const cleanDob = cleanFieldValue(result.date_of_birth || result.dob)
         const confidenceScore = mapConfidenceToNumeric(result.confidence?.overall)
         const cleanAddress = cleanFieldValue(result.address)
 
-        if (cleanNum) ocrUpdates.document_number = cleanNum
-        if (cleanName) ocrUpdates.full_name = cleanName
+        if (cleanNum && !ocrUpdates.document_number) ocrUpdates.document_number = cleanNum
+        if (cleanName && !ocrUpdates.full_name) ocrUpdates.full_name = cleanName
         if (mappedDocType && mappedDocType !== 'UNKNOWN') ocrUpdates.document_type = mappedDocType
         if (cleanDob) ocrUpdates.date_of_birth = cleanDob
         if (cleanAddress) ocrUpdates.address = cleanAddress

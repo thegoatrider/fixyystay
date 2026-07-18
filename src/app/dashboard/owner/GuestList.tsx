@@ -57,7 +57,10 @@ export default React.memo(function GuestList({
   const [showRecent, setShowRecent] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
-
+  const [processingId, setProcessingId] = useState<string | null>(null)
+  const [approveModalId, setApproveModalId] = useState<string | null>(null)
+  const [manualName, setManualName] = useState('')
+  const [manualDocNumber, setManualDocNumber] = useState('')
   const [selectedPropertyId, setSelectedPropertyId] = useState('')
   const [selectedRoomNumberToAssign, setSelectedRoomNumberToAssign] = useState('')
   const [selectedOccupiedRoom, setSelectedOccupiedRoom] = useState<string | null>(null)
@@ -122,12 +125,13 @@ export default React.memo(function GuestList({
     return propRooms.filter((r: any) => !occupiedRoomNumbers.has(r.room_number))
   }, [selectedGuest, propertyRooms, checkins])
 
-  const handleApproveId = async (id: string) => {
+  const handleApproveId = async (id: string, nameOverride?: string, docNumOverride?: string) => {
     setProcessingId(`approve-${id}`)
-    const res = await approveIdentity(id)
+    const res = await approveIdentity(id, nameOverride, docNumOverride)
     if (!res.success) {
       alert(res.error)
     } else {
+      setApproveModalId(null)
       // Re-fetch or UI state will ideally get updated by revalidatePath
     }
     setProcessingId(null)
@@ -840,7 +844,7 @@ export default React.memo(function GuestList({
                               <div className="absolute top-0 right-0 flex items-center shadow-sm">
                                 <div className="bg-amber-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-bl-lg tracking-widest border-r border-amber-600">Review Needed</div>
                                 <button 
-                                  onClick={() => handleApproveId(doc.id)}
+                                  onClick={() => setApproveModalId(doc.id)}
                                   disabled={processingId === `approve-${doc.id}`}
                                   className="bg-green-600 hover:bg-green-700 text-white text-[9px] font-black uppercase px-3 py-1.5 transition-colors disabled:opacity-50 flex items-center gap-1"
                                 >
@@ -1229,6 +1233,76 @@ export default React.memo(function GuestList({
               .print-image-modal .bg-gray-900, .print-image-modal button, .print-image-modal .text-center { display: none !important; }
             }
           `}} />
+        </div>
+      )}
+
+      {/* Manual Approval Modal */}
+      {approveModalId && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                Approve Identity Manually
+              </h3>
+              <button 
+                onClick={() => {
+                  setApproveModalId(null)
+                  setManualName('')
+                  setManualDocNumber('')
+                }}
+                className="p-1 rounded-md hover:bg-gray-200 text-gray-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600 leading-relaxed">
+                The automatic scan could not read this ID perfectly. Please enter the details manually below to approve it, or leave them blank to try an automatic background scan again.
+              </p>
+              
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Guest Full Name</label>
+                  <Input 
+                    placeholder="Enter the name printed on the ID" 
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    className="focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">ID Document Number</label>
+                  <Input 
+                    placeholder="Enter the ID number (e.g. Aadhaar/PAN)" 
+                    value={manualDocNumber}
+                    onChange={(e) => setManualDocNumber(e.target.value)}
+                    className="focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setApproveModalId(null)
+                  setManualName('')
+                  setManualDocNumber('')
+                }}
+                className="font-bold"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => handleApproveId(approveModalId, manualName, manualDocNumber)}
+                disabled={processingId === `approve-${approveModalId}`}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-w-[120px]"
+              >
+                {processingId === `approve-${approveModalId}` ? 'Approving...' : 'Confirm Approval'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
