@@ -22,16 +22,18 @@ export function LanguageSwitcher() {
     const newLocale = e.target.value
     setCurrentLocale(newLocale)
     
-    const domain = window.location.hostname
+    const host = window.location.hostname
+    const domainParts = host.split('.')
+    const rootDomain = domainParts.length > 2 ? `.${domainParts.slice(-2).join('.')}` : host
     
-    // Set cookie for 1 year for current domain
-    if (newLocale === 'en') {
-      document.cookie = `googtrans=/auto/en; path=/; max-age=31536000; SameSite=Lax; domain=${domain}`
-      document.cookie = `googtrans=/auto/en; path=/; max-age=31536000; SameSite=Lax`
-    } else {
-      document.cookie = `googtrans=/en/${newLocale}; path=/; max-age=31536000; SameSite=Lax; domain=${domain}`
-      document.cookie = `googtrans=/en/${newLocale}; path=/; max-age=31536000; SameSite=Lax`
+    // Set cookie for 1 year for current domain, root domain, and without domain
+    const cookieValue = newLocale === 'en' ? '/en/en' : `/en/${newLocale}`
+    
+    document.cookie = `googtrans=${cookieValue}; path=/; max-age=31536000; domain=${host}`
+    if (rootDomain !== host) {
+      document.cookie = `googtrans=${cookieValue}; path=/; max-age=31536000; domain=${rootDomain}`
     }
+    document.cookie = `googtrans=${cookieValue}; path=/; max-age=31536000;`
     
     // Force a full reload so Google Translate script re-initializes and scans the DOM
     window.location.reload()

@@ -144,7 +144,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         setSuccess(true)
         setNewFiles([])
         setNewPreviews([])
-        router.refresh()
+        // Removed router.refresh() to prevent page reload
         setTimeout(() => setSuccess(false), 3000)
       }
     } catch (err: any) {

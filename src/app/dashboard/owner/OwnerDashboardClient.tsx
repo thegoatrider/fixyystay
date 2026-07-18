@@ -159,9 +159,10 @@ export default function OwnerDashboardClient({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-              {properties?.map((property: any) => (
-                <PropertyCard key={property.id} prop={property} />
-              ))}
+              {properties?.map((property: any) => {
+                const room_count = property_rooms?.filter((r: any) => r.property_id === property.id).length || 0;
+                return <PropertyCard key={property.id} prop={{ ...property, room_count }} />
+              })}
               {properties?.length === 0 && (
                 <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 w-full">
                   <Home className="w-12 h-12 text-gray-300 mx-auto mb-4" />

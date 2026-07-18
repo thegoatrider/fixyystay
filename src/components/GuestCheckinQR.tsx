@@ -195,10 +195,11 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               
               try {
                 // Try modern Web Share API for mobile (iOS/Android)
-                if (navigator.share && navigator.canShare) {
+                if (navigator.share) {
                   const blob = await (await fetch(url)).blob()
                   const file = new File([blob], filename, { type: 'image/png' })
-                  if (navigator.canShare({ files: [file] })) {
+                  // Check if canShare exists and supports files, or just try catch
+                  if (!navigator.canShare || navigator.canShare({ files: [file] })) {
                     await navigator.share({
                       title: 'FixyStays Check-in QR',
                       files: [file]
@@ -210,13 +211,21 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
                 console.error("Share failed", err)
               }
 
-              // Fallback to traditional download for desktop
+              // Fallback to traditional download for desktop/android
               const link = document.createElement('a')
               link.href = url
               link.download = filename
-              document.body.appendChild(link) // Required for Firefox/some mobile browsers
+              document.body.appendChild(link)
               link.click()
               document.body.removeChild(link)
+              
+              // iOS Safari fallback if share fails and download attribute is ignored
+              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+              if (isIOS) {
+                setTimeout(() => {
+                  alert('If the download did not start, please long-press the QR code on the screen and select "Save Image".');
+                }, 500);
+              }
             }
           }}
         >

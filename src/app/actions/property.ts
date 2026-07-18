@@ -144,10 +144,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   
   if (newCoverImageUrl) {
     updatePayload.image_url = newCoverImageUrl
-  } else if (image_urls.length === 0) {
-    // If they wipe out all images and never set a cover, we can null it out, 
-    // though usually cover remains untouched. I'll leave it unchanged unless new cover uploaded.
   }
+
 
   const { error: updateError } = await supabaseAdmin
     .from('properties')
