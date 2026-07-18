@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function updateProperty(propertyId: string, formData: FormData) {
+  try {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
@@ -209,4 +210,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   revalidatePath('/dashboard/owner')
   
   return { success: true }
+  } catch (err: any) {
+    console.error('UNEXPECTED ERROR in updateProperty:', err)
+    return { error: `Server Error: ${err.message || String(err)}` }
+  }
 }
