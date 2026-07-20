@@ -44,7 +44,6 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               display: flex; 
               flex-direction: column; 
               align-items: center; 
-              justify-content: center; 
               min-height: 100vh;
               text-align: center;
               padding: 20px;
@@ -61,7 +60,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               width: 90%;
               max-width: 650px;
               box-sizing: border-box;
-              margin-top: 40px;
+              margin: auto 0;
             }
             .welcome-text {
               font-size: 18px;
