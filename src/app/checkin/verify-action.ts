@@ -209,6 +209,11 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let status = 'MANUAL_REVIEW'
     let finalReason = normalizedResult.reason
 
+    const allCriticalFieldsMissing = !normalizedResult.full_name && !normalizedResult.document_number && !normalizedResult.date_of_birth
+    if (allCriticalFieldsMissing) {
+      return { success: false, error: 'No ID information detected. Please upload a clear picture of a valid ID document.' }
+    }
+
     if (parseFailed) {
       status = 'MANUAL_REVIEW'
       finalReason = normalizedResult.reason || 'AI extraction failed. Saved for manual review.'

@@ -12,12 +12,12 @@ export const fetchCache = 'force-no-store'
 // Note: To determine "real-time room inventory" we conceptually check if a property has at least 1 room
 // that isn't completely blocked or booked out. Given the constraints, a simple query 
 // checks if the property is approved and has rooms. For availability, we fetch properties and perform filtering.
-export default async function GuestBrowsePage(props: { searchParams: Promise<{ bucket?: string, checkin?: string, checkout?: string, guests?: string, city?: string }> }) {
+export default async function GuestBrowsePage(props: { searchParams: Promise<{ bucket?: string, checkin?: string, checkout?: string, guests?: string, city?: string, amenities?: string }> }) {
   const searchParams = await props.searchParams;
-  const { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity } = searchParams;
+  const { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity, amenities: selectedAmenities } = searchParams;
   
   const buildUrl = (newParams: Record<string, string | undefined>) => {
-    const combined = { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity, ...newParams }
+    const combined = { bucket: selectedBucket, checkin, checkout, guests, city: selectedCity, amenities: selectedAmenities, ...newParams }
     const urlParams = new URLSearchParams()
     Object.entries(combined).forEach(([key, value]) => {
       if (value) urlParams.set(key, value)
@@ -31,6 +31,7 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     if (checkout) urlParams.set('checkout', checkout)
     if (guests) urlParams.set('guests', guests)
     if (selectedCity) urlParams.set('city', selectedCity)
+    if (selectedAmenities) urlParams.set('amenities', selectedAmenities)
     const qs = urlParams.toString()
     return `/guest/property/${id}${qs ? `?${qs}` : ''}`
   }
@@ -143,6 +144,16 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   } else {
     // No bucket selected — show only featured properties on homepage
     availableProperties = availableProperties.filter(p => p.featured)
+  }
+
+  // Apply Amenities Filter
+  if (selectedAmenities) {
+    const amenityList = selectedAmenities.split(',').map(a => a.trim())
+    availableProperties = availableProperties.filter(prop => {
+      if (!prop.amenities) return false
+      // Property must have ALL selected amenities (or at least SOME, let's do SOME for simpler categories)
+      return amenityList.some(amenity => prop.amenities.includes(amenity))
+    })
   }
 
   const roomBuckets = ['₹799', '₹999', '₹1299', '₹1499', '₹1999', '₹2499', '₹2999', '₹3499', '₹3999', '₹4499', '₹4999', '₹5499', '₹6999', 'See All Rooms']
