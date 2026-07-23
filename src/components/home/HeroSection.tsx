@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HERO_IMAGES = [
-  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-cover-4c6ce4a5-8aac-4f44-8ada-b02f17eec77a-1776008290774-zv7r8.jpg',
-  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-cover-58173aa1-8b36-4b43-ad5d-943f90499235-1776149133851-ktyre.jpg',
-  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-cover-4be8802d-6daa-4e8e-b999-b54a0fba5a2f-1776431220281-k88ho.jpg',
-  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-cover-update-73e99798-e234-404f-a889-cbfed67e00f8-1784283249006-ll52x.jpg'
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-d2f9341f-6f36-44d7-8af6-dd9efe054e93-1784269865939-fom1s.jpg',
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-4c6ce4a5-8aac-4f44-8ada-b02f17eec77a-1774737610548-ievvm.jpg',
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-update-5056d71d-f835-4379-9ce4-470dd34faa80-1776099327067-0xeuv.jpeg',
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-4c6ce4a5-8aac-4f44-8ada-b02f17eec77a-1774736146238-vc4oj.jpg',
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-d2f9341f-6f36-44d7-8af6-dd9efe054e93-1784269860007-2m566.jpg',
+  'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-update-5056d71d-f835-4379-9ce4-470dd34faa80-1776099335990-zhgyq.jpeg'
 ];
 
 export function HeroSection({ children }: { children?: React.ReactNode }) {

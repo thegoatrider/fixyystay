@@ -4,13 +4,6 @@ import { motion } from 'framer-motion';
 import { ShieldCheck, Zap, Tag, Headset, Lock, RefreshCcw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const STATS = [
-  { value: 10000, label: 'Verified Properties', suffix: '+' },
-  { value: 50, label: 'Cities', suffix: '+' },
-  { value: 100000, label: 'Happy Guests', suffix: '+' },
-  { value: 4.8, label: 'Average Rating', suffix: '★' },
-];
-
 const BENEFITS = [
   { icon: ShieldCheck, title: 'Verified stays', desc: 'Every property is handpicked and verified.' },
   { icon: Zap, title: 'Instant booking', desc: 'No waiting. Book instantly and pack your bags.' },
@@ -20,36 +13,6 @@ const BENEFITS = [
   { icon: RefreshCcw, title: 'Easy cancellation', desc: 'Flexible cancellation policies for peace of mind.' },
 ];
 
-// Simple animated counter component
-function AnimatedCounter({ end, suffix }: { end: number, suffix: string }) {
-  const [count, setCount] = useState(0);
-  
-  useEffect(() => {
-    let startTime: number;
-    const duration = 2000; // 2 seconds
-    
-    const animate = (time: number) => {
-      if (!startTime) startTime = time;
-      const progress = Math.min((time - startTime) / duration, 1);
-      // ease out expo
-      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      
-      setCount(Math.floor(easeProgress * end));
-      
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // If it's a float like 4.8, handle it
-        if (end % 1 !== 0) setCount(end);
-      }
-    };
-    
-    requestAnimationFrame(animate);
-  }, [end]);
-
-  return <span>{end % 1 !== 0 ? end.toFixed(1) : count.toLocaleString()}{suffix}</span>;
-}
-
 export function TrustSection() {
   return (
     <section className="w-full py-24 px-4 bg-white relative overflow-hidden">
@@ -57,27 +20,6 @@ export function TrustSection() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-50 rounded-full blur-[100px] opacity-50 pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto relative z-10">
-        
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-24">
-          {STATS.map((stat, i) => (
-            <motion.div 
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="text-center"
-            >
-              <div className="text-4xl md:text-5xl font-extrabold text-blue-600 mb-2 font-mono tracking-tighter">
-                <AnimatedCounter end={stat.value} suffix={stat.suffix} />
-              </div>
-              <div className="text-sm md:text-base font-bold text-gray-500 uppercase tracking-wide">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
 
         {/* Benefits Grid */}
         <div className="text-center mb-12">
