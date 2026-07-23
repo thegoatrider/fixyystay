@@ -514,10 +514,18 @@ export default async function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="mt-auto flex gap-2">
-                  <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/3" />
-                  <div className="w-2/3">
-                    <PropertyApprovalActions propertyId={prop.id} />
+                <div className="mt-auto flex flex-col gap-2">
+                  <Link 
+                    href={`/dashboard/admin/properties/${prop.id}`} 
+                    className="flex justify-center items-center w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                  >
+                    Review Details & Images
+                  </Link>
+                  <div className="flex gap-2">
+                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/3" />
+                    <div className="w-2/3">
+                      <PropertyApprovalActions propertyId={prop.id} />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,9 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import EditPropertyForm from '@/components/EditPropertyForm'
 import GuestCheckinQR from '@/components/GuestCheckinQR'
+import PropertyApprovalActions from '@/app/dashboard/admin/PropertyApprovalActions'
 
 export default async function ManagePropertyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = await params
@@ -28,6 +29,21 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Manage Property</h1>
       </div>
+
+      {!property.approved && (
+        <div className="bg-orange-50 border border-orange-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
+          <div className="flex items-center gap-4 text-orange-800">
+            <AlertCircle className="w-8 h-8 text-orange-500 flex-shrink-0" />
+            <div>
+              <h2 className="text-lg font-bold">This property is pending approval</h2>
+              <p className="text-sm opacity-80">Review the images and details below before approving.</p>
+            </div>
+          </div>
+          <div className="w-full sm:w-auto min-w-[200px]">
+            <PropertyApprovalActions propertyId={property.id} />
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
