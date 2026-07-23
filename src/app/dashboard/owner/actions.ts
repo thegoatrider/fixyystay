@@ -171,6 +171,25 @@ export async function createProperty(formData: FormData) {
   const name = formData.get('name') as string
   const type = formData.get('type') as string
   const description = formData.get('description') as string
+  
+  if (!name || name.trim() === '') {
+    return { error: 'Property name is required.' }
+  }
+
+  // 3.5 Check for duplicate properties by name (case-insensitive)
+  const { data: existingProperties } = await supabaseAdmin
+    .from('properties')
+    .select('id, approved')
+    .ilike('name', name.trim())
+    .limit(1)
+
+  if (existingProperties && existingProperties.length > 0) {
+    if (existingProperties[0].approved) {
+      return { error: 'Property is already listed' }
+    } else {
+      return { error: 'Property already sent for approval' }
+    }
+  }
   const houseRules = formData.get('houseRules') as string // Added houseRules extraction
   const amenities = formData.getAll('amenities') as string[]
   const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
