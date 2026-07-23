@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Link from 'next/link'
 import { 
   User, 
   Mail, 
@@ -242,7 +243,7 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
                   </p>
                   {activeTab === 'upcoming' && (
                     <Button asChild className="rounded-2xl px-8 h-12 font-black shadow-xl shadow-blue-100">
-                      <a href="/guest">Browse Properties</a>
+                      <Link href="/guest">Browse Properties</Link>
                     </Button>
                   )}
                 </div>

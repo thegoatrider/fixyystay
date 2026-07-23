@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import ProfileClient from './ProfileClient'
 import { getUserProfile, getUserBookings } from './actions'
 
@@ -23,7 +24,7 @@ export default async function ProfilePage() {
         <div className="text-center p-8 bg-red-50 border border-red-100 rounded-2xl max-w-md">
           <p className="text-red-600 font-bold mb-4">Error loading profile</p>
           <p className="text-sm text-red-500">{profileResponse.error}</p>
-          <a href="/guest" className="text-sm underline mt-4 block">Return home</a>
+          <Link href="/guest" className="text-sm underline mt-4 block">Return home</Link>
         </div>
       </div>
     )

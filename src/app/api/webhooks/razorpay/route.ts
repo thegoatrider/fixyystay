@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         console.log(`Owner payment for ${notes.email} confirmed via Webhook`)
 
         // IMPORT verifyAndUpgrade to execute the upgrade logic robustly from the webhook
-        const { verifyAndUpgrade } = require('@/app/pricing/business/actions')
+        const { verifyAndUpgrade } = await import('@/app/pricing/business/actions')
         const upgradeResult = await verifyAndUpgrade(orderId)
         if (upgradeResult.error) {
           console.error('Webhook Upgrade Failed:', upgradeResult.error)

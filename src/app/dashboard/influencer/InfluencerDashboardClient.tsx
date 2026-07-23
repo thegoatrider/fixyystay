@@ -26,6 +26,10 @@ export default function InfluencerDashboardClient({
   const [selectedProperty, setSelectedProperty] = useState<any>(null)
   const [proposalText, setProposalText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [appOrigin, setAppOrigin] = useState('https://www.fixystays.com')
+  useEffect(() => {
+    setAppOrigin(window.location.origin)
+  }, [])
 
   if (isLoading) return <DashboardSkeleton />
   if (error || !data) return <div className="p-8 text-center text-red-500">Error loading dashboard: {error?.message || 'Unknown error'}</div>
@@ -51,11 +55,6 @@ export default function InfluencerDashboardClient({
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  const [appOrigin, setAppOrigin] = useState('https://www.fixystays.com')
-  useEffect(() => {
-    setAppOrigin(window.location.origin)
-  }, [])
 
   const handleRequestPromotion = async () => {
     if (!selectedProperty || !proposalText) return

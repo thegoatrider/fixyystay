@@ -75,7 +75,7 @@ export async function GET() {
 
           if (!sub) {
             // No subscription found, run the upgrade logic!
-            const { verifyAndUpgrade } = require('@/app/pricing/business/actions')
+            const { verifyAndUpgrade } = await import('@/app/pricing/business/actions')
             const result = await verifyAndUpgrade(payment.razorpay_order_id)
             if (result.success) {
               report.subscriptions_recovered++
