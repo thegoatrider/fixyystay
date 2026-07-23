@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, QrCode, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import FeaturedToggle from './FeaturedToggle'
 import DeletePropertyButton from './DeletePropertyButton'
+import GuestCheckinQR from '@/components/GuestCheckinQR'
 
 type Property = {
   id: string
@@ -30,6 +31,7 @@ export default function AdminPropertiesSearch({
   influencers: Influencer[]
 }) {
   const [query, setQuery] = useState('')
+  const [qrModalProperty, setQrModalProperty] = useState<Property | null>(null)
 
   const filtered = useMemo(() => {
     if (!query) return properties
@@ -89,7 +91,15 @@ export default function AdminPropertiesSearch({
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-shrink-0 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                      onClick={() => setQrModalProperty(prop)}
+                    >
+                      <QrCode className="w-4 h-4 mr-1" /> QR Code
+                    </Button>
                     <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
                     <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
                       <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
@@ -119,7 +129,15 @@ export default function AdminPropertiesSearch({
               <FeaturedToggle propertyId={prop.id} featured={!!prop.featured} />
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-9 font-bold"
+                onClick={() => setQrModalProperty(prop)}
+              >
+                <QrCode className="w-4 h-4 mr-1" /> QR Code
+              </Button>
               <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="flex-1" />
               <Button asChild variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 h-9 font-bold">
                 <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage Details</Link>
@@ -134,6 +152,22 @@ export default function AdminPropertiesSearch({
           {query ? `No properties match "${query}"` : 'No approved properties yet.'}
         </div>
       )}
+
+      {/* QR Code Modal */}
+      {qrModalProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-sm">
+            <button 
+              onClick={() => setQrModalProperty(null)}
+              className="absolute -top-4 -right-4 bg-white rounded-full p-2 shadow-lg text-gray-500 hover:text-gray-900 z-10 transition-transform hover:scale-110 active:scale-95"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <GuestCheckinQR propertyId={qrModalProperty.id} propertyName={qrModalProperty.name} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
