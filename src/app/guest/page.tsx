@@ -136,10 +136,16 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
   } else if (selectedBucket === 'villa-See All Villas') {
     availableProperties = availableProperties.filter(prop => prop.type === 'villa')
   } else if (selectedBucket) {
+    const selectedLimit = parseInt(rawBucket?.replace(/[^0-9]/g, '') || '0', 10)
     availableProperties = availableProperties.filter(prop => {
       const typeMatch = isRoomFilter ? (prop.type === 'multi-room property' || prop.type === 'hotel') : (isVillaFilter ? prop.type === 'villa' : true)
       if (!typeMatch) return false
-      return prop.rooms?.some((r: any) => r.price_bucket === rawBucket)
+      
+      return prop.rooms?.some((r: any) => {
+        if (!r.price_bucket) return false
+        const roomBucketVal = parseInt(r.price_bucket.replace(/[^0-9]/g, ''), 10)
+        return !isNaN(roomBucketVal) && roomBucketVal <= selectedLimit
+      })
     })
   } else {
     // No bucket selected — show only featured properties on homepage
