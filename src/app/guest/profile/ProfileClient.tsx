@@ -147,9 +147,17 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
             <Button 
                onClick={() => setIsEditModalOpen(true)} 
                variant="outline" 
-               className="w-full py-6 rounded-2xl font-black border-2 hover:bg-blue-50 transition-all group"
+               className="w-full py-6 rounded-2xl font-black border-2 hover:bg-blue-50 transition-all group mb-3"
             >
               <Edit3 className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" /> Edit Profile Details
+            </Button>
+
+            <Button 
+               asChild
+               variant="ghost" 
+               className="w-full py-6 rounded-2xl font-black text-red-500 hover:text-red-700 hover:bg-red-50 transition-all"
+            >
+              <Link href="/delete-account">Delete Account</Link>
             </Button>
           </div>
         </div>

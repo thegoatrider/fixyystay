@@ -264,6 +264,16 @@ export default async function OwnerProfilePage() {
                   <ExternalLink className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition" />
                </Link>
             </div>
+
+            <div className="bg-red-50 p-8 rounded-[32px] border border-red-100 flex flex-col gap-4">
+               <div>
+                  <h4 className="font-black text-red-950 italic">Danger Zone</h4>
+                  <p className="text-xs text-red-700 font-medium leading-relaxed">Permanently delete your account and all associated properties, leads, and checklists.</p>
+               </div>
+               <Button asChild variant="destructive" className="w-full font-black uppercase text-[10px] tracking-widest h-12 rounded-2xl">
+                  <Link href="/delete-account">Delete Account</Link>
+               </Button>
+            </div>
           </div>
         </div>
       </div>
