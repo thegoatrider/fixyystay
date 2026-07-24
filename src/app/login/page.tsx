@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
   
   const title = role === 'owner' ? "Property Owner Sign in" : 
                 role === 'influencer' ? "Agent Sign in" : 
-                role === 'admin' ? "Admin Sign in" : "Sign in (Guest)"
+                role === 'admin' ? "Admin Sign in" : "Sign in"
 
   return (
     <div className="flex-1 flex flex-col w-full min-h-screen bg-gray-50 items-center justify-center p-4">
