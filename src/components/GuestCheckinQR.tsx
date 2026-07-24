@@ -38,7 +38,9 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
         <head>
           <title>Fixy Stays - Guest Check-in QR</title>
           <style>
-            @page { size: A4; margin: 0; }
+            * {
+              box-sizing: border-box;
+            }
             body { 
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
               display: flex; 
@@ -47,62 +49,87 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               min-height: 100vh;
               text-align: center;
               padding: 20px;
-              background-color: white;
-              box-sizing: border-box;
+              background-color: #f3f4f6;
+              margin: 0;
             }
             .container {
               border: 12px solid #2563eb;
-              padding: 50px 30px;
-              border-radius: 50px;
+              padding: 40px 20px;
+              border-radius: 30px;
               display: flex;
               flex-direction: column;
               align-items: center;
-              width: 90%;
-              max-width: 650px;
-              box-sizing: border-box;
+              width: 100%;
+              max-width: 500px;
+              background-color: white;
+              box-shadow: 0 10px 25px rgba(0,0,0,0.1);
               margin: auto 0;
             }
+            .header-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100%;
+            }
             .welcome-text {
-              font-size: 18px;
+              font-size: 14px;
               font-weight: 800;
               color: #4b5563;
-              letter-spacing: 4px;
+              letter-spacing: 3px;
               margin-bottom: 8px;
               text-transform: uppercase;
             }
             .property-name {
-              font-size: 32px;
+              font-size: 24px;
               font-weight: 900;
               color: #1f2937;
-              margin-bottom: 35px;
-              max-width: 500px;
+              margin-bottom: 24px;
+              max-width: 90%;
               line-height: 1.2;
               letter-spacing: -0.5px;
+              text-align: center;
+            }
+            .qr-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
             }
             .qr-wrapper {
               background: white;
-              padding: 25px;
-              border-radius: 25px;
-              box-shadow: 0 15px 40px rgba(0,0,0,0.06);
-              margin-bottom: 35px;
+              padding: 15px;
+              border-radius: 20px;
+              box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+              margin-bottom: 24px;
               border: 1px solid #f3f4f6;
             }
+            .qr-wrapper img {
+              width: 220px;
+              height: 220px;
+              display: block;
+            }
+            .footer-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100%;
+            }
             .instruction {
-              font-size: 22px;
+              font-size: 18px;
               font-weight: 800;
               color: #2563eb;
-              margin-bottom: 10px;
+              margin-bottom: 6px;
               text-transform: uppercase;
               letter-spacing: 0.5px;
             }
             .sub-instruction {
-              font-size: 16px;
+              font-size: 14px;
               color: #4b5563;
               font-weight: 500;
+              margin-bottom: 24px;
             }
             .footer {
-              margin-top: 45px;
-              font-size: 12px;
+              font-size: 11px;
               color: #9ca3af;
               font-weight: 700;
               letter-spacing: 2px;
@@ -111,20 +138,94 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               align-items: center;
               justify-content: center;
             }
+            
+            @media (max-height: 700px) {
+              body {
+                justify-content: flex-start;
+              }
+              .container {
+                margin: 20px 0;
+              }
+            }
+
+            @media print {
+              @page { 
+                size: A4 portrait; 
+                margin: 0; 
+              }
+              html, body {
+                width: 210mm;
+                height: 297mm;
+                background-color: white;
+                padding: 0;
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              body {
+                justify-content: center;
+              }
+              .container {
+                border: 12px solid #2563eb;
+                padding: 60px 40px;
+                border-radius: 50px;
+                width: 170mm;
+                height: 257mm;
+                max-width: none;
+                margin: 0;
+                box-shadow: none;
+                justify-content: space-between;
+              }
+              .welcome-text {
+                font-size: 20px;
+                margin-bottom: 12px;
+              }
+              .property-name {
+                font-size: 36px;
+                margin-bottom: 0;
+                max-width: 550px;
+              }
+              .qr-wrapper {
+                padding: 30px;
+                border-radius: 30px;
+                margin-bottom: 0;
+              }
+              .qr-wrapper img {
+                width: 350px;
+                height: 350px;
+              }
+              .instruction {
+                font-size: 26px;
+                margin-bottom: 12px;
+              }
+              .sub-instruction {
+                font-size: 18px;
+                margin-bottom: 40px;
+              }
+              .footer {
+                font-size: 14px;
+              }
+            }
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="welcome-text">WELCOME TO</div>
-            <div class="property-name">${propertyName}</div>
-            <div class="qr-wrapper">
-              <img src="${qrDataUrl}" style="width: 320px; height: 320px;" />
+            <div class="header-section">
+              <div class="welcome-text">WELCOME TO</div>
+              <div class="property-name">${propertyName}</div>
             </div>
-            <div class="instruction">Scan to Check-in</div>
-            <div class="sub-instruction">Please keep your ID proofs ready for scanning</div>
-            <div class="footer">
-              <img src="/logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; opacity: 0.5;" />
-              Powered by Fixy Stays
+            <div class="qr-section">
+              <div class="qr-wrapper">
+                <img src="${qrDataUrl}" />
+              </div>
+            </div>
+            <div class="footer-section">
+              <div class="instruction">Scan to Check-in</div>
+              <div class="sub-instruction">Please keep your ID proofs ready for scanning</div>
+              <div class="footer">
+                <img src="${origin}/logo.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; opacity: 0.5;" />
+                Powered by Fixy Stays
+              </div>
             </div>
           </div>
           <script>

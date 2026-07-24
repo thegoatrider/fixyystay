@@ -33,92 +33,204 @@ export default function WebsiteQR() {
         <head>
           <title>Fixy Stays - Business Card</title>
           <style>
-            @page { size: A4; margin: 0; }
+            * {
+              box-sizing: border-box;
+            }
             body { 
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
               display: flex; 
               flex-direction: column; 
               align-items: center; 
-              justify-content: center; 
               min-height: 100vh;
               text-align: center;
               padding: 20px;
-              background-color: white;
-              box-sizing: border-box;
+              background-color: #f3f4f6;
+              margin: 0;
             }
             .container {
               border: 12px solid #2563eb;
-              padding: 50px 40px;
-              border-radius: 50px;
+              padding: 40px 20px;
+              border-radius: 30px;
               display: flex;
               flex-direction: column;
               align-items: center;
-              width: 90%;
-              max-width: 650px;
-              box-sizing: border-box;
+              width: 100%;
+              max-width: 500px;
               background: linear-gradient(to bottom, #ffffff, #f0f7ff);
+              box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+              margin: auto 0;
+            }
+            .header-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100%;
+            }
+            .logo-img {
+              width: 60px;
+              height: 60px;
+              margin-bottom: 12px;
             }
             .logo-text {
-              font-size: 56px;
+              font-size: 36px;
               font-weight: 900;
               color: #2563eb;
-              margin-bottom: 5px;
-              letter-spacing: -2px;
+              margin-bottom: 4px;
+              letter-spacing: -1.5px;
             }
             .tagline {
-              font-size: 22px;
+              font-size: 14px;
               font-weight: 700;
               color: #1f2937;
-              margin-bottom: 40px;
-              max-width: 500px;
+              margin-bottom: 24px;
+              max-width: 90%;
               line-height: 1.3;
               font-style: italic;
             }
+            .qr-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+            }
             .qr-wrapper {
               background: white;
-              padding: 30px;
-              border-radius: 30px;
-              box-shadow: 0 20px 50px rgba(37, 99, 235, 0.1);
-              margin-bottom: 40px;
-              border: 2px solid #e5e7eb;
+              padding: 15px;
+              border-radius: 20px;
+              box-shadow: 0 10px 25px rgba(37, 99, 235, 0.05);
+              margin-bottom: 24px;
+              border: 1px solid #e5e7eb;
+            }
+            .qr-wrapper img {
+              width: 220px;
+              height: 220px;
+              display: block;
+            }
+            .footer-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100%;
             }
             .instruction {
-              font-size: 20px;
+              font-size: 14px;
               font-weight: 800;
               color: #2563eb;
-              margin-bottom: 10px;
+              margin-bottom: 6px;
               text-transform: uppercase;
-              letter-spacing: 2px;
+              letter-spacing: 1.5px;
             }
             .website-url {
-              font-size: 24px;
+              font-size: 18px;
               color: #1f2937;
               font-weight: 700;
-              margin-bottom: 30px;
+              margin-bottom: 24px;
             }
             .footer {
-              margin-top: 40px;
-              font-size: 16px;
+              font-size: 11px;
               color: #4b5563;
               font-weight: 600;
               letter-spacing: 1px;
               border-top: 1px solid #e5e7eb;
-              padding-top: 20px;
+              padding-top: 15px;
               width: 100%;
+            }
+            
+            @media (max-height: 700px) {
+              body {
+                justify-content: flex-start;
+              }
+              .container {
+                margin: 20px 0;
+              }
+            }
+
+            @media print {
+              @page { 
+                size: A4 portrait; 
+                margin: 0; 
+              }
+              html, body {
+                width: 210mm;
+                height: 297mm;
+                background-color: white;
+                padding: 0;
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              body {
+                justify-content: center;
+              }
+              .container {
+                border: 12px solid #2563eb;
+                padding: 60px 40px;
+                border-radius: 50px;
+                width: 170mm;
+                height: 257mm;
+                max-width: none;
+                margin: 0;
+                box-shadow: none;
+                justify-content: space-between;
+              }
+              .logo-img {
+                width: 100px;
+                height: 100px;
+                margin-bottom: 20px;
+              }
+              .logo-text {
+                font-size: 56px;
+                margin-bottom: 5px;
+                letter-spacing: -2px;
+              }
+              .tagline {
+                font-size: 22px;
+                margin-bottom: 0;
+                max-width: 500px;
+              }
+              .qr-wrapper {
+                padding: 30px;
+                border-radius: 30px;
+                margin-bottom: 0;
+                border: 2px solid #e5e7eb;
+              }
+              .qr-wrapper img {
+                width: 350px;
+                height: 350px;
+              }
+              .instruction {
+                font-size: 20px;
+                margin-bottom: 10px;
+                letter-spacing: 2px;
+              }
+              .website-url {
+                font-size: 24px;
+                margin-bottom: 0;
+              }
+              .footer {
+                font-size: 16px;
+                padding-top: 20px;
+              }
             }
           </style>
         </head>
         <body>
           <div class="container">
-            <img src="/logo.png" style="width: 100px; height: 100px; margin-bottom: 20px;" />
-            <div class="logo-text">Fixy Stays</div>
-            <div class="tagline">Alibag's premier hotel booking and data management software.</div>
-            <div class="qr-wrapper">
-              <img src="${qrDataUrl}" style="width: 350px; height: 350px;" />
+            <div class="header-section">
+              <img src="${origin}/logo.png" class="logo-img" />
+              <div class="logo-text">Fixy Stays</div>
+              <div class="tagline">Alibag's premier hotel booking and data management software.</div>
             </div>
-            <div class="instruction">Visit us at</div>
-            <div class="website-url">www.fixystays.com</div>
-            <div class="footer">STAY SMART • MANAGE BETTER</div>
+            <div class="qr-section">
+              <div class="qr-wrapper">
+                <img src="${qrDataUrl}" />
+              </div>
+            </div>
+            <div class="footer-section">
+              <div class="instruction">Visit us at</div>
+              <div class="website-url">www.fixystays.com</div>
+              <div class="footer">STAY SMART • MANAGE BETTER</div>
+            </div>
           </div>
           <script>
             window.onload = () => {

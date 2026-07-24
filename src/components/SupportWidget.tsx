@@ -95,6 +95,32 @@ export default function SupportWidget() {
     }
   }, [messages, isOpen])
 
+  // 4b. Handle physical/hardware back button to close the widget on mobile
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (isOpen) {
+        setIsOpen(false)
+      }
+    }
+
+    if (isOpen) {
+      // Push state so that back button pops this state instead of navigating away
+      window.history.pushState({ supportOpen: true }, '')
+      window.addEventListener('popstate', handlePopState)
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [isOpen])
+
+  const handleClose = () => {
+    setIsOpen(false)
+    if (typeof window !== 'undefined' && window.history.state?.supportOpen) {
+      window.history.back()
+    }
+  }
+
   // 5. Send message
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault()
@@ -184,7 +210,7 @@ export default function SupportWidget() {
       {isOpen && (
         <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[520px] bg-white sm:rounded-2xl border-0 sm:border border-gray-200 shadow-2xl flex flex-col overflow-hidden z-[60] transition-all duration-300 ease-out origin-bottom-right">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center justify-between text-white shadow-md">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 sm:pt-3 flex items-center justify-between text-white shadow-md shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white border border-white/10 font-bold text-sm shadow-inner relative">
                 F
@@ -198,7 +224,7 @@ export default function SupportWidget() {
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="p-1 hover:bg-white/10 rounded-full transition-colors text-white/80 hover:text-white cursor-pointer"
               title="Close Chat"
             >
@@ -286,7 +312,7 @@ export default function SupportWidget() {
           )}
 
           {/* Form Input Area */}
-          <div className="p-3 border-t bg-white flex items-center gap-2 shrink-0">
+          <div className="p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-3 border-t bg-white flex items-center gap-2 shrink-0">
             <input
               type="file"
               accept="image/*,application/pdf,.doc,.docx"
