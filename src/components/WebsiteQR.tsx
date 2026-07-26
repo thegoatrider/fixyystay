@@ -8,6 +8,8 @@ import { useRef, useEffect, useState } from 'react'
 export default function WebsiteQR() {
   const printRef = useRef<HTMLDivElement>(null)
   const [origin, setOrigin] = useState('')
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [downloadImageUrl, setDownloadImageUrl] = useState('')
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -301,20 +303,81 @@ export default function WebsiteQR() {
         <Button 
           variant="ghost" 
           className="h-10 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          onClick={() => {
+          onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
               const url = canvas.toDataURL('image/png')
-              const link = document.createElement('a')
-              link.href = url
-              link.download = `fixystays-website-qr.png`
-              link.click()
+              const filename = 'fixystays-website-qr.png'
+
+              try {
+                // Try modern Web Share API for mobile (iOS/Android)
+                if (navigator.share) {
+                  const arr = url.split(',')
+                  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
+                  const bstr = atob(arr[1])
+                  let n = bstr.length
+                  const u8arr = new Uint8Array(n)
+                  while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n)
+                  }
+                  const blob = new Blob([u8arr], { type: mime })
+                  const file = new File([blob], filename, { type: 'image/png' })
+                  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                      title: 'FixyStays Website QR',
+                      files: [file]
+                    })
+                    return;
+                  }
+                }
+              } catch (err) {
+                console.error("Share failed", err)
+              }
+
+              // Detect mobile browser/webview
+              const isMobile = /iPad|iPhone|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+              if (isMobile) {
+                setDownloadImageUrl(url)
+                setShowDownloadModal(true)
+              } else {
+                // Fallback to traditional download for desktop/android
+                const link = document.createElement('a')
+                link.href = url
+                link.download = filename
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+              }
             }
           }}
         >
           <Download className="w-3.5 h-3.5 mr-2 opacity-50" /> Download Raw Image
         </Button>
       </div>
+
+      {showDownloadModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-gray-100 flex flex-col items-center gap-4">
+            <h4 className="font-black text-gray-900 text-lg italic uppercase tracking-tight">Save QR Code</h4>
+            <p className="text-xs text-gray-500 font-semibold px-2">
+              To save the QR code to your phone, long-press the image below and select <span className="text-blue-600">"Save Image"</span> or <span className="text-blue-600">"Download Image"</span>.
+            </p>
+            <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-2">
+              <img 
+                src={downloadImageUrl} 
+                alt="Website QR Code" 
+                className="w-48 h-48 object-contain shadow-md rounded-xl"
+              />
+            </div>
+            <Button 
+              className="mt-2 w-full h-11 bg-gray-900 hover:bg-black font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer"
+              onClick={() => setShowDownloadModal(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
