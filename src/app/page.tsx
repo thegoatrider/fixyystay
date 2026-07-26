@@ -14,7 +14,6 @@ import { FeaturedDestinations } from '@/components/home/FeaturedDestinations';
 import { FeaturedProperties } from '@/components/home/FeaturedProperties';
 import { TrustSection } from '@/components/home/TrustSection';
 import { ExperienceSection } from '@/components/home/ExperienceSection';
-import { Testimonials } from '@/components/home/Testimonials';
 import { HostAndInfluencerSection } from '@/components/home/HostAndInfluencerSection';
 import { AppDownloadSection } from '@/components/home/AppDownloadSection';
 import { Footer } from '@/components/home/Footer';
@@ -100,8 +99,6 @@ export default async function Index() {
         <TrustSection />
         
         <ExperienceSection />
-        
-        <Testimonials />
         
         <HostAndInfluencerSection />
         
