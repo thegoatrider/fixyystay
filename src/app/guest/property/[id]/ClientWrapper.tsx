@@ -646,8 +646,12 @@ export default function PropertyDetailClient({
                       onSelect={(range) => {
                         let newCheckin = checkin
                         let newCheckout = checkout
+                        
+                        // Handle react-day-picker returning same from and to date on initial click
+                        const hasSameDate = range?.from && range?.to && range.from.getTime() === range.to.getTime()
+                        
                         if (range?.from) newCheckin = format(range.from, 'yyyy-MM-dd')
-                        if (range?.to) {
+                        if (range?.to && !hasSameDate) {
                           newCheckout = format(range.to, 'yyyy-MM-dd')
                           setIsCalendarOpen(false)
                         } else {

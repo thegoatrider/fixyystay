@@ -46,9 +46,14 @@ export function HomeSearch({ selectedCity = 'Alibag' }: { selectedCity?: string 
   }
 
   const handleSelectRange = (newRange: DateRange | undefined) => {
-    setRange(newRange)
-    if (newRange?.from && newRange?.to) {
-      setTimeout(() => setIsCalendarOpen(false), 300)
+    if (newRange?.from && newRange?.to && newRange.from.getTime() === newRange.to.getTime()) {
+      // If from and to are the same, treat it as only selecting checkin (from)
+      setRange({ from: newRange.from, to: undefined })
+    } else {
+      setRange(newRange)
+      if (newRange?.from && newRange?.to) {
+        setTimeout(() => setIsCalendarOpen(false), 300)
+      }
     }
   }
 
