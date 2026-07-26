@@ -306,59 +306,42 @@ export default function WebsiteQR() {
           onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
-              const url = canvas.toDataURL('image/png')
               const filename = 'fixystays-website-qr.png'
 
-              try {
-                // Try modern Web Share API for mobile (iOS/Android)
-                if (navigator.share) {
-                  const arr = url.split(',')
-                  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
-                  const bstr = atob(arr[1])
-                  let n = bstr.length
-                  const u8arr = new Uint8Array(n)
-                  while (n--) {
-                    u8arr[n] = bstr.charCodeAt(n)
-                  }
-                  const blob = new Blob([u8arr], { type: mime })
-                  const file = new File([blob], filename, { type: 'image/png' })
-                  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              canvas.toBlob(async (blob) => {
+                if (!blob) return
+
+                // 1. Try modern Web Share API for mobile (iOS/Android)
+                const file = new File([blob], filename, { type: 'image/png' })
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                  try {
                     await navigator.share({
+                      files: [file],
                       title: 'FixyStays Website QR',
-                      files: [file]
+                      text: 'Scan this QR code to visit the website.'
                     })
-                    return;
+                    return
+                  } catch (shareErr) {
+                    console.warn("Share failed, falling back to download", shareErr)
                   }
                 }
-              } catch (err) {
-                console.error("Share failed", err)
-              }
 
-              // Try direct Blob URL download (works on modern iOS/Android browsers)
-              let directDownloadSuccess = false
-              try {
-                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
-                if (blob) {
-                  const blobUrl = URL.createObjectURL(blob)
+                // 2. Fallback: Use direct Blob URL download and display modal
+                const blobUrl = URL.createObjectURL(blob)
+                setDownloadImageUrl(blobUrl)
+                setShowDownloadModal(true)
+
+                try {
                   const link = document.createElement('a')
                   link.href = blobUrl
                   link.download = filename
                   document.body.appendChild(link)
                   link.click()
                   document.body.removeChild(link)
-                  setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
-                  directDownloadSuccess = true
+                } catch (downloadErr) {
+                  console.error("Direct download failed", downloadErr)
                 }
-              } catch (downloadErr) {
-                console.error("Direct download failed", downloadErr)
-              }
-
-              // Detect mobile browser/webview to show helper modal as fallback/supplement
-              const isMobile = /iPad|iPhone|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-              if (isMobile) {
-                setDownloadImageUrl(url)
-                setShowDownloadModal(true)
-              }
+              }, 'image/png')
             }
           }}
         >
@@ -387,21 +370,48 @@ export default function WebsiteQR() {
                 onClick={async () => {
                   const canvas = printRef.current?.querySelector('canvas')
                   if (canvas) {
-                    try {
-                      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
-                      if (blob) {
-                        const blobUrl = URL.createObjectURL(blob)
+                    canvas.toBlob(async (blob) => {
+                      if (!blob) return
+                      const filename = 'fixystays-website-qr.png'
+                      const blobUrl = URL.createObjectURL(blob)
+                      
+                      // 1. Try modern Web Share API again
+                      const file = new File([blob], filename, { type: 'image/png' })
+                      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try {
+                          await navigator.share({
+                            files: [file],
+                            title: 'FixyStays Website QR',
+                            text: 'Scan this QR code to visit the website.'
+                          })
+                          URL.revokeObjectURL(blobUrl)
+                          return
+                        } catch (shareErr) {
+                          console.warn("Share failed in modal", shareErr)
+                        }
+                      }
+
+                      // 2. Try link click download
+                      try {
                         const link = document.createElement('a')
                         link.href = blobUrl
-                        link.download = 'fixystays-website-qr.png'
+                        link.download = filename
                         document.body.appendChild(link)
                         link.click()
                         document.body.removeChild(link)
-                        setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
+                      } catch (downloadErr) {
+                        console.error("Direct download failed in modal", downloadErr)
                       }
-                    } catch (e) {
-                      console.error("Direct download failed", e)
-                    }
+
+                      // 3. Ultimate Fallback: Open in new window/tab (works on webviews)
+                      try {
+                        window.open(blobUrl, '_blank')
+                      } catch (err) {
+                        console.error("Open window failed", err)
+                      }
+
+                      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+                    }, 'image/png')
                   }
                 }}
               >
@@ -409,7 +419,13 @@ export default function WebsiteQR() {
               </Button>
               <Button 
                 className="flex-1 h-11 bg-gray-900 hover:bg-black font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer text-white"
-                onClick={() => setShowDownloadModal(false)}
+                onClick={() => {
+                  if (downloadImageUrl && downloadImageUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(downloadImageUrl)
+                  }
+                  setShowDownloadModal(false)
+                  setDownloadImageUrl('')
+                }}
               >
                 Close
               </Button>
