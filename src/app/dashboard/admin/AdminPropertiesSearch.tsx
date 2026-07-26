@@ -159,7 +159,7 @@ export default function AdminPropertiesSearch({
           <div className="relative w-full max-w-sm">
             <button 
               onClick={() => setQrModalProperty(null)}
-              className="absolute -top-4 -right-4 bg-white rounded-full p-2 shadow-lg text-gray-500 hover:text-gray-900 z-10 transition-transform hover:scale-110 active:scale-95"
+              className="absolute top-4 right-4 bg-white/90 hover:bg-white border rounded-full p-2 shadow-md text-gray-500 hover:text-gray-900 z-10 transition-transform hover:scale-110 active:scale-95"
             >
               <X className="w-5 h-5" />
             </button>

@@ -334,19 +334,30 @@ export default function WebsiteQR() {
                 console.error("Share failed", err)
               }
 
-              // Detect mobile browser/webview
+              // Try direct Blob URL download (works on modern iOS/Android browsers)
+              let directDownloadSuccess = false
+              try {
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+                if (blob) {
+                  const blobUrl = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = blobUrl
+                  link.download = filename
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                  setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
+                  directDownloadSuccess = true
+                }
+              } catch (downloadErr) {
+                console.error("Direct download failed", downloadErr)
+              }
+
+              // Detect mobile browser/webview to show helper modal as fallback/supplement
               const isMobile = /iPad|iPhone|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
               if (isMobile) {
                 setDownloadImageUrl(url)
                 setShowDownloadModal(true)
-              } else {
-                // Fallback to traditional download for desktop/android
-                const link = document.createElement('a')
-                link.href = url
-                link.download = filename
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
               }
             }
           }}
@@ -360,7 +371,7 @@ export default function WebsiteQR() {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-gray-100 flex flex-col items-center gap-4">
             <h4 className="font-black text-gray-900 text-lg italic uppercase tracking-tight">Save QR Code</h4>
             <p className="text-xs text-gray-500 font-semibold px-2">
-              To save the QR code to your phone, long-press the image below and select <span className="text-blue-600">"Save Image"</span> or <span className="text-blue-600">"Download Image"</span>.
+              If the download didn't start automatically, you can long-press the image below and select <span className="text-blue-600">"Save Image"</span> or click the Download button.
             </p>
             <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-2">
               <img 
@@ -369,12 +380,40 @@ export default function WebsiteQR() {
                 className="w-48 h-48 object-contain shadow-md rounded-xl"
               />
             </div>
-            <Button 
-              className="mt-2 w-full h-11 bg-gray-900 hover:bg-black font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer"
-              onClick={() => setShowDownloadModal(false)}
-            >
-              Close
-            </Button>
+            <div className="flex gap-2 w-full mt-2">
+              <Button 
+                variant="outline"
+                className="flex-1 h-11 border-2 border-gray-100 hover:border-blue-200 hover:bg-blue-50 font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer"
+                onClick={async () => {
+                  const canvas = printRef.current?.querySelector('canvas')
+                  if (canvas) {
+                    try {
+                      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+                      if (blob) {
+                        const blobUrl = URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = blobUrl
+                        link.download = 'fixystays-website-qr.png'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
+                      }
+                    } catch (e) {
+                      console.error("Direct download failed", e)
+                    }
+                  }
+                }}
+              >
+                Download
+              </Button>
+              <Button 
+                className="flex-1 h-11 bg-gray-900 hover:bg-black font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer text-white"
+                onClick={() => setShowDownloadModal(false)}
+              >
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}

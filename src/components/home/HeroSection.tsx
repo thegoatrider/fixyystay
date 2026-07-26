@@ -45,17 +45,17 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-5xl px-6 text-center mt-[-10vh]">
+      <div className="relative z-10 w-full max-w-5xl px-6 text-center mt-[-4vh] md:mt-[-10vh]">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
         >
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-white tracking-tight leading-[1.1] drop-shadow-sm">
-            Stay somewhere <br className="hidden md:block" />
+          <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold text-white tracking-tight leading-[1.2] md:leading-[1.1] drop-shadow-sm">
+            Stay somewhere <br className="hidden sm:block" />
             <span className="text-blue-100">worth remembering.</span>
           </h1>
-          <p className="mt-6 text-lg md:text-2xl text-blue-50/90 font-medium max-w-3xl mx-auto drop-shadow-sm">
+          <p className="mt-4 sm:mt-6 text-sm sm:text-lg md:text-2xl text-blue-50/90 font-medium max-w-3xl mx-auto drop-shadow-sm">
             Book handpicked stays, boutique hotels, villas and unique experiences across India.
           </p>
         </motion.div>

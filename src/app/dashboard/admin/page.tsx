@@ -296,7 +296,7 @@ export default async function AdminDashboard() {
             <Banknote className="text-green-600" /> Payout Queue
           </h2>
           <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
@@ -335,7 +335,7 @@ export default async function AdminDashboard() {
             Business Leads
           </h2>
           <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
@@ -396,7 +396,7 @@ export default async function AdminDashboard() {
               </div>
             </div>
             
-            <div className="max-h-[300px] overflow-y-auto">
+            <div className="max-h-[300px] overflow-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 tracking-widest sticky top-0 backdrop-blur-sm">
                   <tr>
@@ -451,7 +451,7 @@ export default async function AdminDashboard() {
               </div>
             </div>
             
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 tracking-widest sticky top-0 backdrop-blur-sm">
                   <tr>
@@ -593,47 +593,49 @@ export default async function AdminDashboard() {
         </h2>
         
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Partner / Email</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {allOwnersDetailed?.map((owner: any) => {
-                const sub = owner.owner_subscriptions?.[0]
-                const isActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
-                
-                return (
-                  <tr key={owner.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-gray-900">{owner.name}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">{owner.email}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      {isActive ? (
-                        <div className="flex flex-col">
-                           <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider w-fit">
-                             <Zap className="w-3 h-3 fill-current" /> {sub.plan_name}
-                           </span>
-                           <span className="text-[9px] text-gray-400 mt-1">Exp: {new Date(sub.end_date).toLocaleDateString()}</span>
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-wider">
-                           No Active Plan
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right text-gray-400 text-xs font-medium">
-                      {new Date(owner.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Partner / Email</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {allOwnersDetailed?.map((owner: any) => {
+                  const sub = owner.owner_subscriptions?.[0]
+                  const isActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+                  
+                  return (
+                    <tr key={owner.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">{owner.name}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">{owner.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isActive ? (
+                          <div className="flex flex-col">
+                             <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider w-fit">
+                               <Zap className="w-3 h-3 fill-current" /> {sub.plan_name}
+                             </span>
+                             <span className="text-[9px] text-gray-400 mt-1">Exp: {new Date(sub.end_date).toLocaleDateString()}</span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                             No Active Plan
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right text-gray-400 text-xs font-medium">
+                        {new Date(owner.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
