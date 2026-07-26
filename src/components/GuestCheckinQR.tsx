@@ -326,18 +326,14 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
                 console.warn("Share failed, falling back to download", shareErr)
               }
 
-              // 2. Fallback: Trigger traditional download & display modal
+              // 2. Fallback: Trigger API-based native download & display modal
               const url = canvas.toDataURL('image/jpeg', 0.9)
               setDownloadImageUrl(url)
               setShowDownloadModal(true)
 
               try {
-                const link = document.createElement('a')
-                link.href = url
-                link.download = filename
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
+                const downloadUrl = `/api/qr-download?url=${encodeURIComponent(checkinUrl)}&filename=${filename}`
+                window.location.href = downloadUrl
               } catch (downloadErr) {
                 console.error("Direct download failed", downloadErr)
               }
@@ -391,15 +387,10 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
                       console.warn("Share failed in modal", shareErr)
                     }
 
-                    // Try direct download fallback (no window.open to prevent locked screens in mobile webviews)
+                    // Try direct download fallback via API endpoint (prevents locked screens in mobile webviews)
                     try {
-                      const url = canvas.toDataURL('image/jpeg', 0.9)
-                      const link = document.createElement('a')
-                      link.href = url
-                      link.download = filename
-                      document.body.appendChild(link)
-                      link.click()
-                      document.body.removeChild(link)
+                      const downloadUrl = `/api/qr-download?url=${encodeURIComponent(checkinUrl)}&filename=${filename}`
+                      window.location.href = downloadUrl
                     } catch (downloadErr) {
                       console.error("Direct download failed in modal", downloadErr)
                     }
