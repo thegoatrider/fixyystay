@@ -45,19 +45,44 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-5xl px-6 text-center mt-[-4vh] md:mt-[-10vh]">
+      <div className="relative z-10 w-full max-w-5xl px-6 text-center mt-[-6vh] md:mt-[-10vh]">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+          className="flex flex-col items-center"
         >
-          <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold text-white tracking-tight leading-[1.2] md:leading-[1.1] drop-shadow-sm">
+          {/* Native-style Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-5 rounded-full bg-white/10 backdrop-blur-md border border-white/25 shadow-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-cyan-200">
+              Alibag's Premium Stays
+            </span>
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white tracking-tight leading-[1.15] drop-shadow-lg">
             Stay somewhere <br className="hidden sm:block" />
-            <span className="text-blue-100">worth remembering.</span>
+            <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-300 bg-clip-text text-transparent">
+              worth remembering.
+            </span>
           </h1>
-          <p className="mt-4 sm:mt-6 text-sm sm:text-lg md:text-2xl text-blue-50/90 font-medium max-w-3xl mx-auto drop-shadow-sm">
-            Book handpicked stays, boutique hotels, villas and unique experiences across India.
+          
+          <p className="mt-5 text-sm sm:text-lg md:text-2xl text-gray-200 font-semibold max-w-2xl mx-auto leading-relaxed drop-shadow-sm">
+            Discover handpicked luxury villas, beachside resorts, and boutique stays built for unforgettable escapes.
           </p>
+
+          {/* Quick Info Tags to "fill it up more well" */}
+          <div className="mt-8 flex flex-wrap justify-center gap-2.5 max-w-md sm:max-w-none">
+            <div className="flex items-center gap-1 bg-white/5 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-inner text-[10px] sm:text-xs font-bold text-white">
+              <span className="text-cyan-400">✓</span> 100% Verified
+            </div>
+            <div className="flex items-center gap-1 bg-white/5 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-inner text-[10px] sm:text-xs font-bold text-white">
+              <span className="text-cyan-400">✓</span> Local Caretaker
+            </div>
+            <div className="flex items-center gap-1 bg-white/5 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-inner text-[10px] sm:text-xs font-bold text-white">
+              <span className="text-cyan-400">✓</span> Best Price Guarantee
+            </div>
+          </div>
         </motion.div>
       </div>
 
