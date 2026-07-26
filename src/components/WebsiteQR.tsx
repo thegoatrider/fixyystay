@@ -6,9 +6,9 @@ import { Printer, Download, Globe } from 'lucide-react'
 import { useRef, useEffect, useState } from 'react'
 
 function getFileFromCanvas(canvas: HTMLCanvasElement, filename: string): File {
-  const dataUrl = canvas.toDataURL('image/png')
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
   const arr = dataUrl.split(',')
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
   const bstr = atob(arr[1])
   let n = bstr.length
   const u8arr = new Uint8Array(n)
@@ -320,7 +320,7 @@ export default function WebsiteQR() {
           onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
-              const filename = 'fixystays-website-qr.png'
+              const filename = 'fixystays-website-qr.jpg'
 
               try {
                 // Synchronous file conversion preserves user gesture for Web Share API
@@ -340,7 +340,7 @@ export default function WebsiteQR() {
               }
 
               // 2. Fallback: Trigger traditional download & display modal
-              const url = canvas.toDataURL('image/png')
+              const url = canvas.toDataURL('image/jpeg', 0.9)
               setDownloadImageUrl(url)
               setShowDownloadModal(true)
 
@@ -382,7 +382,7 @@ export default function WebsiteQR() {
                 onClick={async () => {
                   const canvas = printRef.current?.querySelector('canvas')
                   if (canvas) {
-                    const filename = 'fixystays-website-qr.png'
+                    const filename = 'fixystays-website-qr.jpg'
                     
                     try {
                       const file = getFileFromCanvas(canvas, filename)
@@ -400,7 +400,7 @@ export default function WebsiteQR() {
 
                     // Try direct download fallback (no window.open to prevent locked screens in mobile webviews)
                     try {
-                      const url = canvas.toDataURL('image/png')
+                      const url = canvas.toDataURL('image/jpeg', 0.9)
                       const link = document.createElement('a')
                       link.href = url
                       link.download = filename

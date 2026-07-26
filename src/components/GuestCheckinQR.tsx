@@ -11,9 +11,9 @@ export interface GuestCheckinQRProps {
 }
 
 function getFileFromCanvas(canvas: HTMLCanvasElement, filename: string): File {
-  const dataUrl = canvas.toDataURL('image/png')
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
   const arr = dataUrl.split(',')
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
   const bstr = atob(arr[1])
   let n = bstr.length
   const u8arr = new Uint8Array(n)
@@ -307,7 +307,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
           onClick={async () => {
             const canvas = printRef.current?.querySelector('canvas')
             if (canvas) {
-              const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
+              const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.jpg`
               
               try {
                 // Synchronous file conversion preserves user gesture for Web Share API
@@ -327,7 +327,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               }
 
               // 2. Fallback: Trigger traditional download & display modal
-              const url = canvas.toDataURL('image/png')
+              const url = canvas.toDataURL('image/jpeg', 0.9)
               setDownloadImageUrl(url)
               setShowDownloadModal(true)
 
@@ -375,7 +375,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
                 onClick={async () => {
                   const canvas = printRef.current?.querySelector('canvas')
                   if (canvas) {
-                    const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
+                    const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.jpg`
                     
                     try {
                       const file = getFileFromCanvas(canvas, filename)
@@ -393,7 +393,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
 
                     // Try direct download fallback (no window.open to prevent locked screens in mobile webviews)
                     try {
-                      const url = canvas.toDataURL('image/png')
+                      const url = canvas.toDataURL('image/jpeg', 0.9)
                       const link = document.createElement('a')
                       link.href = url
                       link.download = filename
