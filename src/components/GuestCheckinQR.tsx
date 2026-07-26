@@ -10,6 +10,20 @@ export interface GuestCheckinQRProps {
   propertyName: string
 }
 
+function getFileFromCanvas(canvas: HTMLCanvasElement, filename: string): File {
+  const dataUrl = canvas.toDataURL('image/png')
+  const arr = dataUrl.split(',')
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png'
+  const bstr = atob(arr[1])
+  let n = bstr.length
+  const u8arr = new Uint8Array(n)
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n)
+  }
+  const blob = new Blob([u8arr], { type: mime })
+  return new File([blob], filename, { type: mime })
+}
+
 export default function GuestCheckinQR({ propertyId, propertyName }: GuestCheckinQRProps) {
   const printRef = useRef<HTMLDivElement>(null)
   const [origin, setOrigin] = useState('')
@@ -295,40 +309,38 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
             if (canvas) {
               const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
               
-              canvas.toBlob(async (blob) => {
-                if (!blob) return
-
+              try {
+                // Synchronous file conversion preserves user gesture for Web Share API
+                const file = getFileFromCanvas(canvas, filename)
+                
                 // 1. Try modern Web Share API for mobile (iOS/Android)
-                const file = new File([blob], filename, { type: 'image/png' })
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                  try {
-                    await navigator.share({
-                      files: [file],
-                      title: 'FixyStays Check-in QR',
-                      text: 'Scan this QR code to check-in.'
-                    })
-                    return
-                  } catch (shareErr) {
-                    console.warn("Share failed, falling back to download", shareErr)
-                  }
+                  await navigator.share({
+                    files: [file],
+                    title: 'FixyStays Check-in QR',
+                    text: 'Scan this QR code to check-in.'
+                  })
+                  return
                 }
+              } catch (shareErr) {
+                console.warn("Share failed, falling back to download", shareErr)
+              }
 
-                // 2. Fallback: Use direct Blob URL download and display modal
-                const blobUrl = URL.createObjectURL(blob)
-                setDownloadImageUrl(blobUrl)
-                setShowDownloadModal(true)
+              // 2. Fallback: Trigger traditional download & display modal
+              const url = canvas.toDataURL('image/png')
+              setDownloadImageUrl(url)
+              setShowDownloadModal(true)
 
-                try {
-                  const link = document.createElement('a')
-                  link.href = blobUrl
-                  link.download = filename
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                } catch (downloadErr) {
-                  console.error("Direct download failed", downloadErr)
-                }
-              }, 'image/png')
+              try {
+                const link = document.createElement('a')
+                link.href = url
+                link.download = filename
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+              } catch (downloadErr) {
+                console.error("Direct download failed", downloadErr)
+              }
             }
           }}
         >
@@ -353,7 +365,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               <img 
                 src={downloadImageUrl} 
                 alt="Property QR Code" 
-                className="w-48 h-48 object-contain shadow-md rounded-xl"
+                className="w-48 h-48 object-contain shadow-md rounded-xl animate-in zoom-in-95 duration-200"
               />
             </div>
             <div className="flex gap-2 w-full mt-2">
@@ -363,48 +375,34 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
                 onClick={async () => {
                   const canvas = printRef.current?.querySelector('canvas')
                   if (canvas) {
-                    canvas.toBlob(async (blob) => {
-                      if (!blob) return
-                      const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
-                      const blobUrl = URL.createObjectURL(blob)
-                      
-                      // 1. Try modern Web Share API again
-                      const file = new File([blob], filename, { type: 'image/png' })
+                    const filename = `fixy-qr-${propertyName.replace(/\s+/g, '-').toLowerCase()}.png`
+                    
+                    try {
+                      const file = getFileFromCanvas(canvas, filename)
                       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                        try {
-                          await navigator.share({
-                            files: [file],
-                            title: 'FixyStays Check-in QR',
-                            text: 'Scan this QR code to check-in.'
-                          })
-                          URL.revokeObjectURL(blobUrl)
-                          return
-                        } catch (shareErr) {
-                          console.warn("Share failed in modal", shareErr)
-                        }
+                        await navigator.share({
+                          files: [file],
+                          title: 'FixyStays Check-in QR',
+                          text: 'Scan this QR code to check-in.'
+                        })
+                        return
                       }
+                    } catch (shareErr) {
+                      console.warn("Share failed in modal", shareErr)
+                    }
 
-                      // 2. Try link click download
-                      try {
-                        const link = document.createElement('a')
-                        link.href = blobUrl
-                        link.download = filename
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
-                      } catch (downloadErr) {
-                        console.error("Direct download failed in modal", downloadErr)
-                      }
-
-                      // 3. Ultimate Fallback: Open in new window/tab (works on webviews)
-                      try {
-                        window.open(blobUrl, '_blank')
-                      } catch (err) {
-                        console.error("Open window failed", err)
-                      }
-
-                      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
-                    }, 'image/png')
+                    // Try direct download fallback (no window.open to prevent locked screens in mobile webviews)
+                    try {
+                      const url = canvas.toDataURL('image/png')
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = filename
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    } catch (downloadErr) {
+                      console.error("Direct download failed in modal", downloadErr)
+                    }
                   }
                 }}
               >
@@ -413,9 +411,6 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
               <Button 
                 className="flex-1 h-11 bg-gray-900 hover:bg-black font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer text-white"
                 onClick={() => {
-                  if (downloadImageUrl && downloadImageUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(downloadImageUrl)
-                  }
                   setShowDownloadModal(false)
                   setDownloadImageUrl('')
                 }}
