@@ -9,19 +9,7 @@ import { DateRange } from 'react-day-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
-const ALIBAG_AREAS = [
-  'All Locations',
-  'Nagaon',
-  'Varsoli',
-  'Kashid',
-  'Mandwa',
-  'Kihim',
-  'Revdanda',
-  'Chaul',
-  'Dadar Sagari',
-  'Murud',
-  'Awas'
-];
+
 
 export function SearchCard() {
   const router = useRouter();
@@ -89,12 +77,77 @@ export function SearchCard() {
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 font-bold"
             aria-label="Select location"
           >
-            {ALIBAG_AREAS.map(area => (
-              <option key={area} value={area}>{area}</option>
-            ))}
+            <option value="All Locations">All Locations</option>
+            
+            <optgroup label="Alibag Raigad">
+              <option value="Alibag">Alibag</option>
+              <option value="Akshi">Akshi</option>
+              <option value="Awas">Awas</option>
+              <option value="Bodni">Bodni</option>
+              <option value="Chaul">Chaul</option>
+              <option value="Chondhi">Chondhi</option>
+              <option value="Karmale / Hashivare">Karmale / Hashivare</option>
+              <option value="Kashid">Kashid</option>
+              <option value="Kihim">Kihim</option>
+              <option value="Korlai">Korlai</option>
+              <option value="Mandwa">Mandwa</option>
+              <option value="Murud">Murud</option>
+              <option value="Nagaon">Nagaon</option>
+              <option value="Nandgaon">Nandgaon</option>
+              <option value="Rajpuri">Rajpuri</option>
+              <option value="Revdanda">Revdanda</option>
+              <option value="Rewas">Rewas</option>
+              <option value="Salav">Salav</option>
+              <option value="Saral">Saral</option>
+              <option value="Sasawane">Sasawane</option>
+              <option value="Thal">Thal</option>
+              <option value="Varsoli">Varsoli</option>
+              <option value="Zirad">Zirad</option>
+            </optgroup>
+
+            <optgroup label="Shrivardhan Raigad">
+              <option value="Agardanda">Agardanda</option>
+              <option value="Bagmandala">Bagmandala</option>
+              <option value="Bharadkhol">Bharadkhol</option>
+              <option value="Borli Panchatan">Borli Panchatan</option>
+              <option value="Dighi">Dighi</option>
+              <option value="Diveagar">Diveagar</option>
+              <option value="Harihareshwar">Harihareshwar</option>
+              <option value="Sarve">Sarve</option>
+              <option value="Shekhadi">Shekhadi</option>
+              <option value="Shrivardhan">Shrivardhan</option>
+              <option value="Velas">Velas</option>
+            </optgroup>
+
+            <optgroup label="Extended Raigad Locations">
+              <option value="Dadar Sagari">Dadar Sagari</option>
+              <option value="Dighi Sagari">Dighi Sagari</option>
+              <option value="Goregaon">Goregaon</option>
+              <option value="Karjat">Karjat</option>
+              <option value="Khalapur">Khalapur</option>
+              <option value="Khopoli">Khopoli</option>
+              <option value="Kolad">Kolad</option>
+              <option value="Mahad City">Mahad City</option>
+              <option value="Mahad MIDC">Mahad MIDC</option>
+              <option value="Mahad Taluka">Mahad Taluka</option>
+              <option value="Mangaon">Mangaon</option>
+              <option value="Mandwa Sagari">Mandwa Sagari</option>
+              <option value="Matheran">Matheran</option>
+              <option value="Mhasla">Mhasla</option>
+              <option value="Nagothane">Nagothane</option>
+              <option value="Neral">Neral</option>
+              <option value="Pali">Pali</option>
+              <option value="Pen">Pen</option>
+              <option value="Poladpur">Poladpur</option>
+              <option value="Poynad">Poynad</option>
+              <option value="Rasayani">Rasayani</option>
+              <option value="Roha">Roha</option>
+              <option value="Tala">Tala</option>
+              <option value="Vadkhal">Vadkhal</option>
+            </optgroup>
           </select>
           <div className="bg-blue-50 p-2 rounded-full group-hover:bg-blue-100 transition-colors relative z-0 pointer-events-none">
             <MapPin className="w-5 h-5 text-blue-600" />
