@@ -91,22 +91,47 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
   return data.publicUrl
 }
 
-// ─── Helper: Retry wrapper for Gemini API to handle rate limits ────────────────
+// ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const generatePromise = ai.models.generateContent(contents);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
-      );
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-      return response;
-    } catch (error: any) {
-      if (i === maxRetries - 1 || error.message === 'AI_TIMEOUT') throw error;
-      // If it's a rate limit or other temporary error, wait and retry
-      await new Promise(res => setTimeout(res, 1500 * (i + 1))); // Exponential backoff
+  const modelsToTry = [
+    contents.model || MODEL_NAME,
+    'gemini-1.5-flash',
+    'gemini-2.5-pro'
+  ];
+
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        console.log(`[GEMINI] Attempting content generation with model: ${model} (attempt ${i + 1}/${maxRetries})...`)
+        const generatePromise = ai.models.generateContent({
+          ...contents,
+          model: model
+        });
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
+        );
+        const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+        return response;
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`[GEMINI] Model ${model} attempt ${i + 1} failed:`, error.message || error);
+        
+        // If it's a timeout, skip remaining retries for this model and try next model
+        if (error.message === 'AI_TIMEOUT') {
+          break;
+        }
+        
+        // Wait before retrying the same model
+        if (i < maxRetries - 1) {
+          await new Promise(res => setTimeout(res, 1500 * (i + 1)));
+        }
+      }
     }
   }
+
+  throw lastError || new Error('All Gemini models failed');
 }
 
 // ─── Action 1: Upload FRONT ID → run OCR → create guest_identity record ────────
