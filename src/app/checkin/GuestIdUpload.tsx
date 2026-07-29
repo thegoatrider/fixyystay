@@ -241,10 +241,12 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     setFrontStatus('IDLE')
     setFrontReason('')
     setIdentityId(null)
-    setBackPreview(null)
-    setBackStatus('IDLE')
-    setBackReason('')
-    setPendingBackFile(null)
+    if (backStatus !== 'PENDING') {
+      setBackPreview(null)
+      setBackStatus('IDLE')
+      setBackReason('')
+      setPendingBackFile(null)
+    }
     onVerified(null)
   }
 
@@ -397,7 +399,11 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                 )}
                 {backStatus === 'PENDING' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white gap-1">
-                    <span className="text-[9px] font-bold uppercase text-center px-2">Ready. Waiting for front to verify...</span>
+                    <span className="text-[9px] font-bold uppercase text-center px-2">
+                      {frontStatus === 'FAILED' ? 'Front failed. Retry front.' :
+                       frontStatus === 'PROCESSING' ? 'Scanning front side...' :
+                       'Ready. Waiting for front...'}
+                    </span>
                   </div>
                 )}
                 {backStatus === 'DONE' && (

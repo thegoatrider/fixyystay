@@ -92,19 +92,19 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
 }
 
 // ─── Helper: Retry wrapper for Gemini API to handle rate limits ────────────────
-async function generateContentWithRetry(contents: any, maxRetries = 3) {
+async function generateContentWithRetry(contents: any, maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       const generatePromise = ai.models.generateContent(contents);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), 45000)
+        setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
       );
       const response = await Promise.race([generatePromise, timeoutPromise]) as any;
       return response;
     } catch (error: any) {
-      if (i === maxRetries - 1) throw error;
-      // If it's a timeout or rate limit, wait and retry
-      await new Promise(res => setTimeout(res, 2000 * (i + 1))); // Exponential backoff
+      if (i === maxRetries - 1 || error.message === 'AI_TIMEOUT') throw error;
+      // If it's a rate limit or other temporary error, wait and retry
+      await new Promise(res => setTimeout(res, 1500 * (i + 1))); // Exponential backoff
     }
   }
 }
@@ -209,7 +209,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let status = 'MANUAL_REVIEW'
     let finalReason = normalizedResult.reason
 
-    const allCriticalFieldsMissing = !normalizedResult.full_name && !normalizedResult.document_number && !normalizedResult.date_of_birth
+    const allCriticalFieldsMissing = !parseFailed && !normalizedResult.full_name && !normalizedResult.document_number && !normalizedResult.date_of_birth
     if (allCriticalFieldsMissing) {
       return { success: false, error: 'No ID information detected. Please upload a clear picture of a valid ID document.' }
     }
