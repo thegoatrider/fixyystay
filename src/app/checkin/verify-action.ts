@@ -151,27 +151,39 @@ export async function uploadAndVerifyFront(formData: FormData) {
     // 3. Parse JSON
     let result: any = {}
     let parseFailed = false
-    try {
-      if (aiUnavailableError) throw new Error('AI Unavailable')
-      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-    } catch {
+    
+    if (aiUnavailableError) {
+      parseFailed = true
+      result = { 
+        is_government_id: false, 
+        document_type: 'UNKNOWN', 
+        confidence: 0, 
+        suspicious: false, 
+        reason: aiUnavailableError, 
+        raw_ocr_text: aiResponseText 
+      }
+    } else {
       try {
-        const firstBrace = aiResponseText.indexOf('{')
-        const lastBrace = aiResponseText.lastIndexOf('}')
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-        } else {
-          throw new Error('No JSON object found')
-        }
-      } catch (fallbackErr) {
-        parseFailed = true
-        result = { 
-          is_government_id: false, 
-          document_type: 'UNKNOWN', 
-          confidence: 0, 
-          suspicious: false, 
-          reason: aiUnavailableError || 'AI could not format data correctly. Manual review required.', 
-          raw_ocr_text: aiResponseText 
+        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+      } catch {
+        try {
+          const firstBrace = aiResponseText.indexOf('{')
+          const lastBrace = aiResponseText.lastIndexOf('}')
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+          } else {
+            throw new Error('No JSON object found')
+          }
+        } catch (fallbackErr) {
+          parseFailed = true
+          result = { 
+            is_government_id: false, 
+            document_type: 'UNKNOWN', 
+            confidence: 0, 
+            suspicious: false, 
+            reason: 'AI could not format data correctly. Manual review required.', 
+            raw_ocr_text: aiResponseText 
+          }
         }
       }
     }
