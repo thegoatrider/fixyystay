@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Home, CheckCircle, Clock } from 'lucide-react'
+import { Home, CheckCircle, Clock, Building } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import React from 'react'
 
@@ -18,58 +18,80 @@ type Property = {
 
 export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
   return (
-    <div className="bg-white border rounded-xl p-3 sm:p-5 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 group w-full overflow-hidden">
-      <div className="flex items-start gap-3 sm:gap-4 w-full md:w-auto overflow-hidden">
-        <div className="bg-blue-100 text-blue-600 rounded-lg overflow-hidden flex-shrink-0 relative w-14 h-14 sm:w-20 sm:h-20">
-          {prop.image_url ? (
-            <Image 
-              src={prop.image_url} 
-              alt={prop.name} 
-              fill 
-              className="object-cover"
-              sizes="(max-width: 640px) 56px, 80px"
-              priority={false}
-            />
+    <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300 flex flex-col group w-full h-full select-none">
+      {/* Top Image Container */}
+      <div className="bg-blue-50 relative aspect-[16/10] w-full overflow-hidden border-b border-gray-100 flex-shrink-0">
+        {prop.image_url ? (
+          <Image 
+            src={prop.image_url} 
+            alt={prop.name} 
+            fill 
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={false}
+          />
+        ) : (
+          <div className="flex w-full h-full items-center justify-center text-blue-400 bg-gradient-to-br from-blue-50 to-white">
+            <Building className="w-10 h-10 transition-transform duration-300 group-hover:scale-110" />
+          </div>
+        )}
+        
+        {/* Absolute Badges */}
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
+          <span className="text-[10px] font-black text-blue-600 bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg border border-blue-100 shadow-sm uppercase tracking-wider">
+            {prop.uid || 'NO-ID'}
+          </span>
+        </div>
+
+        <div className="absolute top-3 right-3 z-10">
+          {prop.approved ? (
+            <span className="bg-green-500/90 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+              <CheckCircle className="w-3 h-3" /> Approved
+            </span>
           ) : (
-            <div className="flex w-full h-full items-center justify-center">
-              <Home className="w-5 h-5 sm:w-8 sm:h-8" />
+            <span className="bg-orange-500/90 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+              <Clock className="w-3 h-3" /> Pending
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Property Details */}
+      <div className="p-5 flex flex-col justify-between flex-1 gap-4">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition truncate leading-snug">
+            {prop.name}
+          </h2>
+          <p className="text-xs text-gray-400 capitalize font-semibold tracking-wide">
+            {prop.type} • {prop.room_count || 0} Rooms
+          </p>
+          
+          {!prop.approved && (
+            <div className="mt-2 bg-orange-50/50 border border-orange-100/50 p-2.5 rounded-xl text-center">
+              <p className="text-[9px] sm:text-[10px] text-orange-700 font-bold leading-normal">
+                📞 Call <span className="underline">7506288907</span> for admin approval
+              </p>
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <h2 className="text-base sm:text-xl font-bold group-hover:text-blue-600 transition truncate flex-1 min-w-0">{prop.name}</h2>
-            <span className="text-[10px] sm:text-xs font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter shrink-0">
-              {prop.uid || 'NO-ID'}
-            </span>
-          </div>
-          <p className="text-[10px] sm:text-sm text-gray-400 capitalize truncate font-medium w-full min-w-0">{prop.type} • {prop.room_count || 0} Rooms</p>
-          <div className="mt-1 sm:mt-2">
-            <div className="flex items-center gap-1 text-[9px] sm:text-xs font-bold uppercase tracking-wider">
-              {prop.approved ? (
-                <span className="text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded"><CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Approved</span>
-              ) : (
-                <span className="text-orange-500 flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded"><Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Pending</span>
-              )}
-            </div>
-            {!prop.approved && (
-              <p className="text-[9px] sm:text-[10px] text-gray-500 font-bold mt-1.5 animate-pulse">
-                📞 Contact <span className="text-blue-600">7506288907</span> for admin approval
-              </p>
-            )}
-          </div>
+
+        {/* Buttons Grid */}
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-50 flex-shrink-0">
+          <Link href={`/dashboard/owner/property/${prop.id}/edit`} className="flex-1">
+            <Button variant="outline" size="sm" className="w-full h-10 font-bold border-gray-200 hover:bg-gray-50 rounded-xl transition text-xs">
+              Edit Details
+            </Button>
+          </Link>
+          <Link href={`/dashboard/owner/property/${prop.id}`} className="flex-1">
+            <Button variant="default" size="sm" className="w-full h-10 font-bold shadow-md hover:shadow-lg rounded-xl transition text-xs">
+              Manage Stay
+            </Button>
+          </Link>
         </div>
-      </div>
-      <div className="flex w-full md:w-auto items-center gap-2 pt-2 md:pt-0 border-t md:border-0 border-gray-50">
-        <Link href={`/dashboard/owner/property/${prop.id}/edit`} className="flex-1 md:flex-none">
-          <Button variant="outline" size="sm" className="w-full h-9 sm:h-10 font-bold border-gray-200">Edit</Button>
-        </Link>
-        <Link href={`/dashboard/owner/property/${prop.id}`} className="flex-1 md:flex-none">
-          <Button variant="default" size="sm" className="w-full h-9 sm:h-10 font-bold shadow-md">Manage</Button>
-        </Link>
       </div>
     </div>
   )
 })
 
 PropertyCard.displayName = 'PropertyCard'
+
