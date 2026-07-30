@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-2.5-flash'
+const MODEL_NAME = 'gemini-2.0-flash'
 
 const OCR_PROMPT = `
 You are a document OCR extraction engine. Your only job is to extract text and structured data from ID documents. You must NEVER refuse, NEVER ask for re-upload, and NEVER return an error message.

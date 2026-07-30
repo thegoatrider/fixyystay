@@ -451,7 +451,7 @@ export async function approveIdentity(identityId: string, manualName?: string, m
         const mimeType = response.headers.get('content-type') || 'image/jpeg'
 
         const generatePromise = ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.0-flash',
           contents: [
             OCR_SYSTEM_PROMPT,
             { inlineData: { data: base64Data, mimeType } }
