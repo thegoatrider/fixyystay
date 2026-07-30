@@ -108,6 +108,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   if (!uid && city) {
     const prefixes: Record<string, string> = {
       'Alibag': 'ALB',
+      'Raigad': 'ALB',
       'Lonavala': 'LON',
       'Khandala': 'KHA',
       'Matheran': 'MAT',

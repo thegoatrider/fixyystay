@@ -322,10 +322,10 @@ export default function CreatePropertyForm() {
           id="city"
           name="city"
           required
-          defaultValue="Alibag"
+          defaultValue="Raigad"
           className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
         >
-          <option value="Alibag">Alibag</option>
+          <option value="Raigad">Raigad</option>
           <option value="Lonavala" disabled>Lonavala (Coming Soon)</option>
           <option value="Khandala" disabled>Khandala (Coming Soon)</option>
           <option value="Matheran" disabled>Matheran (Coming Soon)</option>
@@ -345,7 +345,7 @@ export default function CreatePropertyForm() {
           className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
         >
           <option value="" disabled>Select area...</option>
-          <optgroup label="── Alibag Raigad ──">
+          <optgroup label="── Raigad ──">
             <option value="Rewas">Rewas</option>
             <option value="Bodni">Bodni</option>
             <option value="Karmale / Hashivare">Karmale / Hashivare</option>

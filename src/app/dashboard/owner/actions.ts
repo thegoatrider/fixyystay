@@ -72,6 +72,7 @@ function mapConfidenceToNumeric(overall: string | null | undefined): number {
 async function generatePropertyUid(supabaseAdmin: any, city: string) {
   const prefixes: Record<string, string> = {
     'Alibag': 'ALB',
+    'Raigad': 'ALB',
     'Lonavala': 'LON',
     'Khandala': 'KHA',
     'Matheran': 'MAT',
@@ -199,7 +200,7 @@ export async function createProperty(formData: FormData) {
   const priceBucket = formData.get('priceBucket') as string
   const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
-  const city = (formData.get('city') as string) || 'Alibag'
+  const city = (formData.get('city') as string) || 'Raigad'
   const helpdeskNumber = formData.get('helpdeskNumber') as string
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20

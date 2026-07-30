@@ -82,7 +82,7 @@ export function SearchCard() {
           >
             <option value="All Locations">All Locations</option>
             
-            <optgroup label="Alibag Raigad">
+            <optgroup label="Raigad">
               <option value="Alibag">Alibag</option>
               <option value="Akshi">Akshi</option>
               <option value="Awas">Awas</option>
