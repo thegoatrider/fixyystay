@@ -160,12 +160,13 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
       <div className="space-y-2">
         <Label htmlFor="name" className="text-gray-700 font-bold">Property Name</Label>
-        <Input name="name" defaultValue={property.name} required className="font-semibold" />
+        <Input id="name" name="name" defaultValue={property.name} required className="font-semibold" />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="type" className="text-gray-700 font-bold">Property Type</Label>
         <select 
+          id="type"
           name="type" 
           value={propertyType}
           onChange={(e) => setPropertyType(e.target.value)}
@@ -180,6 +181,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="description" className="text-gray-700 font-bold">Description</Label>
         <textarea 
+          id="description"
           name="description" 
           defaultValue={property.description || ''} 
           rows={3}
@@ -190,12 +192,12 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="max_guests" className="text-gray-700 font-bold">Standard Guests (Base Capacity)</Label>
-          <Input type="number" name="max_guests" defaultValue={property.max_guests || 2} required min={1} />
+          <Input type="number" id="max_guests" name="max_guests" defaultValue={property.max_guests || 2} required min={1} />
           <p className="text-[10px] text-gray-400 font-medium">Guests included in the base price.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="max_capacity" className="text-gray-700 font-bold">Total Max Capacity</Label>
-          <Input type="number" name="max_capacity" defaultValue={property.max_capacity || 20} required min={1} />
+          <Input type="number" id="max_capacity" name="max_capacity" defaultValue={property.max_capacity || 20} required min={1} />
           <p className="text-[10px] text-gray-400 font-medium">Maximum guests allowed in this property.</p>
         </div>
       </div>
@@ -203,6 +205,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="houseRules" className="text-gray-700 font-bold">House Rules</Label>
         <textarea 
+          id="houseRules"
           name="houseRules" 
           defaultValue={property.house_rules || ''} 
           rows={3}
@@ -218,6 +221,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
             <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
               <input 
                 type="checkbox" 
+                id={`amenity-${amenity.toLowerCase().replace(/\s+/g, '-')}`}
                 name="amenities" 
                 value={amenity}
                 defaultChecked={property.amenities?.includes(amenity)}
@@ -230,6 +234,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         <div className="mt-3">
           <Label htmlFor="otherAmenities" className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1.5 block">Other Amenities (Custom)</Label>
           <Input 
+            id="otherAmenities"
             name="otherAmenities" 
             defaultValue={property.amenities?.filter((a: string) => !ALL_AMENITIES.includes(a)).join(', ')}
             placeholder="e.g. Infinity Pool, Movie Room, Chef on call" 
@@ -242,7 +247,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       {(initialRooms.length === 0 || propertyType === 'villa') && (
         <div className="space-y-2">
           <Label htmlFor="priceBucket" className="text-gray-700 font-bold">Maximum Price Cap / Category</Label>
-          <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" defaultValue={initialRooms[0]?.price_bucket || ""} required>
+          <select id="priceBucket" name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" defaultValue={initialRooms[0]?.price_bucket || ""} required>
             <option value="" disabled>Select max price bucket...</option>
             {propertyType === 'villa' ? (
               <>
@@ -285,6 +290,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="extra_per_pax" className="text-gray-700 font-bold">Extra Cost Per Additional Guest (₹)</Label>
         <Input
+          id="extra_per_pax"
           name="extra_per_pax"
           type="number"
           min="0"
@@ -298,6 +304,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="city" className="text-gray-700 font-bold">City</Label>
         <select
+          id="city"
           name="city"
           required
           defaultValue={property.city || "Alibag"}
@@ -316,6 +323,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="cityArea" className="text-gray-700 font-bold">Area / Sub-locality</Label>
         <select
+          id="cityArea"
           name="cityArea"
           required
           defaultValue={property.city_area || ""}
@@ -392,6 +400,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       <div className="space-y-2">
         <Label htmlFor="pincode" className="text-gray-700 font-bold">Area Pincode</Label>
         <Input
+          id="pincode"
           name="pincode"
           type="text"
           inputMode="numeric"
@@ -407,12 +416,12 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
       <div className="space-y-2">
         <Label htmlFor="helpdeskNumber" className="text-gray-700 font-bold">Helpdesk Number</Label>
-        <Input name="helpdeskNumber" required defaultValue={property.helpdesk_number || ""} placeholder="e.g. +91 98765 43210" />
+        <Input id="helpdeskNumber" name="helpdeskNumber" required defaultValue={property.helpdesk_number || ""} placeholder="e.g. +91 98765 43210" />
       </div>
 
       <div className="space-y-4 bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5">
         <div className="flex flex-col gap-1 mb-2">
-          <Label className="text-gray-900 font-bold text-base">Cover Image (Main Display)</Label>
+          <Label htmlFor="coverImage" className="text-gray-900 font-bold text-base">Cover Image (Main Display)</Label>
           <p className="text-xs text-gray-500">This image represents the property in listings.</p>
         </div>
         
@@ -434,6 +443,8 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
             </div>
           )}
           <Input 
+            id="coverImage"
+            name="coverImage"
             type="file" 
             accept="image/*" 
             onChange={handleCoverChange} 
@@ -450,9 +461,11 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label className="text-gray-700 font-bold">Photos Gallery ({existingPhotos.length + newFiles.length})</Label>
+          <Label htmlFor="galleryImages" className="text-gray-700 font-bold">Photos Gallery ({existingPhotos.length + newFiles.length})</Label>
           <div className="relative">
             <input 
+              id="galleryImages"
+              name="galleryImages"
               type="file" 
               multiple 
               accept="image/*" 
@@ -520,6 +533,8 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
         <div className="flex items-center gap-2 max-w-sm">
           <Input
+            id="roomNumberRegistry"
+            name="roomNumberRegistry"
             placeholder="Room Number (e.g. 101)"
             value={newRoomNumber}
             onChange={e => setNewRoomNumber(e.target.value)}

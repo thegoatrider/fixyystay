@@ -73,19 +73,19 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="space-y-2">
           <Label htmlFor="name">Room Name / Label</Label>
-          <Input name="name" placeholder="e.g. Room 101" required />
+          <Input id="name" name="name" placeholder="e.g. Room 101" required />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="acType">AC / Non AC</Label>
-            <select name="acType" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+            <select id="acType" name="acType" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
               <option value="AC">AC</option>
               <option value="Non AC">Non AC</option>
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <select name="category" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+            <select id="category" name="category" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
               <option value="Standard">Standard</option>
               <option value="Premium">Premium</option>
               <option value="Deluxe">Deluxe</option>
@@ -94,11 +94,11 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="basePrice">Base Price (₹ per night)</Label>
-          <Input type="number" name="basePrice" placeholder="2000" min="0" required />
+          <Input id="basePrice" type="number" name="basePrice" placeholder="2000" min="0" required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="priceBucket">Price Cap / Bucket</Label>
-          <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+          <select id="priceBucket" name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
             <option value="" disabled selected>Select price bucket...</option>
             <option value="₹799">₹799</option>
             <option value="₹999">₹999</option>
@@ -118,6 +118,7 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
         <div className="space-y-2">
           <Label htmlFor="image">Room Photos</Label>
           <Input 
+            id="image"
             type="file" 
             name="image" 
             accept="image/*" 

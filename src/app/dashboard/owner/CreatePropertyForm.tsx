@@ -142,12 +142,13 @@ export default function CreatePropertyForm() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 pb-12 text-left">
       <div className="space-y-2">
         <Label htmlFor="name">Property Name</Label>
-        <Input name="name" required placeholder="e.g. Beachfront Villa" />
+        <Input id="name" name="name" required placeholder="e.g. Beachfront Villa" />
       </div>
       
       <div className="space-y-2">
         <Label htmlFor="type">Property Type</Label>
         <select 
+          id="type"
           name="type" 
           className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" 
           required
@@ -162,6 +163,7 @@ export default function CreatePropertyForm() {
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <textarea 
+          id="description"
           name="description" 
           required 
           rows={3}
@@ -173,6 +175,7 @@ export default function CreatePropertyForm() {
       <div className="space-y-2">
         <Label htmlFor="houseRules">House Rules</Label>
         <textarea 
+          id="houseRules"
           name="houseRules" 
           rows={3}
           placeholder="List any property rules here..."
@@ -191,6 +194,7 @@ export default function CreatePropertyForm() {
             <label key={amenity} className="flex items-center gap-2 cursor-pointer group">
               <input 
                 type="checkbox" 
+                id={`amenity-${amenity.toLowerCase().replace(/\s+/g, '-')}`}
                 name="amenities" 
                 value={amenity}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -202,6 +206,7 @@ export default function CreatePropertyForm() {
         <div className="mt-3">
           <Label htmlFor="otherAmenities" className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1.5 block">Other Amenities (Custom)</Label>
           <Input 
+            id="otherAmenities"
             name="otherAmenities" 
             placeholder="e.g. Infinity Pool, Movie Room, Chef on call" 
             className="bg-gray-50/50 border-dashed focus:border-solid transition-all"
@@ -212,7 +217,7 @@ export default function CreatePropertyForm() {
 
       <div className="space-y-2">
         <Label htmlFor="priceBucket">Maximum Price Cap / Category</Label>
-        <select name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
+        <select id="priceBucket" name="priceBucket" className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm" required>
           <option value="" disabled selected>Select max price bucket...</option>
           {propertyType === 'villa' ? (
             <>
@@ -256,6 +261,7 @@ export default function CreatePropertyForm() {
         <div className="space-y-2">
           <Label htmlFor="max_guests">Base Guests (included in price)</Label>
           <select
+            id="max_guests"
             name="max_guests"
             defaultValue="2"
             className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm"
@@ -271,6 +277,7 @@ export default function CreatePropertyForm() {
         <div className="space-y-2">
           <Label htmlFor="max_capacity">Maximum Capacity</Label>
           <Input
+            id="max_capacity"
             name="max_capacity"
             type="number"
             min="1"
@@ -285,6 +292,7 @@ export default function CreatePropertyForm() {
         <div className="space-y-2">
           <Label htmlFor="extra_per_pax">Extra Cost Per Additional Guest (₹)</Label>
           <Input
+            id="extra_per_pax"
             name="extra_per_pax"
             type="number"
             min="0"
@@ -299,6 +307,7 @@ export default function CreatePropertyForm() {
       <div className="space-y-2">
         <Label htmlFor="city">City</Label>
         <select
+          id="city"
           name="city"
           required
           defaultValue="Alibag"
@@ -317,6 +326,7 @@ export default function CreatePropertyForm() {
       <div className="space-y-2">
         <Label htmlFor="cityArea">Area / Sub-locality</Label>
         <select
+          id="cityArea"
           name="cityArea"
           required
           defaultValue=""
@@ -393,6 +403,7 @@ export default function CreatePropertyForm() {
       <div className="space-y-2">
         <Label htmlFor="pincode">Area Pincode</Label>
         <Input
+          id="pincode"
           name="pincode"
           type="text"
           inputMode="numeric"
@@ -409,13 +420,14 @@ export default function CreatePropertyForm() {
 
       <div className="space-y-2">
         <Label htmlFor="helpdeskNumber">Helpdesk Number</Label>
-        <Input name="helpdeskNumber" required placeholder="e.g. +91 98765 43210" />
+        <Input id="helpdeskNumber" name="helpdeskNumber" required placeholder="e.g. +91 98765 43210" />
       </div>
 
       <div className="space-y-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
         <Label htmlFor="coverImageInput" className="font-bold text-gray-900">Cover Image (Main Display)</Label>
         <p className="text-[11px] text-gray-500 mb-2">This will be the primary image shown to guests.</p>
         <Input 
+          id="coverImageInput"
           name="coverImageInput" 
           type="file" 
           accept="image/*" 
@@ -437,6 +449,7 @@ export default function CreatePropertyForm() {
           <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase tracking-widest">Mandatory</span>
         </Label>
         <Input 
+          id="image"
           name="image" 
           type="file" 
           accept="image/*" 
