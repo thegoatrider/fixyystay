@@ -60,11 +60,14 @@ export async function POST(req: Request) {
       }
       
       // Verify that the property belongs to this organization
-      const { data: prop, error: propErr } = await supabaseAdmin
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyId || '')
+      const propQuery = supabaseAdmin
         .from('properties')
         .select('organization_id')
-        .eq('id', propertyId)
-        .single()
+      const { data: prop, error: propErr } = await (isUUID 
+        ? propQuery.eq('id', propertyId) 
+        : propQuery.eq('uid', propertyId)
+      ).single()
         
       if (propErr || !prop || prop.organization_id !== org.id) {
         return NextResponse.json(

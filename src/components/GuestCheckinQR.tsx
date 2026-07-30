@@ -31,7 +31,7 @@ export default function GuestCheckinQR({ propertyId, propertyName }: GuestChecki
   const [downloadImageUrl, setDownloadImageUrl] = useState('')
 
   useEffect(() => {
-    setOrigin(window.location.origin)
+    setOrigin(process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
   }, [])
   
   // URL to encode

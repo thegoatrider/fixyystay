@@ -45,7 +45,7 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
     }
 
     const propertyName = properties?.find(p => p.id === selectedPropertyId)?.name || 'Property'
-    const baseUrl = window.location.origin
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
     const checkinUrl = `${baseUrl}/checkin?p=${selectedPropertyId}&pn=${encodeURIComponent(phone)}&gn=${encodeURIComponent(guestName)}`
     const message = `Hello ${guestName}! Please complete your check-in for ${propertyName} at FixyStay by filling out this ID form:\n\n${checkinUrl}`
     
