@@ -5,6 +5,20 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 
+export async function checkEmailAvailability(email: string) {
+  const supabaseAdmin = createAdminClient()
+  const { data } = await supabaseAdmin
+    .from('owners')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .maybeSingle()
+
+  if (data) {
+    return { error: 'Email already registered. If this is you, please enter your correct password to continue onboarding.' }
+  }
+  return { success: true }
+}
+
 export async function submitOnboarding(formData: FormData) {
   const supabase = await createClient()
 

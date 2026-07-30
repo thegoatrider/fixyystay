@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { submitOnboarding } from './actions'
+import { submitOnboarding, checkEmailAvailability } from './actions'
 import { createOwnerOrder, verifyAndUpgrade } from '../pricing/business/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,9 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState('')
+  const [userName, setUserName] = useState('')
+  const [userPassword, setUserPassword] = useState('')
+  const [propertyName, setPropertyName] = useState('')
 
   const handleAccountCreation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -36,16 +39,25 @@ export default function OnboardingPage() {
     
     const formData = new FormData(e.currentTarget)
     const email = formData.get('email') as string
-    const result = await submitOnboarding(formData)
+    const name = formData.get('name') as string
+    const password = formData.get('password') as string
+    const propName = formData.get('propertyName') as string
 
-    if (result.error) {
-      setError(result.error)
+    // 1. Check if email is already registered before proceeding
+    const checkRes = await checkEmailAvailability(email)
+    if (checkRes.error) {
+      setError(checkRes.error)
       setLoading(null)
-    } else if (result.success) {
-      setUserEmail(email)
-      setStep(2)
-      setLoading(null)
+      return
     }
+
+    // 2. Save credentials in local state and transition to Step 2
+    setUserEmail(email)
+    setUserName(name)
+    setUserPassword(password)
+    setPropertyName(propName)
+    setStep(2)
+    setLoading(null)
   }
 
   const handlePayment = async (planName: string, amount: number) => {
@@ -66,11 +78,16 @@ export default function OnboardingPage() {
         theme: { color: "#4F46E5" },
         handler: async function (response: any) {
           setLoading('Processing...')
-          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id)
+          // Call verifyAndUpgrade passing registration details as signupData
+          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id, {
+            name: userName,
+            password: userPassword,
+            propertyName: propertyName || undefined
+          })
           if (verifyRes.success) {
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           } else {
-            alert(`Payment Successful, but account upgrade failed: ${verifyRes.error}. Please contact support.`)
+            alert(`Payment Successful, but account setup failed: ${verifyRes.error}. Please contact support.`)
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           }
         },

@@ -19,11 +19,12 @@ import OrganizationsManagement from './OrganizationsManagement'
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  // 1. Pending Approvals
+  // 1. Pending Approvals (excluding onboarding placeholder properties that are not fully edited)
   const { data: pendingProperties } = await supabase
     .from('properties')
     .select('*, owners(name), rooms(price_bucket)')
     .eq('approved', false)
+    .neq('city', 'Pending')
     .order('created_at', { ascending: false })
 
   // 2. All Approved Properties
