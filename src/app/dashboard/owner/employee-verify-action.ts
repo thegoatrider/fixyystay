@@ -99,8 +99,15 @@ export async function verifyEmployeeFrontId(formData: FormData) {
     try {
       const res = await ai.models.generateContent({
         model: MODEL_NAME,
-        contents: [SYSTEM_PROMPT, { inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }],
-        config: { temperature: 0.0, responseMimeType: 'application/json' }
+        contents: [{
+          role: 'user',
+          parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
+        }],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          temperature: 0.0,
+          responseMimeType: 'application/json'
+        }
       })
       aiText = res.text || '{}'
     } catch (err) {
@@ -179,8 +186,15 @@ export async function uploadEmployeeBackId(formData: FormData) {
     try {
       const res = await ai.models.generateContent({
         model: MODEL_NAME,
-        contents: [BACK_SYSTEM_PROMPT, { inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }],
-        config: { temperature: 0.0, responseMimeType: 'application/json' }
+        contents: [{
+          role: 'user',
+          parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
+        }],
+        config: {
+          systemInstruction: BACK_SYSTEM_PROMPT,
+          temperature: 0.0,
+          responseMimeType: 'application/json'
+        }
       })
       aiText = res.text || '{}'
     } catch (err) {
