@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { format, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, User, Phone, Users, FileText, ExternalLink, X, AlertCircle, Calendar as CalIcon, Search, Download, Printer, Share2, Lock, MapPin, CheckCircle, Globe } from 'lucide-react'
+import { format } from 'date-fns'
+import { ChevronLeft, Users, FileText, ExternalLink, X, AlertCircle, Search, Download, Printer, Share2, Lock, CheckCircle, Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -28,17 +28,7 @@ type GuestCheckin = {
   form_c_details?: any | null
 }
 
-const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-function getDaysInMonth(year: number, month: number) {
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const startPad = firstDay.getDay()
-  const days: (Date | null)[] = []
-  for (let i = 0; i < startPad; i++) days.push(null)
-  for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d))
-  return days
-}
 
 export default React.memo(function GuestList({ 
   checkins,
@@ -51,12 +41,7 @@ export default React.memo(function GuestList({
   properties?: any[];
   propertyRooms?: any[];
 }) {
-  const today = new Date()
-  const [viewYear, setViewYear] = useState(today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [searchTerm, setSearchState] = useState('')
-  const [showRecent, setShowRecent] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
   const [approveModalId, setApproveModalId] = useState<string | null>(null)
   const [manualName, setManualName] = useState('')
@@ -249,77 +234,6 @@ export default React.memo(function GuestList({
     }
   }
 
-  // Map: 'YYYY-MM-DD' => GuestCheckin[]
-  const checkinsByDate = useMemo(() => {
-    const map: Record<string, GuestCheckin[]> = {}
-    checkins.forEach(c => {
-      if (c.checkin_date) {
-        const key = c.checkin_date.slice(0, 10)
-        if (!map[key]) map[key] = []
-        map[key].push(c)
-      }
-    })
-    return map
-  }, [checkins])
-
-  // Recent Activity memo
-  const recentCheckins = useMemo(() => {
-    return [...checkins].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 30)
-  }, [checkins])
-
-  // When searching, show ALL matching guests regardless of date
-  const allSearchResults = useMemo(() => {
-    if (!searchTerm) return []
-    const q = searchTerm.toLowerCase()
-    const cleanQ = q.replace(/[\s+]+/g, '')
-    return checkins.filter(c => {
-      let matchesIdentity = false;
-      if (c.identities && Array.isArray(c.identities)) {
-        matchesIdentity = c.identities.some((doc: any) => 
-          (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-          (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-          (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-          (doc.address && String(doc.address).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-          (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
-        )
-      } else if (c.id_documents && Array.isArray(c.id_documents)) {
-        matchesIdentity = c.id_documents.some((doc: any) => 
-          (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-          (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
-        )
-      }
-
-      const cleanPhone = (c.guest_phone || '').replace(/[\s+]+/g, '')
-      const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/[\s+]+/g, '')
-
-      return (c.guest_name && c.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-             cleanPhone.includes(cleanQ) ||
-             cleanVehicle.includes(cleanQ) ||
-             (c.properties?.name && c.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-             (c.uid && c.uid.toLowerCase().includes(q)) ||
-             matchesIdentity;
-    })
-  }, [checkins, searchTerm])
-
-  const isGlobalSearch = searchTerm.length > 0
-
-  // Guests for the selected date (used when NOT in global search mode)
-  const selectedGuests = selectedDate
-    ? (checkinsByDate[format(selectedDate, 'yyyy-MM-dd')] || [])
-    : []
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
-    else setViewMonth(m => m - 1)
-    setSelectedDate(null); setSelectedGuest(null)
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
-    else setViewMonth(m => m + 1)
-    setSelectedDate(null); setSelectedGuest(null)
-  }
-  const calendarDays = getDaysInMonth(viewYear, viewMonth)
-  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
 
   // 1. Process and filter guests dynamically
   const processedGuests = useMemo(() => {
@@ -395,6 +309,7 @@ export default React.memo(function GuestList({
   
   const totalPages = Math.ceil(processedGuests.length / itemsPerPage) || 1
 
+
   return (
     <div className="flex flex-col gap-6 select-none">
       {/* Header */}
@@ -405,159 +320,8 @@ export default React.memo(function GuestList({
         </div>
       </div>
 
-      {/* ── View 1: Mobile View (< 768px) ── */}
-      <div className="md:hidden flex flex-col gap-5 w-full">
-        {/* Toggle View & Search */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-          <div className="flex p-1 bg-gray-100 rounded-xl w-full sm:w-auto">
-            <button 
-              onClick={() => { setShowRecent(false); setSearchState(''); }}
-              className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!showRecent ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Calendar View
-            </button>
-            <button 
-              onClick={() => { setShowRecent(true); setSearchState(''); }}
-              className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${showRecent ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Recent Activity
-            </button>
-          </div>
-
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search guests..."
-              className="pl-9 h-10 text-xs rounded-xl"
-              value={searchTerm}
-              onChange={e => { setSearchState(e.target.value); if (e.target.value) setShowRecent(false); }}
-            />
-          </div>
-        </div>
-
-        {/* 3-panel style mobile grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full relative">
-          {/* Blur Overlay for Free Tier */}
-          {isFreeTier && <FreeTierOverlay />}
-
-          {/* Calendar/Recent Activity Panel */}
-          {!showRecent ? (
-            <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
-                <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-                  <ChevronLeft className="w-5 h-5 text-gray-600" />
-                </button>
-                <span className="font-bold text-gray-900 text-xs">{monthLabel}</span>
-                <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-                  <ChevronRight className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-
-              <div className="p-4">
-                <div className="grid grid-cols-7 mb-2">
-                  {DAYS_OF_WEEK.map((d, i) => (
-                    <div key={i} className="text-center text-[10px] font-black text-gray-400 uppercase py-1">{d}</div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-y-1">
-                  {calendarDays.map((day, i) => {
-                    if (!day) return <div key={`pad-${i}`} />
-                    const key = format(day, 'yyyy-MM-dd')
-                    const dayGuests = checkinsByDate[key] || []
-                    const hasGuests = dayGuests.length > 0
-                    const isToday = isSameDay(day, today)
-                    const isSelected = selectedDate ? isSameDay(day, selectedDate) : false
-
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          if (!hasGuests) return
-                          setSelectedDate(isSelected ? null : day)
-                          setSelectedGuest(null)
-                        }}
-                        className={[
-                          'relative flex flex-col items-center justify-start pt-1.5 pb-1 rounded-xl h-14 transition-all duration-150',
-                          hasGuests ? 'cursor-pointer hover:bg-indigo-50 animate-in zoom-in-95 duration-100' : 'cursor-default',
-                          isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300' : '',
-                          isToday && !isSelected ? 'bg-indigo-50 font-bold text-indigo-700' : '',
-                          !isSelected && !isToday ? 'text-gray-700' : '',
-                        ].join(' ')}
-                      >
-                        <span className="text-xs font-bold leading-none">{day.getDate()}</span>
-                        {hasGuests && (
-                          <div className="flex items-center gap-0.5 mt-1.5">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
-                              {dayGuests.length}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
-                <span className="font-bold text-gray-900 text-xs uppercase tracking-wider">Recent Activity</span>
-              </div>
-              <div className="flex flex-col divide-y max-h-[400px] overflow-y-auto">
-                {recentCheckins.map(guest => (
-                  <button
-                    key={`rec-${guest.id}`}
-                    onClick={() => {
-                      setSelectedGuest(guest)
-                    }}
-                    className="w-full text-left px-5 py-4 transition hover:bg-indigo-50/20"
-                  >
-                    <p className="font-bold text-gray-900 text-xs">{guest.guest_name}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{guest.properties?.name}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[9px] font-mono text-indigo-500 uppercase">{guest.uid || 'GUEST'}</span>
-                      <span className="text-[9px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full">{guest.num_people} PAX</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Guest selector by Date (only in Calendar Mode) */}
-          {!showRecent && (
-            <div>
-              {selectedDate ? (
-                <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 bg-gray-50 border-b flex justify-between items-center">
-                    <span className="text-xs font-bold text-gray-900">{format(selectedDate, 'MMM d, yyyy')}</span>
-                    <button onClick={() => setSelectedDate(null)} className="p-1 rounded-lg hover:bg-gray-200">
-                      <X className="w-4 h-4 text-gray-400" />
-                    </button>
-                  </div>
-                  <div className="flex flex-col divide-y max-h-[350px] overflow-y-auto">
-                    {selectedGuests.map(g => (
-                      <button key={g.id} onClick={() => setSelectedGuest(g)} className="w-full text-left p-4 hover:bg-indigo-50/20">
-                        <p className="font-bold text-gray-900 text-xs">{g.guest_name}</p>
-                        <p className="text-[10px] text-gray-400">{g.guest_phone}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-gray-50 border border-dashed border-gray-250 rounded-2xl p-8 text-center text-gray-400 flex flex-col items-center gap-2 h-full justify-center">
-                  <CalIcon className="w-8 h-8 opacity-25" />
-                  <p className="text-xs font-semibold">Select calendar date to list guest check-ins</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── View 2: Tablet & Desktop View ($\geq$ 768px) ── */}
-      <div className="hidden md:flex flex-col gap-4 w-full relative">
+      {/* Unified Guest List — all screen sizes */}
+      <div className="flex flex-col gap-4 w-full relative">
         {/* Blur Overlay for Free Tier */}
         {isFreeTier && <FreeTierOverlay />}
 
@@ -727,7 +491,7 @@ export default React.memo(function GuestList({
             </div>
           )}
         </div>
-      </div>
+
 
       {/* ── Live Room Visualizer Section ── */}
       <div className="bg-white border border-gray-150 rounded-2xl p-6 shadow-sm flex flex-col gap-6 mt-6">
