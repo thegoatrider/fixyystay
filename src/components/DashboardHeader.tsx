@@ -16,11 +16,11 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
     <header className="bg-white border-b sticky top-0 z-50 w-full shadow-sm pt-[env(safe-area-inset-top)] pt-10 md:pt-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-[3.5rem] sm:min-h-[4rem] flex items-center justify-between gap-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+        <a href="https://www.fixystays.com" className="flex items-center gap-2 flex-shrink-0">
           <span className="font-black text-lg sm:text-xl text-blue-600 tracking-tight whitespace-nowrap">
             Fixy Stays
           </span>
-        </Link>
+        </a>
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">

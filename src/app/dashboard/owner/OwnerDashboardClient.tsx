@@ -100,7 +100,7 @@ export default function OwnerDashboardClient({
           <h1 className="text-3xl font-black tracking-tight text-gray-900 drop-shadow-sm flex items-center gap-2">
             Welcome, {(data as any)?.owner?.name || email?.split('@')[0] || 'Partner'}!
           </h1>
-          <p className="text-gray-500 font-medium">Manage your properties, guests, and leads in one workspace</p>
+          <p className="text-gray-500 font-medium">Manage your properties, guests, and leads in one dashboard</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {isFreeTier && (
@@ -144,6 +144,40 @@ export default function OwnerDashboardClient({
           const occupancyRate = totalRoomsCount > 0 ? Math.round((occupiedRoomsCount / totalRoomsCount) * 100) : 0
           const totalBookings = checkins?.length || 0
           const pendingLeadsCount = leads?.filter((l: any) => l.status === 'Enquired' || l.status === 'Shortlisted').length || 0
+
+          // Calculate real monthly bookings dynamically from checkins
+          const monthlyBookings = useMemo(() => {
+            const months = []
+            const today = new Date()
+            
+            // Generate last 6 months (including current month)
+            for (let i = 5; i >= 0; i--) {
+              const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+              const monthLabel = d.toLocaleString('default', { month: 'short' })
+              const yearMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` // e.g. "2026-07"
+              months.push({
+                label: monthLabel,
+                key: yearMonthKey,
+                value: 0
+              })
+            }
+            
+            // Aggregate checkins
+            if (checkins && Array.isArray(checkins)) {
+              checkins.forEach((c: any) => {
+                if (c.checkin_date) {
+                  // checkin_date is usually "YYYY-MM-DD"
+                  const key = c.checkin_date.substring(0, 7) // "YYYY-MM"
+                  const match = months.find(m => m.key === key)
+                  if (match) {
+                    match.value += 1
+                  }
+                }
+              })
+            }
+            
+            return months
+          }, [checkins])
 
           return (
             <div className="flex flex-col gap-6 items-start w-full">
@@ -211,27 +245,23 @@ export default function OwnerDashboardClient({
                   </div>
                   
                   <div className="flex items-end justify-between h-40 pt-6 pb-2 px-4 gap-2">
-                    {[
-                      { month: 'Feb', value: 4 },
-                      { month: 'Mar', value: 8 },
-                      { month: 'Apr', value: 15 },
-                      { month: 'May', value: 12 },
-                      { month: 'Jun', value: 20 },
-                      { month: 'Jul', value: totalBookings > 0 ? totalBookings : 24 }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex flex-col items-center gap-1.5 group w-full">
-                        <div className="relative w-full flex justify-center">
-                          <div className="absolute bottom-full mb-1.5 bg-gray-900 text-white text-[9px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition duration-150 pointer-events-none shadow-md z-10 whitespace-nowrap">
-                            {item.value} bookings
+                    {monthlyBookings.map((item, idx) => {
+                      const maxValue = Math.max(...monthlyBookings.map(m => m.value), 1)
+                      return (
+                        <div key={idx} className="flex flex-col items-center gap-1.5 group w-full">
+                          <div className="relative w-full flex justify-center">
+                            <div className="absolute bottom-full mb-1.5 bg-gray-900 text-white text-[9px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition duration-150 pointer-events-none shadow-md z-10 whitespace-nowrap">
+                              {item.value} bookings
+                            </div>
+                            <div 
+                              style={{ height: `${Math.max(12, (item.value / maxValue) * 120)}px` }}
+                              className="w-7 sm:w-10 bg-blue-600 rounded-t-lg group-hover:bg-blue-500 transition duration-200 shadow-sm"
+                            />
                           </div>
-                          <div 
-                            style={{ height: `${Math.max(12, (item.value / 28) * 120)}px` }}
-                            className="w-7 sm:w-10 bg-blue-600 rounded-t-lg group-hover:bg-blue-500 transition duration-200 shadow-sm"
-                          />
+                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider mt-1">{item.label}</span>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider mt-1">{item.month}</span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 

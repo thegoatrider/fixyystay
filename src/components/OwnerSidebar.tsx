@@ -33,7 +33,6 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
   const router = useRouter()
   const supabase = createClient()
   const [userName, setUserName] = useState<string>('Owner')
-  const [workspaceOpen, setWorkspaceOpen] = useState(false)
 
   useEffect(() => {
     async function getUserName() {
@@ -103,54 +102,14 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
   return (
     <aside className="hidden md:flex flex-col flex-shrink-0 bg-white border-r border-gray-150 h-screen sticky top-0 z-40 transition-all duration-300 md:w-20 lg:w-64 shadow-sm select-none">
       {/* Top: Logo section */}
-      <div className="p-4 border-b border-gray-100 flex items-center justify-center lg:justify-start gap-3 h-16">
+      <a href="https://www.fixystays.com" className="p-4 border-b border-gray-100 flex items-center justify-center lg:justify-start gap-3 h-16 hover:opacity-85 transition-opacity">
         <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-200">
           FS
         </div>
         <span className="hidden lg:inline-block font-black text-lg text-blue-600 tracking-tight leading-none italic uppercase">
           Fixy Stays
         </span>
-      </div>
-
-      {/* Workspace Switcher (Desktop Only) */}
-      <div className="hidden lg:block p-3">
-        <div className="relative">
-          <button 
-            onClick={() => setWorkspaceOpen(!workspaceOpen)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-200/50 hover:bg-gray-100/50 hover:border-gray-300 transition duration-150 text-left cursor-pointer group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs flex-shrink-0 border border-blue-100">
-                A1
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-black text-gray-900 leading-tight">Alibag Region</p>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-none mt-0.5">Workspace</p>
-              </div>
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition" />
-          </button>
-          
-          {workspaceOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-1 animate-in fade-in slide-in-from-top-2 duration-150">
-              <p className="text-[9px] font-black uppercase text-gray-400 px-3 py-1.5 tracking-widest">Switch Workspace</p>
-              <button 
-                onClick={() => setWorkspaceOpen(false)}
-                className="w-full text-left px-3 py-2 rounded-lg bg-blue-50/50 text-blue-600 text-xs font-bold flex items-center justify-between"
-              >
-                <span>Alibag Region</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-              <button 
-                onClick={() => { alert('Add new regions in settings'); setWorkspaceOpen(false); }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 text-gray-500 hover:text-gray-900 text-xs font-bold transition mt-0.5"
-              >
-                + Create Workspace
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      </a>
 
       {/* Navigation Links */}
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-16rem)]">
