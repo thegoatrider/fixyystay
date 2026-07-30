@@ -339,16 +339,20 @@ export default function WebsiteQR() {
                 console.warn("Share failed, falling back to download", shareErr)
               }
 
-              // 2. Fallback: Trigger API-based native download & display modal
-              const url = canvas.toDataURL('image/jpeg', 0.9)
-              setDownloadImageUrl(url)
-              setShowDownloadModal(true)
-
+              // 2. Client-side download using local canvas data URL
               try {
-                const downloadUrl = `/api/qr-download?url=${encodeURIComponent(websiteUrl)}&filename=${filename}`
-                window.location.href = downloadUrl
+                const url = canvas.toDataURL('image/jpeg', 0.9)
+                setDownloadImageUrl(url)
+                setShowDownloadModal(true)
+
+                const a = document.createElement('a')
+                a.href = url
+                a.download = filename
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
               } catch (downloadErr) {
-                console.error("Direct download failed", downloadErr)
+                console.error("Client-side download failed", downloadErr)
               }
             }
           }}
@@ -394,12 +398,17 @@ export default function WebsiteQR() {
                       console.warn("Share failed in modal", shareErr)
                     }
 
-                    // Try direct download fallback via API endpoint (prevents locked screens in mobile webviews)
+                    // Client-side download fallback
                     try {
-                      const downloadUrl = `/api/qr-download?url=${encodeURIComponent(websiteUrl)}&filename=${filename}`
-                      window.location.href = downloadUrl
+                      const url = canvas.toDataURL('image/jpeg', 0.9)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = filename
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
                     } catch (downloadErr) {
-                      console.error("Direct download failed in modal", downloadErr)
+                      console.error("Client-side download failed in modal", downloadErr)
                     }
                   }
                 }}
