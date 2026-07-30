@@ -43,7 +43,7 @@ function SuccessContent() {
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
         <Button asChild className="w-full sm:w-auto h-12 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2 transition-all">
-          <a href={apkDownloadLink} download="fixystays.apk">
+          <a href={apkDownloadLink} download="fixystays.apk" target="_blank" rel="noopener noreferrer">
             <Download className="w-5 h-5" />
             Download APK
           </a>
