@@ -3,10 +3,23 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 // Use a static client for SEO fetchers since they run at build time (generateStaticParams)
 // where cookies() are not available.
 const createStaticClient = () => {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) {
+    console.warn("WARNING: Supabase URL or Anon Key is missing. Returning a mock Supabase client.")
+    return {
+      from: () => ({
+        select: () => ({
+          limit: () => Promise.resolve({ data: [] }),
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null }),
+            limit: () => Promise.resolve({ data: [] }),
+          }),
+        }),
+      }),
+    } as any
+  }
+  return createSupabaseClient(url, key)
 }
 
 // Fetch top locations for generateStaticParams

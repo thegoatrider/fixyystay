@@ -5,7 +5,7 @@ import { format, isSameDay } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User, Download, CheckSquare, Square, Lock } from 'lucide-react'
+import { MessageCircle, Plus, Phone, Trash2, ChevronLeft, ChevronRight, AlertCircle, X, Flame, Snowflake, Zap, CheckCircle, User, Download, CheckSquare, Square, Lock, Search } from 'lucide-react'
 import Link from 'next/link'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -76,6 +76,28 @@ export default React.memo(function LeadsSection({
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
   const [typedMessage, setTypedMessage] = useState('')
   const [notesState, setNotesState] = useState<Record<string, string>>({})
+  
+  const filteredLeads = useMemo(() => {
+    return localLeads.filter(lead => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        const guestNameMatch = lead.guest_name?.toLowerCase().includes(q)
+        const propertyNameMatch = lead.properties?.name?.toLowerCase().includes(q)
+        const phoneMatch = lead.phone_number?.includes(q)
+        if (!guestNameMatch && !propertyNameMatch && !phoneMatch) return false
+      }
+      if (filterStatus !== 'all' && lead.status !== filterStatus) return false
+      if (filterMarking !== 'all' && lead.marking !== filterMarking) return false
+      return true
+    })
+  }, [localLeads, searchQuery, filterStatus, filterMarking])
+
+  const activeLead = useMemo(() => {
+    if (selectedLeadId) {
+      return localLeads.find(l => l.id === selectedLeadId) || null
+    }
+    return filteredLeads[0] || null
+  }, [localLeads, selectedLeadId, filteredLeads])
 
   // Load notes on mount and lead changes
   useEffect(() => {

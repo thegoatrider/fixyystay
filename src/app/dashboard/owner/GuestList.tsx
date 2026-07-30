@@ -25,6 +25,7 @@ type GuestCheckin = {
   properties: { name: string }
   property_id: string
   room_number?: string | null
+  form_c_details?: any | null
 }
 
 const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -316,6 +317,7 @@ export default React.memo(function GuestList({
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
     else setViewMonth(m => m + 1)
     setSelectedDate(null); setSelectedGuest(null)
+  }
   const calendarDays = getDaysInMonth(viewYear, viewMonth)
   const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
 

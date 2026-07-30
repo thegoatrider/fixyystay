@@ -98,7 +98,7 @@ export default function OwnerDashboardClient({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-gray-900 drop-shadow-sm flex items-center gap-2">
-            Welcome, {data?.owner?.name || email?.split('@')[0] || 'Partner'}!
+            Welcome, {(data as any)?.owner?.name || email?.split('@')[0] || 'Partner'}!
           </h1>
           <p className="text-gray-500 font-medium">Manage your properties, guests, and leads in one workspace</p>
         </div>
@@ -432,7 +432,10 @@ function TabLink({ href, active, icon, label, count }: { href: string, active: b
         {count !== undefined && count > 0 && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-black">{count}</span>}
       </span>
     </Link>
- function NavIconButton({ icon, label, active, onClick, badge }: { 
+  )
+}
+
+function NavIconButton({ icon, label, active, onClick, badge }: { 
   icon: React.ReactNode, 
   label: string, 
   active?: boolean, 
