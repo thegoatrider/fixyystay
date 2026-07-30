@@ -92,6 +92,40 @@ export default function OwnerDashboardClient({
   const { properties, leads, checkins, influencer_requests, wallet_transactions, payout_requests, property_rooms } = data as any
   const pendingInfluencerRequestCount = influencer_requests?.filter((r: any) => r.status === 'pending').length || 0
 
+  // Calculate real monthly bookings dynamically from checkins at the top level
+  const monthlyBookings = useMemo(() => {
+    const months = []
+    const today = new Date()
+    
+    // Generate last 6 months (including current month)
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      const monthLabel = d.toLocaleString('default', { month: 'short' })
+      const yearMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` // e.g. "2026-07"
+      months.push({
+        label: monthLabel,
+        key: yearMonthKey,
+        value: 0
+      })
+    }
+    
+    // Aggregate checkins
+    if (checkins && Array.isArray(checkins)) {
+      checkins.forEach((c: any) => {
+        if (c.checkin_date) {
+          // checkin_date is usually "YYYY-MM-DD"
+          const key = c.checkin_date.substring(0, 7) // "YYYY-MM"
+          const match = months.find(m => m.key === key)
+          if (match) {
+            match.value += 1
+          }
+        }
+      })
+    }
+    
+    return months
+  }, [checkins])
+
   return (
     <div className="flex flex-col gap-8 pb-32 w-full min-w-0 overflow-x-hidden md:overflow-visible">
       {/* Welcome Header Section */}
@@ -145,39 +179,7 @@ export default function OwnerDashboardClient({
           const totalBookings = checkins?.length || 0
           const pendingLeadsCount = leads?.filter((l: any) => l.status === 'Enquired' || l.status === 'Shortlisted').length || 0
 
-          // Calculate real monthly bookings dynamically from checkins
-          const monthlyBookings = useMemo(() => {
-            const months = []
-            const today = new Date()
-            
-            // Generate last 6 months (including current month)
-            for (let i = 5; i >= 0; i--) {
-              const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-              const monthLabel = d.toLocaleString('default', { month: 'short' })
-              const yearMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` // e.g. "2026-07"
-              months.push({
-                label: monthLabel,
-                key: yearMonthKey,
-                value: 0
-              })
-            }
-            
-            // Aggregate checkins
-            if (checkins && Array.isArray(checkins)) {
-              checkins.forEach((c: any) => {
-                if (c.checkin_date) {
-                  // checkin_date is usually "YYYY-MM-DD"
-                  const key = c.checkin_date.substring(0, 7) // "YYYY-MM"
-                  const match = months.find(m => m.key === key)
-                  if (match) {
-                    match.value += 1
-                  }
-                }
-              })
-            }
-            
-            return months
-          }, [checkins])
+
 
           return (
             <div className="flex flex-col gap-6 items-start w-full">
