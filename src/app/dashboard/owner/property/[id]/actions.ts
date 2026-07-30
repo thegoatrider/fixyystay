@@ -22,9 +22,8 @@ export async function addRoom(propertyId: string, formData: FormData) {
 
     // Handle Multiple Image Uploads
     const imageFiles = formData.getAll('image') as File[]
-    const image_urls: string[] = []
-
-    for (const imageFile of imageFiles) {
+    
+    const uploadPromises = imageFiles.map(async (imageFile) => {
       if (imageFile && imageFile.size > 0) {
         const fileExt = imageFile.name.split('.').pop()
         const fileName = `room-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
@@ -38,12 +37,17 @@ export async function addRoom(propertyId: string, formData: FormData) {
             .from('property_images')
             .getPublicUrl(fileName)
 
-          image_urls.push(publicUrlData.publicUrl)
+          return publicUrlData.publicUrl
         } else {
           console.error('Failed to upload room image:', uploadError)
+          return null
         }
       }
-    }
+      return null
+    })
+
+    const uploadedUrls = await Promise.all(uploadPromises)
+    const image_urls = uploadedUrls.filter((url): url is string => url !== null)
 
     const { error } = await supabase.from('rooms').insert([{
       property_id: propertyId,

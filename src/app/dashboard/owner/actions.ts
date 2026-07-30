@@ -233,7 +233,7 @@ export async function createProperty(formData: FormData) {
   const imageFiles = formData.getAll('image') as File[]
   const image_urls: string[] = []
   
-  for (const imageFile of imageFiles) {
+  const uploadPromises = imageFiles.map(async (imageFile) => {
     if (imageFile && imageFile.size > 0) {
       const fileExt = imageFile.name.split('.').pop()
       const fileName = `prop-${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
@@ -244,12 +244,21 @@ export async function createProperty(formData: FormData) {
         
       if (!uploadError) {
         const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
-        image_urls.push(urlData.publicUrl)
+        return urlData.publicUrl
       } else {
         console.error('Image upload failed:', uploadError)
-        return { error: `Failed to upload gallery image: ${uploadError.message}` }
+        throw new Error(`Failed to upload gallery image: ${uploadError.message}`)
       }
     }
+    return null
+  })
+
+  try {
+    const uploadedUrls = await Promise.all(uploadPromises)
+    const validUrls = uploadedUrls.filter((url): url is string => url !== null)
+    image_urls.push(...validUrls)
+  } catch (err: any) {
+    return { error: err.message }
   }
 
   if (!coverImageUrl && image_urls.length === 0) {

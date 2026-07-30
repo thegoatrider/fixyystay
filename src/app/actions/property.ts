@@ -53,7 +53,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   // 3. Handle new image uploads
   const imageFiles = formData.getAll('newImages') as File[]
   
-  for (const imageFile of imageFiles) {
+  const uploadPromises = imageFiles.map(async (imageFile) => {
     if (imageFile && imageFile.size > 0) {
       const fileExt = imageFile.name.split('.').pop()
       const fileName = `prop-update-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
@@ -64,12 +64,18 @@ export async function updateProperty(propertyId: string, formData: FormData) {
         
       if (!uploadError) {
         const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
-        image_urls.push(urlData.publicUrl)
+        return urlData.publicUrl
       } else {
         console.error('Image upload failed during update:', uploadError)
+        return null
       }
     }
-  }
+    return null
+  })
+
+  const uploadedUrls = await Promise.all(uploadPromises)
+  const validUrls = uploadedUrls.filter((url): url is string => url !== null)
+  image_urls.push(...validUrls)
 
   // 3.5 Handle new Cover Image upload
   const coverImageFile = formData.get('coverImage') as File | null;
