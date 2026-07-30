@@ -71,14 +71,18 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     console.log(`[CHECKIN] Submitting check-in for property ${propertyId}, guest ${guestName}, ${numPeople} person(s)`)
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyId || '')
-    const propQuery = supabaseAdmin
-      .from('properties')
-      .select('owner_id, name, helpdesk_number, organization_id')
-
     const { data: property, error: propError } = await (isUUID 
-      ? propQuery.eq('id', propertyId) 
-      : propQuery.eq('uid', propertyId)
-    ).single()
+      ? supabaseAdmin
+          .from('properties')
+          .select('owner_id, name, helpdesk_number, organization_id')
+          .eq('id', propertyId)
+          .single()
+      : supabaseAdmin
+          .from('properties')
+          .select('owner_id, name, helpdesk_number, organization_id')
+          .eq('uid', propertyId)
+          .single()
+    )
 
     if (propError || !property) {
       console.error('[CHECKIN] Property fetch error:', propError)
@@ -164,14 +168,18 @@ export async function getPropertyInfo(propertyId: string) {
   try {
     const supabaseAdmin = createAdminClient()
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyId || '')
-    const propQuery = supabaseAdmin
-      .from('properties')
-      .select('name, helpdesk_number')
-
     const { data: property, error } = await (isUUID 
-      ? propQuery.eq('id', propertyId) 
-      : propQuery.eq('uid', propertyId)
-    ).single()
+      ? supabaseAdmin
+          .from('properties')
+          .select('name, helpdesk_number')
+          .eq('id', propertyId)
+          .single()
+      : supabaseAdmin
+          .from('properties')
+          .select('name, helpdesk_number')
+          .eq('uid', propertyId)
+          .single()
+    )
 
     if (error || !property) return null
     return property
