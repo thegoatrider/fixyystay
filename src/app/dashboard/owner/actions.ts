@@ -231,6 +231,10 @@ export async function createProperty(formData: FormData) {
 
   // 4. Handle multiple image uploads
   const imageFiles = formData.getAll('image') as File[]
+  const validNewFilesCount = imageFiles.filter(file => file && file.size > 0).length
+  if (validNewFilesCount > 15) {
+    return { error: 'only 15 pictures of property are permitted.' }
+  }
   const image_urls: string[] = []
   
   const uploadPromises = imageFiles.map(async (imageFile) => {

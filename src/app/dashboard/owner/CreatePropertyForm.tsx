@@ -22,6 +22,12 @@ export default function CreatePropertyForm() {
     e.preventDefault()
     setIsLoading(true)
     
+    if (selectedFiles.length > 15) {
+      alert('only 15 pictures of property are permitted.')
+      setIsLoading(false)
+      return
+    }
+    
     const formData = new FormData(e.currentTarget)
     
     if (!coverImage && selectedFiles.length === 0) {
@@ -113,6 +119,12 @@ export default function CreatePropertyForm() {
     if (!files) return
 
     const newFiles = Array.from(files)
+    if (selectedFiles.length + newFiles.length > 15) {
+      alert('only 15 pictures of property are permitted.')
+      e.target.value = ''
+      return
+    }
+
     const newPreviews = newFiles.map(file => URL.createObjectURL(file))
     
     setSelectedFiles(prev => [...prev, ...newFiles])

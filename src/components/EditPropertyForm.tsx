@@ -91,6 +91,12 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     if (!files) return
 
     const selectedFiles = Array.from(files)
+    if (existingPhotos.length + newFiles.length + selectedFiles.length > 15) {
+      alert('only 15 pictures of property are permitted.')
+      e.target.value = ''
+      return
+    }
+
     const previews = selectedFiles.map(f => URL.createObjectURL(f))
     
     setNewFiles(prev => [...prev, ...selectedFiles])
@@ -121,6 +127,12 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     setIsLoading(true)
     setError(null)
     setSuccess(false)
+    
+    if (existingPhotos.length + newFiles.length > 15) {
+      setError('only 15 pictures of property are permitted.')
+      setIsLoading(false)
+      return
+    }
     
     const formData = new FormData(e.currentTarget)
     

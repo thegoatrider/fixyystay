@@ -52,6 +52,10 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 
   // 3. Handle new image uploads
   const imageFiles = formData.getAll('newImages') as File[]
+  const validNewFilesCount = imageFiles.filter(file => file && file.size > 0).length
+  if (image_urls.length + validNewFilesCount > 15) {
+    return { error: 'only 15 pictures of property are permitted.' }
+  }
   
   const uploadPromises = imageFiles.map(async (imageFile) => {
     if (imageFile && imageFile.size > 0) {
