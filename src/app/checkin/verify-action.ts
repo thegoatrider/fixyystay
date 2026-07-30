@@ -7,23 +7,34 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.0-flash'
 
 const OCR_PROMPT = `
-You are a document OCR extraction engine. Your only job is to extract text and structured data from ID documents. You must NEVER refuse, NEVER ask for re-upload, and NEVER return an error message.
+You are a strict government ID verification engine. Your FIRST task is to determine whether the uploaded image is a genuine, government-issued identity document. You must REJECT any image that is not a government ID.
 
-ABSOLUTE RULES:
-1. Always return a valid JSON response — no exceptions.
-2. If a field is unclear, make your best guess and mark it with a confidence flag.
-3. If a section is partially visible, extract whatever is visible.
-4. Never say "I cannot", "please re-upload", "image quality", or any failure message.
-5. Treat every image as processable, regardless of angle, lighting, or partial obstruction.
+STEP 1 — DOCUMENT CLASSIFICATION (mandatory, do this first):
+Examine the image carefully. A valid government ID must:
+- Be an official identity document issued by a government authority.
+- Contain at least TWO of: a person's name, a unique ID number, a date of birth or expiry, and an official emblem/logo.
+- Be one of these accepted types: Aadhaar Card, PAN Card, Passport, Voter ID / EPIC Card, Driving Licence.
 
-EXTRACTION TASK:
-Extract the following fields from the uploaded government ID image:
+REJECT the image (set is_government_id: false) if it is any of the following:
+- A selfie, portrait, or photo of a person without an ID document.
+- A random photograph (nature, objects, food, buildings, etc.).
+- A screenshot of a website, app, or digital content.
+- A business card, loyalty card, gym card, or any non-government card.
+- A receipt, invoice, bill, or any financial document.
+- A bank statement, utility bill, or address proof only (without photo ID).
+- A blank image, solid colour, or image with no readable text.
+- Anything that does not look like an official government-issued photo ID.
+
+STEP 2 — EXTRACTION (only if STEP 1 passes):
+If and only if the image IS a government ID, extract the following fields:
 
 {
+  "is_government_id": true,
+  "rejection_reason": null,
   "full_name": "",
   "date_of_birth": "",
   "id_number": "",
-  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence | Other",
+  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence",
   "address": "",
   "gender": "",
   "expiry_date": "",
@@ -33,11 +44,16 @@ Extract the following fields from the uploaded government ID image:
   }
 }
 
-FALLBACK BEHAVIOR (follow strictly):
-- If a field cannot be read at all: use null, do not omit the key.
+If the image is NOT a government ID, return ONLY this JSON and nothing else:
+{
+  "is_government_id": false,
+  "rejection_reason": "<one sentence describing why this image was rejected, e.g. 'This appears to be a selfie, not a government ID.' or 'This is a random photograph, not an identity document.'"
+}
+
+FALLBACK BEHAVIOR (only when is_government_id is true):
+- If a field cannot be read at all: use null.
 - If text is partially readable: extract the readable portion and add "[partial]" suffix.
 - If you are guessing: add "[inferred]" suffix to that field's value.
-- Never leave the response blank or return plain text — always return the JSON object.
 
 Return ONLY the JSON. No explanations, no preamble, no markdown.
 `
@@ -218,25 +234,42 @@ export async function uploadAndVerifyFront(formData: FormData) {
     if (parseFailed) {
       normalizedResult = result
     } else {
-      const mappedDocType = mapIdType(result.id_type || result.idType)
-      const cleanNum = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
-      const cleanName = cleanFieldValue(result.full_name || result.fullName || result.name)
-      const cleanDob = cleanFieldValue(result.date_of_birth || result.dateOfBirth || result.dob)
-      const numericConfidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
-      
-      const isGovtId = mappedDocType !== 'UNKNOWN'
-      const suspicious = numericConfidence < 0.40
-      
-      normalizedResult = {
-        is_government_id: isGovtId,
-        document_type: mappedDocType,
-        document_number: cleanNum,
-        full_name: cleanName,
-        date_of_birth: cleanDob,
-        confidence: numericConfidence,
-        suspicious: suspicious,
-        reason: result.confidence?.notes || '',
-        raw_ocr_text: aiResponseText
+      // If the AI explicitly flagged is_government_id: false, propagate that immediately
+      if (result.is_government_id === false) {
+        normalizedResult = {
+          is_government_id: false,
+          rejection_reason: result.rejection_reason || null,
+          document_type: 'UNKNOWN',
+          document_number: '',
+          full_name: '',
+          date_of_birth: '',
+          confidence: 0,
+          suspicious: true,
+          reason: result.rejection_reason || '',
+          raw_ocr_text: aiResponseText
+        }
+      } else {
+        const mappedDocType = mapIdType(result.id_type || result.idType)
+        const cleanNum = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
+        const cleanName = cleanFieldValue(result.full_name || result.fullName || result.name)
+        const cleanDob = cleanFieldValue(result.date_of_birth || result.dateOfBirth || result.dob)
+        const numericConfidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
+
+        const isGovtId = mappedDocType !== 'UNKNOWN'
+        const suspicious = numericConfidence < 0.40
+
+        normalizedResult = {
+          is_government_id: isGovtId,
+          rejection_reason: null,
+          document_type: mappedDocType,
+          document_number: cleanNum,
+          full_name: cleanName,
+          date_of_birth: cleanDob,
+          confidence: numericConfidence,
+          suspicious: suspicious,
+          reason: result.confidence?.notes || '',
+          raw_ocr_text: aiResponseText
+        }
       }
     }
 
@@ -246,15 +279,22 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let status = 'MANUAL_REVIEW'
     let finalReason = normalizedResult.reason
 
+    // Hard-reject non-government IDs immediately — do not save to DB, force re-upload
+    if (!parseFailed && normalizedResult.is_government_id === false) {
+      const rejectionMsg = normalizedResult.rejection_reason ||
+        'This does not appear to be a government-issued ID. Please upload a valid document such as Aadhaar, PAN, Passport, Voter ID, or Driving Licence.'
+      return { success: false, error: rejectionMsg }
+    }
+
     const allCriticalFieldsMissing = !parseFailed && !normalizedResult.full_name && !normalizedResult.document_number && !normalizedResult.date_of_birth
     if (allCriticalFieldsMissing) {
-      return { success: false, error: 'No ID information detected. Please upload a clear picture of a valid ID document.' }
+      return { success: false, error: 'No ID information detected. Please upload a clear picture of a valid government ID document (Aadhaar, PAN, Passport, Voter ID, or Driving Licence).' }
     }
 
     if (parseFailed) {
       status = 'MANUAL_REVIEW'
       finalReason = normalizedResult.reason || 'AI extraction failed. Saved for manual review.'
-    } else if (normalizedResult.suspicious || !normalizedResult.is_government_id) {
+    } else if (normalizedResult.suspicious) {
       status = 'MANUAL_REVIEW'
       finalReason = normalizedResult.reason || 'Document flagged or type unrecognized. Saved for manual review.'
     } else {

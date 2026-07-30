@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   CheckCircle, Users, Phone, User, ShieldCheck,
-  HelpCircle, Globe, Instagram, Facebook
+  HelpCircle, Globe, Instagram, Facebook, UserPlus, UserMinus
 } from 'lucide-react'
 import { submitCheckin, getPropertyInfo } from './actions'
 import { cn, formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
@@ -39,6 +39,9 @@ function CheckinForm() {
   const [countryCode, setCountryCode] = useState('91')
   const [guestPhone, setGuestPhone] = useState('')
   const [numPeople, setNumPeople] = useState(1)
+  // Stable keys for each guest slot so removing a guest doesn't reset other guests' state
+  const [guestKeys, setGuestKeys] = useState<number[]>([0])
+  const nextKeyRef = useRef(1)
   const [checkinDate, setCheckinDate] = useState('')
   const [checkoutDate, setCheckoutDate] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +61,16 @@ function CheckinForm() {
         next[i] = prev[i]
       }
       return next
+    })
+    setGuestKeys(prev => {
+      if (numPeople > prev.length) {
+        const added = []
+        for (let i = prev.length; i < numPeople; i++) {
+          added.push(nextKeyRef.current++)
+        }
+        return [...prev, ...added]
+      }
+      return prev.slice(0, numPeople)
     })
   }, [numPeople])
 
@@ -338,13 +351,55 @@ function CheckinForm() {
               {/* One card per guest */}
               <div className="flex flex-col gap-4">
                 {Array.from({ length: numPeople }).map((_, i) => (
-                  <GuestIdUpload
-                    key={i}
-                    guestIndex={i}
-                    onVerified={(id) => handleGuestVerified(i, id)}
-                  />
+                  <div key={guestKeys[i]} className="relative">
+                    {/* Remove guest button — always visible when more than 1 guest */}
+                    {numPeople > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNumPeople(prev => prev - 1)
+                          setVerifiedIds(prev => {
+                            const next = [...prev]
+                            next.splice(i, 1)
+                            return next
+                          })
+                          setGuestKeys(prev => {
+                            const next = [...prev]
+                            next.splice(i, 1)
+                            return next
+                          })
+                        }}
+                        className="absolute -top-1.5 -right-1.5 z-20 flex items-center gap-1 bg-red-100 hover:bg-red-200 text-red-600 text-[9px] font-black px-2 py-1 rounded-full shadow transition-all active:scale-95"
+                        title={`Remove ${i === 0 ? 'Primary Guest' : `Guest ${i + 1}`}`}
+                      >
+                        <UserMinus className="w-3 h-3" />
+                        Remove
+                      </button>
+                    )}
+                    <GuestIdUpload
+                      key={guestKeys[i]}
+                      guestIndex={i}
+                      onVerified={(id) => handleGuestVerified(i, id)}
+                    />
+                  </div>
                 ))}
               </div>
+
+              {/* Add Guest button */}
+              {numPeople < 10 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNumPeople(prev => prev + 1)
+                    setVerifiedIds(prev => [...prev, null])
+                    setGuestKeys(prev => [...prev, nextKeyRef.current++])
+                  }}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-dashed border-blue-300 text-blue-600 text-xs font-bold hover:bg-blue-50 hover:border-blue-400 transition-all active:scale-[0.98]"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add Another Guest
+                </button>
+              )}
 
               {/* All done banner */}
               {allVerified && (

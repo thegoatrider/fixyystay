@@ -52,13 +52,6 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
           transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
           className="flex flex-col items-center"
         >
-          {/* Native-style Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-5 rounded-full bg-white/10 backdrop-blur-md border border-white/25 shadow-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-cyan-200">
-              Alibag's Premium Stays
-            </span>
-          </div>
 
           <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white tracking-tight leading-[1.15] drop-shadow-lg">
             Stay somewhere <br className="hidden sm:block" />
