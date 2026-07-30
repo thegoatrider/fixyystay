@@ -156,7 +156,18 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         setSuccess(true)
         setNewFiles([])
         setNewPreviews([])
-        // Removed router.refresh() to prevent page reload
+        // Refetch the updated image_urls from DB so existingPhotos stays in sync
+        // Without this, newly uploaded images are lost on next save because
+        // existingPhotos state never knew about the newly uploaded URLs
+        const supabase = createClient()
+        const { data: updatedProp } = await supabase
+          .from('properties')
+          .select('image_urls')
+          .eq('id', property.id)
+          .single()
+        if (updatedProp?.image_urls) {
+          setExistingPhotos(updatedProp.image_urls)
+        }
         setTimeout(() => setSuccess(false), 3000)
       }
     } catch (err: any) {
