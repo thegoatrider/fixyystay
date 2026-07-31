@@ -173,19 +173,25 @@ export async function uploadAndVerifyFront(formData: FormData) {
       const response = await generateContentWithRetry({
         model: MODEL_NAME,
         contents: [
-          SYSTEM_PROMPT,
-          { inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }
+          {
+            role: 'user',
+            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+          }
         ],
-        config: { temperature: 0.0, responseMimeType: 'application/json' }
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          temperature: 0.0,
+          responseMimeType: 'application/json'
+        }
       });
 
       aiResponseText = response?.text || '{}'
     } catch (aiError: any) {
       console.error('[VERIFY-FRONT] AI call failed:', aiError)
       if (aiError.message === 'AI_TIMEOUT') {
-        aiUnavailableError = 'Scanning timed out. Saved for manual review.'
+        aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
       } else {
-        aiUnavailableError = 'AI verification service temporarily unavailable. Saved for manual review.'
+        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
       }
     }
 
@@ -412,10 +418,16 @@ export async function uploadBackImage(formData: FormData) {
       const response = await generateContentWithRetry({
         model: MODEL_NAME,
         contents: [
-          BACK_SYSTEM_PROMPT,
-          { inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }
+          {
+            role: 'user',
+            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+          }
         ],
-        config: { temperature: 0.0, responseMimeType: 'application/json' }
+        config: {
+          systemInstruction: BACK_SYSTEM_PROMPT,
+          temperature: 0.0,
+          responseMimeType: 'application/json'
+        }
       });
 
       aiResponseText = response?.text || '{}'
