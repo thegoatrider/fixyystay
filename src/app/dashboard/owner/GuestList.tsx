@@ -490,6 +490,7 @@ function GuestList({
             </div>
           )}
         </div>
+      </div>
 
 
       {/* ── Live Room Visualizer Section ── */}
