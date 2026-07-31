@@ -414,6 +414,38 @@ export default function PoliceDashboardClient({
                             <p className="text-xs text-blue-900 font-medium">{doc.address}</p>
                           </div>
                         )}
+                        {(doc.date_of_birth || doc.ocr_json) && (
+                          (() => {
+                            const ocrData = doc.ocr_json && typeof doc.ocr_json === 'string' 
+                              ? (() => { try { return JSON.parse(doc.ocr_json) } catch { return {} } })()
+                              : (doc.ocr_json || {})
+                            const gender = ocrData.gender || ocrData.Gender
+                            const expiry = ocrData.expiry_date || ocrData.expiryDate || ocrData.expiry
+                            if (!doc.date_of_birth && !gender && !expiry) return null;
+                            return (
+                              <div className="bg-gray-50 rounded-xl p-3 mb-2 border border-gray-200 grid grid-cols-2 gap-3">
+                                {doc.date_of_birth && (
+                                  <div>
+                                    <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-0.5">Date of Birth</span>
+                                    <p className="text-xs text-gray-800 font-bold">{doc.date_of_birth}</p>
+                                  </div>
+                                )}
+                                {gender && (
+                                  <div>
+                                    <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-0.5">Gender</span>
+                                    <p className="text-xs text-gray-800 font-bold capitalize">{String(gender).toLowerCase()}</p>
+                                  </div>
+                                )}
+                                {expiry && (
+                                  <div className="col-span-2 border-t border-gray-150 pt-2">
+                                    <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-0.5">Expiry Date</span>
+                                    <p className="text-xs text-gray-850 font-bold">{expiry}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()
+                        )}
                         {(doc.raw_ocr_text || doc.raw_ocr_text_back) && (
                           <div className="bg-gray-100 rounded-xl p-3 mb-2 max-h-32 overflow-y-auto text-[10px] text-gray-600 font-mono whitespace-pre-wrap shadow-inner border border-gray-200">
                             <span className="font-bold text-gray-400 uppercase text-[9px] tracking-wider block mb-1">Raw Extracted OCR Data:</span>

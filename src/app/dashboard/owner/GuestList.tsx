@@ -795,15 +795,55 @@ function GuestList({
                             <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest">Failed</div>
                           )}
 
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className={`w-9 h-9 border rounded-xl flex items-center justify-center flex-shrink-0 ${doc.is_verified ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
+                          <div className="flex items-start gap-3 mt-1">
+                            <div className={`w-9 h-9 border rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${doc.is_verified ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'}`}>
                               <FileText className={`w-4 h-4 ${doc.is_verified ? 'text-green-600' : 'text-indigo-500'}`} />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-bold text-gray-800 truncate">{doc.document_type || 'ID Document'}</p>
-                              <p className="text-[10px] text-gray-500 font-bold break-words whitespace-normal leading-tight">
+                              <p className="text-[10px] text-gray-550 font-bold break-words whitespace-normal leading-tight">
                                 {doc.document_number || '—'}{doc.full_name ? ` · ${doc.full_name}` : ''}
                               </p>
+                              
+                              {/* Extended OCR Details */}
+                              {(() => {
+                                const ocrData = doc.ocr_json && typeof doc.ocr_json === 'string' 
+                                  ? (() => { try { return JSON.parse(doc.ocr_json) } catch { return {} } })()
+                                  : (doc.ocr_json || {})
+                                const gender = ocrData.gender || ocrData.Gender
+                                const expiry = ocrData.expiry_date || ocrData.expiryDate || ocrData.expiry
+                                
+                                if (!doc.date_of_birth && !gender && !doc.address && !expiry) return null;
+
+                                return (
+                                  <div className="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-500 font-bold space-y-1">
+                                    {doc.date_of_birth && (
+                                      <div className="flex gap-1.5">
+                                        <span className="text-gray-400 font-black uppercase tracking-wider text-[8px] min-w-[50px]">DOB:</span>
+                                        <span className="text-gray-700">{doc.date_of_birth}</span>
+                                      </div>
+                                    )}
+                                    {gender && (
+                                      <div className="flex gap-1.5">
+                                        <span className="text-gray-400 font-black uppercase tracking-wider text-[8px] min-w-[50px]">Gender:</span>
+                                        <span className="text-gray-700 capitalize">{String(gender).toLowerCase()}</span>
+                                      </div>
+                                    )}
+                                    {doc.address && (
+                                      <div className="flex items-start gap-1.5">
+                                        <span className="text-gray-400 font-black uppercase tracking-wider text-[8px] min-w-[50px] mt-0.5">Address:</span>
+                                        <span className="text-gray-750 break-words leading-normal flex-1">{doc.address}</span>
+                                      </div>
+                                    )}
+                                    {expiry && (
+                                      <div className="flex gap-1.5">
+                                        <span className="text-gray-400 font-black uppercase tracking-wider text-[8px] min-w-[50px]">Expiry:</span>
+                                        <span className="text-gray-700">{expiry}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </div>
                           </div>
 
