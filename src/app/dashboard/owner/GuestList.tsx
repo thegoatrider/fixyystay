@@ -48,7 +48,6 @@ export default React.memo(function GuestList({
   const [manualDocNumber, setManualDocNumber] = useState('')
   const [selectedPropertyId, setSelectedPropertyId] = useState('')
   const [selectedRoomNumberToAssign, setSelectedRoomNumberToAssign] = useState('')
-  const [selectedOccupiedRoom, setSelectedOccupiedRoom] = useState<string | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
 
   // Data table state hooks
@@ -546,7 +545,7 @@ export default React.memo(function GuestList({
                     key={r.id}
                     onClick={() => {
                       if (isOccupied) {
-                        setSelectedOccupiedRoom(r.room_number)
+                        setSelectedGuest(occupant)
                       } else {
                         alert(`Room ${r.room_number} is currently available.`)
                       }

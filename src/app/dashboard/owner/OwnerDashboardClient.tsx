@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,6 @@ import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
-import { CollapsibleTile } from '@/components/CollapsibleTile'
 import WalletSection from '@/components/WalletSection'
 import AddLeadTile from './AddLeadTile'
 import QuickCheckin from './QuickCheckin'
@@ -42,14 +41,13 @@ export default function OwnerDashboardClient({
   
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'properties'
-  const router = useRouter()
   const queryClient = useQueryClient()
 
   const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
   // Use useMemo for trial calculation to avoid redundant calculations
-  const { isTrial, isFreeTier, isPaid } = useMemo(() => {
-    if (!data) return { isTrial: false, isFreeTier: false, isPaid: false }
+  const { isFreeTier } = useMemo(() => {
+    if (!data) return { isFreeTier: false }
     
     const { subscription, owner } = data as any
     const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
@@ -57,10 +55,9 @@ export default function OwnerDashboardClient({
     // 7-day Trial Logic from Owner Creation Date
     const ownerCreatedAt = owner?.created_at ? new Date(owner.created_at) : null
     const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
-    const isTrial = !isPaid && trialEndDate ? trialEndDate > new Date() : false
     const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
     
-    return { isTrial, isFreeTier: isExpired, isPaid }
+    return { isFreeTier: isExpired }
   }, [data])
 
 
