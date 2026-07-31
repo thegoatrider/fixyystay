@@ -53,7 +53,7 @@ function getDaysInMonth(year: number, month: number) {
   return days
 }
 
-export default React.memo(function LeadsSection({
+function LeadsSection({
   ownerId,
   properties,
   initialLeads,
@@ -929,7 +929,9 @@ export default React.memo(function LeadsSection({
       )}
     </div>
   )
-})
+}
+
+export default React.memo(LeadsSection)
 
 /* Helper subcomponents to keep markup dry */
 

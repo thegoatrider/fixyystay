@@ -30,7 +30,7 @@ type GuestCheckin = {
 
 
 
-export default React.memo(function GuestList({ 
+function GuestList({ 
   checkins,
   isFreeTier = false,
   properties = [],
@@ -1044,7 +1044,7 @@ export default React.memo(function GuestList({
                 Cancel
               </Button>
               <Button 
-                onClick={() => handleApproveId(approveModalId, manualName, manualDocNumber)}
+                onClick={() => approveModalId && handleApproveId(approveModalId, manualName, manualDocNumber)}
                 disabled={processingId === `approve-${approveModalId}`}
                 className="bg-emerald-650 hover:bg-emerald-750 text-white font-bold min-w-[110px] rounded-xl text-xs h-9"
               >
@@ -1056,7 +1056,9 @@ export default React.memo(function GuestList({
       )}
     </div>
   )
-})
+}
+
+export default React.memo(GuestList)
 
 /* Helper subcomponents to keep markup dry */
 
