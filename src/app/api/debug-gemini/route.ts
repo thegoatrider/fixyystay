@@ -15,13 +15,13 @@ export async function GET() {
   try {
     console.log('[DEBUG-GEMINI] Testing basic text generation...')
     const textResponse = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: 'Hello, respond with success.' }] }]
     })
 
     console.log('[DEBUG-GEMINI] Testing text generation with system instruction...')
     const systemResponse = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       config: {
         systemInstruction: 'You are a test helper. Respond only with the word OK.'
