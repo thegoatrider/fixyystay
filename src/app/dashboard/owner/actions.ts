@@ -466,11 +466,15 @@ export async function approveIdentity(identityId: string, manualName?: string, m
 
         const generatePromise = ai.models.generateContent({
           model: 'gemini-2.0-flash',
-          contents: [
-            OCR_SYSTEM_PROMPT,
-            { inlineData: { data: base64Data, mimeType } }
-          ],
-          config: { temperature: 0.0, responseMimeType: 'application/json' }
+          contents: [{
+            role: 'user',
+            parts: [{ inlineData: { data: base64Data, mimeType } }]
+          }],
+          config: {
+            systemInstruction: OCR_SYSTEM_PROMPT,
+            temperature: 0.0,
+            responseMimeType: 'application/json'
+          }
         });
         
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 45000));
