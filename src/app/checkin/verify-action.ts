@@ -275,65 +275,75 @@ export async function uploadAndVerifyFront(formData: FormData) {
 
     console.log('[VERIFY-FRONT] AI Result:', normalizedResult.document_type, 'Confidence:', normalizedResult.confidence)
 
-    // 4. Validation
-    let status = 'MANUAL_REVIEW'
-    let finalReason = normalizedResult.reason
+    // 4. Validation and strict rejection
+    if (parseFailed) {
+      return { 
+        success: false, 
+        error: normalizedResult.reason || 'AI verification service temporarily unavailable or timed out. Please try again with a clearer, well-lit image.' 
+      }
+    }
 
-    // Hard-reject non-government IDs immediately — do not save to DB, force re-upload
-    if (!parseFailed && normalizedResult.is_government_id === false) {
+    if (normalizedResult.is_government_id === false) {
       const rejectionMsg = normalizedResult.rejection_reason ||
         'This does not appear to be a government-issued ID. Please upload a valid document such as Aadhaar, PAN, Passport, Voter ID, or Driving Licence.'
       return { success: false, error: rejectionMsg }
     }
 
-    const allCriticalFieldsMissing = !parseFailed && !normalizedResult.full_name && !normalizedResult.document_number && !normalizedResult.date_of_birth
-    if (allCriticalFieldsMissing) {
-      return { success: false, error: 'No ID information detected. Please upload a clear picture of a valid government ID document (Aadhaar, PAN, Passport, Voter ID, or Driving Licence).' }
-    }
-
-    if (parseFailed) {
-      status = 'MANUAL_REVIEW'
-      finalReason = normalizedResult.reason || 'AI extraction failed. Saved for manual review.'
-    } else if (normalizedResult.suspicious) {
-      status = 'MANUAL_REVIEW'
-      finalReason = normalizedResult.reason || 'Document flagged or type unrecognized. Saved for manual review.'
-    } else {
-      const num = normalizedResult.document_number?.trim().replace(/[\s-]/g, '')
-      let validFormat = true
-
-      if (normalizedResult.document_type === 'AADHAAR') {
-        if (!num || !/^\d{12}$/.test(num)) validFormat = false
-      } else if (normalizedResult.document_type === 'PAN') {
-        if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
-      } else if (normalizedResult.document_type === 'PASSPORT') {
-        const isIndian = /^[A-Z]\d{7}$/i.test(num)
-        const isGeneral = /^[A-Z0-9]{6,12}$/i.test(num)
-        if (!num || (!isIndian && !isGeneral)) validFormat = false
-      } else if (normalizedResult.document_type === 'DRIVING_LICENSE') {
-        const cleanDl = num.replace(/[\s-/]/g, '')
-        const modernFormat = /^[A-Z]{2}\d{13}$/i.test(cleanDl)
-        const genericFormat = /^[A-Z]{2}[A-Z0-9]{9,15}$/i.test(cleanDl)
-        if (!cleanDl || (!modernFormat && !genericFormat)) validFormat = false
-      } else if (normalizedResult.document_type === 'VOTER_ID') {
-        const cleanVoter = num.replace(/[\s-/]/g, '')
-        const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
-        const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(normalizedResult.document_number?.trim().replace(/[\s]/g, '') || '')
-        const genericFormat = /^[A-Z]{2,3}[A-Z0-9]{6,12}$/i.test(cleanVoter)
-        if (!cleanVoter || (!modernFormat && !legacyFormat && !genericFormat)) validFormat = false
-      }
-
-      if (!validFormat) {
-        status = 'MANUAL_REVIEW'
-        finalReason = `Document number for ${normalizedResult.document_type || 'ID'} does not match expected format. Saved for manual review.`
-      } else {
-        if (normalizedResult.confidence >= 0.40) {
-          status = 'VERIFIED'
-        } else {
-          status = 'MANUAL_REVIEW'
-          finalReason = 'Image quality too poor or confidence too low. Saved for manual review.'
-        }
+    if (normalizedResult.document_type === 'UNKNOWN') {
+      return { 
+        success: false, 
+        error: 'The document type could not be recognized. Please upload a valid government ID (Aadhaar, PAN, Passport, Voter ID, or Driving Licence).' 
       }
     }
+
+    if (!normalizedResult.full_name || !normalizedResult.document_number) {
+      return { 
+        success: false, 
+        error: 'ID details (name or document number) could not be extracted. Please ensure the card is completely visible, glare-free, and try again.' 
+      }
+    }
+
+    if (normalizedResult.suspicious || normalizedResult.confidence < 0.40) {
+      return { 
+        success: false, 
+        error: 'Image quality is too poor or text is blurry. Please upload a sharper, glare-free photo of your ID.' 
+      }
+    }
+
+    const num = normalizedResult.document_number?.trim().replace(/[\s-]/g, '')
+    let validFormat = true
+
+    if (normalizedResult.document_type === 'AADHAAR') {
+      if (!num || !/^\d{12}$/.test(num)) validFormat = false
+    } else if (normalizedResult.document_type === 'PAN') {
+      if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
+    } else if (normalizedResult.document_type === 'PASSPORT') {
+      const isIndian = /^[A-Z]\d{7}$/i.test(num)
+      const isGeneral = /^[A-Z0-9]{6,12}$/i.test(num)
+      if (!num || (!isIndian && !isGeneral)) validFormat = false
+    } else if (normalizedResult.document_type === 'DRIVING_LICENSE') {
+      const cleanDl = num.replace(/[\s-/]/g, '')
+      const modernFormat = /^[A-Z]{2}\d{13}$/i.test(cleanDl)
+      const genericFormat = /^[A-Z]{2}[A-Z0-9]{9,15}$/i.test(cleanDl)
+      if (!cleanDl || (!modernFormat && !genericFormat)) validFormat = false
+    } else if (normalizedResult.document_type === 'VOTER_ID') {
+      const cleanVoter = num.replace(/[\s-/]/g, '')
+      const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
+      const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(normalizedResult.document_number?.trim().replace(/[\s]/g, '') || '')
+      const genericFormat = /^[A-Z]{2,3}[A-Z0-9]{6,12}$/i.test(cleanVoter)
+      if (!cleanVoter || (!modernFormat && !legacyFormat && !genericFormat)) validFormat = false
+    }
+
+    if (!validFormat) {
+      return {
+        success: false,
+        error: `The extracted ${normalizedResult.document_type || 'ID'} number "${normalizedResult.document_number}" does not match the expected format. Please ensure the card is fully visible and try again.`
+      }
+    }
+
+    // If we passed all checks, the status is VERIFIED
+    const status = 'VERIFIED'
+    const finalReason = 'Verified via automated OCR scan.'
 
     // 5. Save to guest_identity (front only, back_image_url will be updated later)
     const supabaseAdmin = createAdminClient()
@@ -343,7 +353,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
       full_name: normalizedResult.full_name,
       date_of_birth: normalizedResult.date_of_birth,
       document_confidence: normalizedResult.confidence || 0,
-      is_verified: status === 'VERIFIED',
+      is_verified: true,
       verification_status: status,
       document_image_url: imageUrl,    // front image
       back_image_url: null,            // will be filled by uploadBackImage
@@ -397,6 +407,7 @@ export async function uploadBackImage(formData: FormData) {
     const base64Data = Buffer.from(arrayBuffer).toString('base64')
 
     let aiResponseText = '{}'
+    let aiUnavailableError = ''
     try {
       const response = await generateContentWithRetry({
         model: MODEL_NAME,
@@ -410,6 +421,44 @@ export async function uploadBackImage(formData: FormData) {
       aiResponseText = response?.text || '{}'
     } catch (aiError: any) {
       console.error('[VERIFY-BACK] AI call failed:', aiError)
+      if (aiError.message === 'AI_TIMEOUT') {
+        aiUnavailableError = 'Back side scanning timed out. Please try again with a clearer image.'
+      } else {
+        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+      }
+    }
+
+    if (aiUnavailableError) {
+      return { success: false, error: aiUnavailableError }
+    }
+
+    let result: any = {}
+    let parseFailed = false
+    try {
+      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+    } catch {
+      try {
+        const firstBrace = aiResponseText.indexOf('{')
+        const lastBrace = aiResponseText.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+        } else {
+          throw new Error('No JSON object found')
+        }
+      } catch (fallbackErr) {
+        parseFailed = true
+      }
+    }
+
+    if (parseFailed) {
+      return { success: false, error: 'AI could not read the back side image. Please ensure the image is clear and try again.' }
+    }
+
+    if (result.is_government_id === false) {
+      return {
+        success: false,
+        error: result.rejection_reason || 'This back side image does not appear to be a valid government ID. Please upload the back side of your ID.'
+      }
     }
 
     const supabaseAdmin = createAdminClient()
@@ -419,119 +468,50 @@ export async function uploadBackImage(formData: FormData) {
       .eq('id', identityId)
       .single()
 
-    if (fetchError) {
+    if (fetchError || !existingRecord) {
       console.warn('[VERIFY-BACK] Could not fetch existing identity record:', fetchError)
+      return { success: false, error: 'Could not find the corresponding front ID record. Please upload the front ID first.' }
     }
 
-    let address = ''
-    let rawOcrTextBack = aiResponseText
-    let confidence = 0
-    let suspicious = false
-    let isGovtId = true
-    
-    let backFullName = ''
-    let backIdNumber = ''
-    let backIdType = 'UNKNOWN'
-    let backDob = ''
+    const backIdType = mapIdType(result.id_type || result.idType)
+    const frontIdType = existingRecord.document_type
 
-    try {
-      const firstBrace = aiResponseText.indexOf('{')
-      const lastBrace = aiResponseText.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const jsonStr = aiResponseText.substring(firstBrace, lastBrace + 1)
-        const result = JSON.parse(jsonStr)
-        address = cleanFieldValue(result.address)
-        rawOcrTextBack = aiResponseText
-        confidence = mapConfidenceToNumeric(result.confidence?.overall)
-        suspicious = confidence < 0.40
-        isGovtId = mapIdType(result.id_type) !== 'UNKNOWN'
-
-        backFullName = cleanFieldValue(result.full_name || result.fullName || result.name)
-        backIdNumber = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
-        backIdType = mapIdType(result.id_type || result.idType)
-        backDob = cleanFieldValue(result.date_of_birth || result.dateOfBirth || result.dob)
-      } else {
-        console.warn('[VERIFY-BACK] No JSON found in response. Skipping address extraction.')
+    if (backIdType !== 'UNKNOWN' && frontIdType !== 'UNKNOWN' && backIdType !== frontIdType) {
+      return {
+        success: false,
+        error: `The back side document type (${backIdType}) does not match the front side document type (${frontIdType}). Please upload the back side of the same ID.`
       }
-    } catch (e) {
-      console.warn('[VERIFY-BACK] Failed to parse AI JSON response. Skipping address extraction.')
     }
 
-    // We intentionally don't block on back image validation to avoid friction.
-    // If it's blurry or unrecognizable, we still save the image.
-
-    // Merge strategy: update the existing guest_identity record with back image, address, and any fields that were missing/empty from the front side.
-    const updates: any = { 
-      back_image_url: backUrl,
-      address: address || (existingRecord ? existingRecord.address : ''),
-      raw_ocr_text_back: rawOcrTextBack
-    }
-
-    if (existingRecord) {
-      if ((!existingRecord.full_name || existingRecord.full_name.trim() === '') && backFullName) {
-        updates.full_name = backFullName
-      }
-      if ((!existingRecord.document_number || existingRecord.document_number.trim() === '') && backIdNumber) {
-        updates.document_number = backIdNumber
-      }
-      if ((!existingRecord.document_type || existingRecord.document_type === 'UNKNOWN') && backIdType !== 'UNKNOWN') {
-        updates.document_type = backIdType
-      }
-      if ((!existingRecord.date_of_birth || existingRecord.date_of_birth.trim() === '') && backDob) {
-        updates.date_of_birth = backDob
-      }
-
-      // Re-evaluate verification status on combined fields
-      const docType = updates.document_type || existingRecord.document_type
-      const docNum = updates.document_number || existingRecord.document_number
-      const name = updates.full_name || existingRecord.full_name
-
-      if (docType && docType !== 'UNKNOWN' && docNum) {
-        const num = docNum.trim().replace(/[\s-]/g, '')
-        let validFormat = true
-
-        if (docType === 'AADHAAR') {
-          if (!num || !/^\d{12}$/.test(num)) validFormat = false
-        } else if (docType === 'PAN') {
-          if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
-        } else if (docType === 'PASSPORT') {
-          const isIndian = /^[A-Z]\d{7}$/i.test(num)
-          const isGeneral = /^[A-Z0-9]{6,12}$/i.test(num)
-          if (!num || (!isIndian && !isGeneral)) validFormat = false
-        } else if (docType === 'DRIVING_LICENSE') {
-          const cleanDl = num.replace(/[\s-/]/g, '')
-          const modernFormat = /^[A-Z]{2}\d{13}$/i.test(cleanDl)
-          const genericFormat = /^[A-Z]{2}[A-Z0-9]{9,15}$/i.test(cleanDl)
-          if (!cleanDl || (!modernFormat && !genericFormat)) validFormat = false
-        } else if (docType === 'VOTER_ID') {
-          const cleanVoter = num.replace(/[\s-/]/g, '')
-          const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
-          const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(docNum.trim().replace(/[\s]/g, '') || '')
-          const genericFormat = /^[A-Z]{2,3}[A-Z0-9]{6,12}$/i.test(cleanVoter)
-          if (!cleanVoter || (!modernFormat && !legacyFormat && !genericFormat)) validFormat = false
-        }
-
-        let newStatus = existingRecord.verification_status
-        let newReason = existingRecord.verification_reason
-
-        if (!validFormat) {
-          newStatus = 'MANUAL_REVIEW'
-          newReason = `Document number for ${docType} does not match expected format. Saved for manual review.`
-        } else {
-          const combinedConfidence = Math.max(Number(existingRecord.document_confidence) || 0, confidence || 0)
-          if (combinedConfidence >= 0.40 && name && name.trim() !== '') {
-            newStatus = 'VERIFIED'
-            newReason = 'Verified via combined front/back OCR.'
-          } else {
-            newStatus = 'MANUAL_REVIEW'
-            newReason = 'Review needed (low confidence or missing name).'
+    const backIdNumber = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
+    if (backIdNumber && existingRecord.document_number) {
+      const cleanBackNum = backIdNumber.trim().replace(/[\s-]/g, '')
+      const cleanFrontNum = existingRecord.document_number.trim().replace(/[\s-]/g, '')
+      if (cleanBackNum !== cleanFrontNum && cleanBackNum.length >= 4 && cleanFrontNum.length >= 4) {
+        if (!cleanBackNum.includes(cleanFrontNum) && !cleanFrontNum.includes(cleanBackNum)) {
+          return {
+            success: false,
+            error: 'The document number on the back side does not match the front side. Please upload the back side of the same ID.'
           }
         }
-
-        updates.verification_status = newStatus
-        updates.verification_reason = newReason
-        updates.is_verified = newStatus === 'VERIFIED'
       }
+    }
+
+    const confidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
+    if (confidence < 0.40) {
+      return {
+        success: false,
+        error: 'The back side image quality is too poor or text is blurry. Please upload a sharper, glare-free photo.'
+      }
+    }
+
+    const address = cleanFieldValue(result.address)
+    const updates: any = { 
+      back_image_url: backUrl,
+      address: address || existingRecord.address,
+      raw_ocr_text_back: aiResponseText,
+      verification_status: 'VERIFIED',
+      is_verified: true
     }
 
     const { error } = await supabaseAdmin

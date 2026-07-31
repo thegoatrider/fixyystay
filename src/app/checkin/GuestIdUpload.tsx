@@ -138,7 +138,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
   const [pendingBackFile, setPendingBackFile] = useState<File | null>(null)
   const pendingBackFileRef = useRef<File | null>(null)
 
-  const frontDone = frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW'
+  const frontDone = frontStatus === 'VERIFIED'
   const backDone = backStatus === 'DONE'
   const bothDone = frontDone && backDone
 
@@ -155,9 +155,8 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     const result = await uploadAndVerifyFront(fd)
 
     if (result.success && result.guest_identity_id) {
-      if (result.status === 'VERIFIED' || result.status === 'MANUAL_REVIEW') {
-        const nextStatus = result.status === 'VERIFIED' ? 'VERIFIED' : 'MANUAL_REVIEW'
-        setFrontStatus(nextStatus)
+      if (result.status === 'VERIFIED') {
+        setFrontStatus('VERIFIED')
         setIdentityId(result.guest_identity_id)
 
         // Only call onVerified if back is already DONE (edge case if back was processed before somehow, though unlikely)
@@ -227,7 +226,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
     if (result.success) {
       setBackStatus('DONE')
       setPendingBackFile(null)
-      if (identityId && (frontStatus === 'VERIFIED' || frontStatus === 'MANUAL_REVIEW')) onVerified(identityId)
+      if (identityId && frontStatus === 'VERIFIED') onVerified(identityId)
     } else {
       setBackStatus('FAILED')
       setBackReason(result.error || 'Back image upload failed.')
@@ -317,12 +316,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                     <span className="text-[9px] font-bold text-green-800 bg-white px-2 py-0.5 rounded-full">✓ ID Verified</span>
                   </div>
                 )}
-                {frontStatus === 'MANUAL_REVIEW' && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-amber-400/20 gap-1">
-                    <CheckCircle className="w-6 h-6 text-amber-600 bg-white rounded-full" />
-                    <span className="text-[9px] font-bold text-amber-800 bg-white px-2 py-0.5 rounded-full">Accepted</span>
-                  </div>
-                )}
+
                 {frontStatus === 'FAILED' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-600/80 p-2 gap-1">
                     <AlertTriangle className="w-5 h-5 text-white" />

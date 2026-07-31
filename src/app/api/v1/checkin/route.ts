@@ -102,8 +102,13 @@ export async function POST(req: Request) {
       backFormData.append('image', backImage)
       backFormData.append('identityId', identityId)
       
-      // We don't block check-in if back image upload fails, but we attempt it.
-      await uploadBackImage(backFormData)
+      const backResult = await uploadBackImage(backFormData)
+      if (!backResult.success) {
+        return NextResponse.json(
+          { error: backResult.error || 'Failed to verify back image' }, 
+          { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      }
     }
     
     // 5. Submit Check-in
