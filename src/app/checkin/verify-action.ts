@@ -26,8 +26,15 @@ REJECT the image (set is_government_id: false) if it is any of the following:
 - Anything that does not look like an official government-issued photo ID.
 
 STEP 2 — EXTRACTION (only if STEP 1 passes):
-If and only if the image IS a government ID, extract the following fields:
+If and only if the image IS a government ID, extract the following fields using these strict rules:
+- full_name: Extract the full name of the person. Do not miss it.
+- id_number: Extract the unique ID number. If it is a masked Aadhaar card (e.g. showing 'xxxx xxxx 1234' or 'XXXX-XXXX-5678'), extract it exactly as printed. If the number is partially blacked out or masked, extract the visible last 4 digits (e.g., 'XXXX-XXXX-1234' or '1234'). If it cannot be read at all, return null.
+- date_of_birth: Extract the date of birth (DOB) or year of birth (YOB) (e.g. 'DD/MM/YYYY' or 'YYYY').
+- address: Extract the full address if present (this is usually on the back side of the card). Look for labels like 'Address', 'S/O', 'D/O', 'W/O', 'C/O'.
+- gender: Extract the gender (Male/Female/Transgender). Look for labels like 'Gender', 'Sex', 'MALE', 'FEMALE', 'M/F', or symbols.
+- expiry_date: Extract the expiry date of the document if present.
 
+JSON Output structure:
 {
   "is_government_id": true,
   "rejection_reason": null,
@@ -302,10 +309,29 @@ export async function uploadAndVerifyFront(formData: FormData) {
       }
     }
 
-    if (!normalizedResult.full_name || !normalizedResult.document_number) {
+    if (!normalizedResult.full_name || normalizedResult.full_name.trim() === '') {
       return { 
         success: false, 
-        error: 'ID details (name or document number) could not be extracted. Please ensure the card is completely visible, glare-free, and try again.' 
+        error: 'Could not extract your name from the ID. Please ensure the front side is completely visible, glare-free, and try again.' 
+      }
+    }
+
+    if (!normalizedResult.date_of_birth || normalizedResult.date_of_birth.trim() === '') {
+      return { 
+        success: false, 
+        error: 'Could not extract your date of birth from the ID. Please ensure your date of birth is clearly visible on the document.' 
+      }
+    }
+
+    const docNumStr = normalizedResult.document_number || '';
+    const cleanNum = docNumStr.trim().replace(/[\s-]/g, '');
+
+    if (normalizedResult.document_type !== 'AADHAAR') {
+      if (!docNumStr || docNumStr.trim() === '') {
+        return { 
+          success: false, 
+          error: `Could not extract the document number from your ${normalizedResult.document_type || 'ID'}. Please ensure the number is clearly visible.` 
+        }
       }
     }
 
@@ -316,34 +342,41 @@ export async function uploadAndVerifyFront(formData: FormData) {
       }
     }
 
-    const num = normalizedResult.document_number?.trim().replace(/[\s-]/g, '')
     let validFormat = true
 
     if (normalizedResult.document_type === 'AADHAAR') {
-      if (!num || !/^\d{12}$/.test(num)) validFormat = false
+      // Accept 12 digits, masked formats (with x, X, *), 4 digits (last 4), or empty
+      const is12Digit = /^\d{12}$/.test(cleanNum)
+      const isMasked = /^[xX*\d]{12}$/.test(cleanNum) && /[xX*]/.test(cleanNum)
+      const isLast4 = /^\d{4}$/.test(cleanNum)
+      const isEmpty = cleanNum === ''
+      
+      if (!is12Digit && !isMasked && !isLast4 && !isEmpty) {
+        validFormat = false
+      }
     } else if (normalizedResult.document_type === 'PAN') {
-      if (!num || !/^[A-Z]{5}\d{4}[A-Z]$/i.test(num)) validFormat = false
+      if (!/^[A-Z]{5}\d{4}[A-Z]$/i.test(cleanNum)) validFormat = false
     } else if (normalizedResult.document_type === 'PASSPORT') {
-      const isIndian = /^[A-Z]\d{7}$/i.test(num)
-      const isGeneral = /^[A-Z0-9]{6,12}$/i.test(num)
-      if (!num || (!isIndian && !isGeneral)) validFormat = false
+      const isIndian = /^[A-Z]\d{7}$/i.test(cleanNum)
+      const isGeneral = /^[A-Z0-9]{6,12}$/i.test(cleanNum)
+      if (!isIndian && !isGeneral) validFormat = false
     } else if (normalizedResult.document_type === 'DRIVING_LICENSE') {
-      const cleanDl = num.replace(/[\s-/]/g, '')
+      const cleanDl = cleanNum.replace(/[\s-/]/g, '')
       const modernFormat = /^[A-Z]{2}\d{13}$/i.test(cleanDl)
       const genericFormat = /^[A-Z]{2}[A-Z0-9]{9,15}$/i.test(cleanDl)
-      if (!cleanDl || (!modernFormat && !genericFormat)) validFormat = false
+      if (!modernFormat && !genericFormat) validFormat = false
     } else if (normalizedResult.document_type === 'VOTER_ID') {
-      const cleanVoter = num.replace(/[\s-/]/g, '')
+      const cleanVoter = cleanNum.replace(/[\s-/]/g, '')
       const modernFormat = /^[A-Z]{3}\d{7}$/i.test(cleanVoter)
-      const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(normalizedResult.document_number?.trim().replace(/[\s]/g, '') || '')
+      const legacyFormat = /^[A-Z]{2}\/\d{2}\/\d{3}\/\d{6}$/i.test(docNumStr.trim().replace(/[\s]/g, '') || '')
       const genericFormat = /^[A-Z]{2,3}[A-Z0-9]{6,12}$/i.test(cleanVoter)
-      if (!cleanVoter || (!modernFormat && !legacyFormat && !genericFormat)) validFormat = false
+      if (!modernFormat && !legacyFormat && !genericFormat) validFormat = false
     }
 
     if (!validFormat) {
       return {
         success: false,
-        error: `The extracted ${normalizedResult.document_type || 'ID'} number "${normalizedResult.document_number}" does not match the expected format. Please ensure the card is fully visible and try again.`
+        error: `The extracted ${normalizedResult.document_type || 'ID'} number "${normalizedResult.document_number}" does not match the expected format. Please ensure the card is clear and fully visible.`
       }
     }
 
@@ -499,8 +532,22 @@ export async function uploadBackImage(formData: FormData) {
     if (backIdNumber && existingRecord.document_number) {
       const cleanBackNum = backIdNumber.trim().replace(/[\s-]/g, '')
       const cleanFrontNum = existingRecord.document_number.trim().replace(/[\s-]/g, '')
-      if (cleanBackNum !== cleanFrontNum && cleanBackNum.length >= 4 && cleanFrontNum.length >= 4) {
-        if (!cleanBackNum.includes(cleanFrontNum) && !cleanFrontNum.includes(cleanBackNum)) {
+      
+      const getDigitsOnly = (s: string) => s.replace(/\D/g, '')
+      const digitsBack = getDigitsOnly(cleanBackNum)
+      const digitsFront = getDigitsOnly(cleanFrontNum)
+
+      if (digitsBack && digitsFront) {
+        if (digitsBack.length === 12 && digitsFront.length === 12 && digitsBack !== digitsFront) {
+          return {
+            success: false,
+            error: 'The Aadhaar number on the back side does not match the front side. Please upload the back side of the same ID.'
+          }
+        }
+        
+        const last4Back = digitsBack.slice(-4)
+        const last4Front = digitsFront.slice(-4)
+        if (last4Back.length === 4 && last4Front.length === 4 && last4Back !== last4Front) {
           return {
             success: false,
             error: 'The document number on the back side does not match the front side. Please upload the back side of the same ID.'
@@ -518,6 +565,15 @@ export async function uploadBackImage(formData: FormData) {
     }
 
     const address = cleanFieldValue(result.address)
+    if (frontIdType !== 'PAN') {
+      if (!address || address.trim() === '') {
+        return {
+          success: false,
+          error: 'Could not extract the address from the back side of your ID. Please ensure the address text is clear, glare-free, and try again.'
+        }
+      }
+    }
+
     const updates: any = { 
       back_image_url: backUrl,
       address: address || existingRecord.address,
