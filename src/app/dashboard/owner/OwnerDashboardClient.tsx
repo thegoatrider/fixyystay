@@ -11,6 +11,7 @@ import { PropertyCard } from '@/components/PropertyCard'
 import WalletSection from '@/components/WalletSection'
 import AddLeadTile from './AddLeadTile'
 import QuickCheckin from './QuickCheckin'
+import DigitizeRegisterTile from './DigitizeRegisterTile'
 import { requestPayout } from '@/app/actions/wallet'
 import React, { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -157,6 +158,7 @@ export default function OwnerDashboardClient({
             <div id="dashboard-forms" className="flex flex-col w-full gap-3 bg-white border border-gray-150 p-5 shadow-sm rounded-2xl">
               <AddLeadTile ownerId={ownerId} properties={properties || []} />
               <QuickCheckin properties={properties || []} />
+              <DigitizeRegisterTile properties={properties || []} />
             </div>
 
             {/* Properties Grid Portfolio */}
