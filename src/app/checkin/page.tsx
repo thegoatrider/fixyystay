@@ -52,7 +52,7 @@ function CheckinForm() {
   const [showFormC, setShowFormC] = useState(false)
 
   // Register OCR Flow States
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [isRegisterMode, setIsRegisterMode] = useState(searchParams.get('mode') === 'register')
   const [registerStep, setRegisterStep] = useState<'SELECT_DATE' | 'UPLOAD' | 'SCANNING' | 'VERIFY'>('SELECT_DATE')
   const [registerDateRange, setRegisterDateRange] = useState({ from: '', to: '' })
   const [registerImages, setRegisterImages] = useState<File[]>([])

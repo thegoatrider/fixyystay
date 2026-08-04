@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Phone, MessageSquare, User } from 'lucide-react'
+import { Phone, MessageSquare, User, FileText } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
 
@@ -111,12 +111,31 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
           </select>
         </div>
 
-        <Button 
-          onClick={handleSendForm}
-          className="bg-blue-600 hover:bg-blue-700 w-full gap-2 h-11"
-        >
-          Send ID Form on WhatsApp
-        </Button>
+        <div className="flex flex-col gap-2 mt-1">
+          <Button 
+            onClick={handleSendForm}
+            className="bg-blue-600 hover:bg-blue-700 w-full gap-2 h-11"
+          >
+            Send ID Form on WhatsApp
+          </Button>
+          <Button 
+            type="button"
+            onClick={() => {
+              if (!selectedPropertyId) {
+                alert('Please select a property.');
+                return;
+              }
+              const baseUrl = window.location.origin;
+              const registerUrl = `${baseUrl}/checkin?p=${selectedPropertyId}&mode=register`;
+              window.open(registerUrl, '_blank');
+            }}
+            variant="outline"
+            className="border-blue-200 text-blue-600 hover:bg-blue-50 w-full gap-2 h-11 border-2"
+          >
+            <FileText className="w-4 h-4" />
+            Digitize Register (Register OCR)
+          </Button>
+        </div>
       </div>
     </CollapsibleTile>
   )
