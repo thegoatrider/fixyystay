@@ -604,3 +604,114 @@ export async function uploadBackImage(formData: FormData) {
 export async function uploadAndVerifyDocument(formData: FormData) {
   return uploadAndVerifyFront(formData)
 }
+
+// ─── Action 3: Upload Register Page → run handwritten OCR via Gemini ────────
+export async function verifyRegisterOCR(formData: FormData) {
+  console.log('[VERIFY-REGISTER-OCR] Starting register page OCR...')
+
+  try {
+    const file = formData.get('image') as File
+    if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
+
+    // 1. Upload register page image to storage
+    const imageUrl = await uploadToStorage(file, 'temp_registers')
+    if (!imageUrl) return { success: false, error: 'Failed to upload register image.' }
+
+    // 2. OCR with Gemini
+    console.log('[VERIFY-REGISTER-OCR] Analyzing with Gemini AI...')
+    const arrayBuffer = await file.arrayBuffer()
+    const base64Data = Buffer.from(arrayBuffer).toString('base64')
+
+    const prompt = `
+You are an expert handwritten text extraction (OCR) engine specialized in transcribing guest registers from hotels/stays.
+Analyze the uploaded register image and extract all guest records.
+
+For each guest entry on the page, identify and extract:
+- guest_name: Full name of the guest.
+- mobile_number: Mobile number (usually 10 digits). If not visible or blank, return null.
+- id_type: Mapped to one of these values: "Aadhaar Card", "Driving Licence", "Voter ID", "Passport", "Other", or "None".
+- id_number: Document number of the ID. If not visible or blank, return null.
+- checkin_date: Extract check-in date. If written as DD/MM/YYYY or DD-MM-YYYY, convert it to YYYY-MM-DD. If cannot be parsed, use null.
+- checkout_date: Extract check-out date. Convert to YYYY-MM-DD. If blank or cannot be parsed, return null.
+
+Return a JSON array of objects with the following structure:
+{
+  "guests": [
+    {
+      "guest_name": "...",
+      "mobile_number": "...",
+      "id_type": "Aadhaar Card | Driving Licence | Voter ID | Passport | Other | None",
+      "id_number": "...",
+      "checkin_date": "YYYY-MM-DD",
+      "checkout_date": "YYYY-MM-DD",
+      "confidence": "high | medium | low",
+      "uncertain_fields": ["guest_name", "id_number"]
+    }
+  ]
+}
+
+Only return JSON. Do not include markdown formatting, explanations, or preambles.
+`;
+
+    let aiResponseText = '{}'
+    let aiUnavailableError = ''
+    try {
+      const response = await generateContentWithRetry({
+        model: MODEL_NAME,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+          }
+        ],
+        config: {
+          systemInstruction: prompt,
+          temperature: 0.0,
+          responseMimeType: 'application/json'
+        }
+      });
+
+      aiResponseText = response?.text || '{}'
+    } catch (aiError: any) {
+      console.error('[VERIFY-REGISTER-OCR] AI call failed:', aiError)
+      if (aiError.message === 'AI_TIMEOUT') {
+        aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
+      } else {
+        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+      }
+    }
+
+    if (aiUnavailableError) {
+      return { success: false, error: aiUnavailableError }
+    }
+
+    // 3. Parse JSON
+    let result: any = {}
+    try {
+      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+    } catch {
+      try {
+        const firstBrace = aiResponseText.indexOf('{')
+        const lastBrace = aiResponseText.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+        } else {
+          throw new Error('No JSON object found')
+        }
+      } catch (fallbackErr) {
+        return { success: false, error: 'AI could not format register data correctly. Please upload a clearer image.' }
+      }
+    }
+
+    const guests = result.guests || []
+    return {
+      success: true,
+      imageUrl,
+      guests
+    }
+  } catch (err: any) {
+    console.error('[VERIFY-REGISTER-OCR] Uncaught exception:', err)
+    return { success: false, error: 'Internal system error during register OCR.' }
+  }
+}
+

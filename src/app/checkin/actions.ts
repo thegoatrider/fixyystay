@@ -188,3 +188,124 @@ export async function getPropertyInfo(propertyId: string) {
     return null
   }
 }
+
+export async function saveRegisterGuests(
+  propertyId: string,
+  registerDate: string,
+  guestEntries: any[],
+  imageUrls: string[]
+) {
+  try {
+    console.log(`[SAVE-REGISTER-GUESTS] Saving ${guestEntries.length} entries for property ${propertyId}`)
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch property info to get owner_id and organization_id
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyId || '')
+    const { data: property, error: propError } = await (isUUID 
+      ? supabaseAdmin
+          .from('properties')
+          .select('owner_id, organization_id')
+          .eq('id', propertyId)
+          .single()
+      : supabaseAdmin
+          .from('properties')
+          .select('owner_id, organization_id')
+          .eq('uid', propertyId)
+          .single()
+    )
+
+    if (propError || !property) {
+      console.error('[SAVE-REGISTER-GUESTS] Property fetch error:', propError)
+      return { success: false, error: 'Property not found.' }
+    }
+
+    const savedCheckinIds: string[] = []
+
+    // Helper: Map government ID type to ENUM
+    const mapIdTypeEnum = (typeStr: string | null | undefined): string => {
+      if (!typeStr) return 'UNKNOWN'
+      const normalized = typeStr.toLowerCase().replace(/[\s-_]/g, '')
+      if (normalized.includes('aadhaar')) return 'AADHAAR'
+      if (normalized.includes('pan')) return 'PAN'
+      if (normalized.includes('passport')) return 'PASSPORT'
+      if (normalized.includes('voterid') || normalized.includes('voter')) return 'VOTER_ID'
+      if (normalized.includes('drivinglicence') || normalized.includes('drivinglicense') || normalized.includes('driving')) return 'DRIVING_LICENSE'
+      return 'UNKNOWN'
+    }
+
+    for (const entry of guestEntries) {
+      // Generate standard guest check-in UID
+      const uid = 'GST-' + Date.now().toString(16).toUpperCase().slice(-8)
+
+      // 2. Insert check-in record
+      const checkinRecord: any = {
+        property_id: propertyId,
+        owner_id: property.owner_id,
+        organization_id: property.organization_id || null,
+        guest_phone: entry.mobile_number || '—',
+        guest_name: entry.guest_name || 'Guest (Register OCR)',
+        num_people: 1,
+        checkin_date: entry.checkin_date || registerDate || null,
+        checkout_date: entry.checkout_date || null,
+        uid,
+        status: 'completed',
+        source: 'Register OCR',
+        register_date: registerDate || null,
+        register_image_url: imageUrls.join(', ')
+      }
+
+      const { data: checkin, error: checkinError } = await supabaseAdmin
+        .from('guest_checkins')
+        .insert([checkinRecord])
+        .select('id')
+        .single()
+
+      if (checkinError || !checkin) {
+        console.error('[SAVE-REGISTER-GUESTS] Failed to save check-in:', checkinError)
+        continue
+      }
+
+      savedCheckinIds.push(checkin.id)
+
+      // 3. Create guest identity record
+      const identityRecord = {
+        checkin_id: checkin.id,
+        document_type: mapIdTypeEnum(entry.id_type),
+        document_number: entry.id_number || '—',
+        full_name: entry.guest_name || 'Guest (Register OCR)',
+        is_verified: true,
+        verification_status: 'VERIFIED',
+        document_image_url: imageUrls[0] || null, // Front side uses first page image
+        raw_ocr_text: JSON.stringify(entry),
+        verification_reason: 'Verified via Register OCR digitization.'
+      }
+
+      const { data: identity, error: identityError } = await supabaseAdmin
+        .from('guest_identity')
+        .insert([identityRecord])
+        .select('id')
+        .single()
+
+      if (identityError || !identity) {
+        console.error('[SAVE-REGISTER-GUESTS] Failed to save identity:', identityError)
+        continue
+      }
+
+      // Link identity record back in the JSON array in guest_checkins.id_documents
+      const idDocuments = [{ personIndex: 1, identityId: identity.id }]
+      await supabaseAdmin
+        .from('guest_checkins')
+        .update({ id_documents: idDocuments })
+        .eq('id', checkin.id)
+    }
+
+    return {
+      success: true,
+      count: savedCheckinIds.length
+    }
+  } catch (err: any) {
+    console.error('[SAVE-REGISTER-GUESTS] Uncaught exception:', err)
+    return { success: false, error: err.message || 'Failed to save register guests.' }
+  }
+}
+

@@ -26,6 +26,9 @@ type GuestCheckin = {
   property_id: string
   room_number?: string | null
   form_c_details?: any | null
+  source?: string | null
+  register_date?: string | null
+  register_image_url?: string | null
 }
 
 
@@ -624,6 +627,22 @@ function GuestList({
                     <span className="text-gray-450">Vehicle Number</span>
                     <span className="text-gray-900 font-bold uppercase">{selectedGuest.vehicle_number || 'None'}</span>
                   </div>
+                  <div className="flex justify-between py-1 pt-2 border-t border-gray-100">
+                    <span className="text-gray-450">Check-in Source</span>
+                    <span className={
+                      selectedGuest.source === 'Register OCR' 
+                        ? "bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-black text-[10px] uppercase"
+                        : "bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded font-black text-[10px] uppercase"
+                    }>
+                      {selectedGuest.source || 'Guest ID Form'}
+                    </span>
+                  </div>
+                  {selectedGuest.register_date && (
+                    <div className="flex justify-between py-1 pt-2">
+                      <span className="text-gray-450">Register Date</span>
+                      <span className="text-gray-900 font-bold">{selectedGuest.register_date}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -711,6 +730,46 @@ function GuestList({
                       </Button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Original Register Sheet */}
+              {selectedGuest.source === 'Register OCR' && selectedGuest.register_image_url && (
+                <div className="space-y-3 font-semibold">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Original Register Sheet</span>
+                  <div className="bg-gray-55 border border-gray-100 rounded-2xl p-4 flex flex-col gap-3">
+                    <div className="relative aspect-[3/2] rounded-xl overflow-hidden border border-gray-150 bg-gray-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selectedGuest.register_image_url} alt="Original Register Sheet" className="w-full h-full object-cover" />
+                      <a
+                        href={selectedGuest.register_image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-[9px] font-bold gap-1 transition"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Open Original
+                      </a>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleDownload(selectedGuest.register_image_url!, `Register_${selectedGuest.guest_name.replace(/\s+/g, '_')}`, `save-${selectedGuest.register_image_url}`)}
+                        disabled={processingId === `save-${selectedGuest.register_image_url}`}
+                        className="flex items-center justify-center gap-1.5 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition text-xs text-gray-700 font-bold cursor-pointer"
+                      >
+                        {processingId === `save-${selectedGuest.register_image_url}` 
+                          ? <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> 
+                          : <Download className="w-4 h-4 text-gray-605" />}
+                        Save Image
+                      </button>
+                      <button 
+                        onClick={() => handlePrint(selectedGuest.register_image_url!)} 
+                        className="flex items-center justify-center gap-1.5 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition text-xs text-gray-700 font-bold cursor-pointer"
+                      >
+                        <Printer className="w-4 h-4 text-gray-605" />
+                        Print Sheet
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
