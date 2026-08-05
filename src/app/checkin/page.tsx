@@ -299,18 +299,27 @@ function CheckinForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto flex flex-col gap-8">
+    <div className={`min-h-screen bg-gray-50 px-4 ${isRegisterMode ? 'py-6' : 'py-12'}`}>
+      <div className={`max-w-2xl mx-auto flex flex-col ${isRegisterMode ? 'gap-4' : 'gap-8'}`}>
         <div className="text-center">
-          <Link href="/" className="font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition">
+          <Link href="/" className={isRegisterMode
+            ? "font-bold text-xl text-blue-600 mb-2 inline-block hover:text-blue-700 transition"
+            : "font-bold text-2xl text-blue-600 mb-4 inline-block hover:text-blue-700 transition"
+          }>
             Fixy Stays
           </Link>
-          <h1 className="text-4xl font-extrabold text-gray-900 leading-tight">
+          <h1 className={isRegisterMode 
+            ? "text-2xl font-bold text-gray-900 leading-tight" 
+            : "text-4xl font-extrabold text-gray-900 leading-tight"
+          }>
             Welcome to <br />
             <span className="text-blue-600 drop-shadow-sm">{propertyInfo?.name || 'Guest Check-in'}</span>
           </h1>
-          <p className="text-gray-500 mt-3 font-medium">
-            Please fill in your details and upload both sides of a government ID for <strong>every guest</strong>.
+          <p className="text-gray-500 mt-3 font-medium text-sm">
+            {isRegisterMode 
+              ? "Upload the Guest register images" 
+              : <>Please fill in your details and upload both sides of a government ID for <strong>every guest</strong>.</>
+            }
           </p>
         </div>
 
