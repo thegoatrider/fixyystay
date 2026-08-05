@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.fixystays.app',
+  appId: 'com.fixystays.myapp',
   appName: 'FixyStays',
   webDir: 'public',
   server: {

@@ -1,4 +1,4 @@
-package com.fixystays.app;
+package com.fixystays.myapp;
 
 import com.getcapacitor.BridgeActivity;
 
