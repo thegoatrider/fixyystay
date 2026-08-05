@@ -2,12 +2,24 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import { ChevronLeft, Users, FileText, ExternalLink, X, AlertCircle, Search, Download, Printer, Share2, Lock, CheckCircle, Globe } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users, FileText, ExternalLink, X, AlertCircle, Search, Download, Printer, Share2, Lock, CheckCircle, Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import React, { useEffect } from 'react'
 import { approveIdentity, assignRoomToGuest, checkoutGuest } from './actions'
+
+const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+function getDaysInMonth(year: number, month: number) {
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const startPad = firstDay.getDay() // 0=Sun
+  const days: (Date | null)[] = []
+  for (let i = 0; i < startPad; i++) days.push(null)
+  for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d))
+  return days
+}
 
 type GuestCheckin = {
   id: string
@@ -59,6 +71,12 @@ function GuestList({
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterProperty, setFilterProperty] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
+
+  // Calendar view states
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewYear, setViewYear] = useState(new Date().getFullYear())
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
   // Initialize selectedPropertyId
   useEffect(() => {
@@ -237,6 +255,17 @@ function GuestList({
   }
 
 
+  const handleCheckout = async (guestId: string) => {
+    if (confirm('Check out this guest from their stay?')) {
+      setProcessingId(`out-${guestId}`)
+      const res = await checkoutGuest(guestId)
+      setProcessingId(null)
+      if (!res.success) {
+        alert(res.error)
+      }
+    }
+  }
+
   // 1. Process and filter guests dynamically
   const processedGuests = useMemo(() => {
     let list = [...checkins]
@@ -302,6 +331,40 @@ function GuestList({
     return list
   }, [checkins, searchTerm, filterStatus, filterProperty, sortField, sortOrder])
 
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+    setSelectedDate(null)
+  }
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
+    setSelectedDate(null)
+  }
+
+  const calendarDays = getDaysInMonth(viewYear, viewMonth)
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
+
+  // Map guests to their checkin dates
+  const guestsByDate = useMemo(() => {
+    const map: Record<string, GuestCheckin[]> = {}
+    processedGuests.forEach(g => {
+      if (g.checkin_date) {
+        // g.checkin_date is in YYYY-MM-DD format
+        const key = g.checkin_date
+        if (!map[key]) map[key] = []
+        map[key].push(g)
+      }
+    })
+    return map
+  }, [processedGuests])
+
+  const guestsOnSelectedDate = useMemo(() => {
+    if (!selectedDate) return []
+    const key = format(selectedDate, 'yyyy-MM-dd')
+    return guestsByDate[key] || []
+  }, [selectedDate, guestsByDate])
+
   // 2. Paginate processed results
   const itemsPerPage = 10
   const paginatedGuests = useMemo(() => {
@@ -319,6 +382,24 @@ function GuestList({
         <div>
           <h2 className="text-xl font-bold text-gray-900">Guest Check-in Records</h2>
           <p className="text-sm text-gray-400 mt-0.5">{checkins.length} total registered guests</p>
+        </div>
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            List view
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'calendar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Calendar view
+          </button>
         </div>
       </div>
 
@@ -366,134 +447,250 @@ function GuestList({
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden w-full">
-          <div className="overflow-x-auto w-full">
-            <table className="min-w-full divide-y divide-gray-100 text-left">
-              <thead className="bg-gray-50 text-[10px] font-black text-gray-450 uppercase tracking-widest">
-                <tr>
-                  <th className="px-6 py-4">UID</th>
-                  <th 
-                    className="px-6 py-4 cursor-pointer hover:text-indigo-600 transition select-none"
-                    onClick={() => {
-                      setSortField('guest_name');
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    }}
-                  >
-                    Guest Name {sortField === 'guest_name' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="px-6 py-4">Contact</th>
-                  <th className="px-6 py-4">Property</th>
-                  <th className="px-6 py-4 text-center">Room</th>
-                  <th 
-                    className="px-6 py-4 text-center cursor-pointer hover:text-indigo-600 transition select-none"
-                    onClick={() => {
-                      setSortField('num_people');
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    }}
-                  >
-                    PAX {sortField === 'num_people' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th 
-                    className="px-6 py-4 cursor-pointer hover:text-indigo-600 transition select-none"
-                    onClick={() => {
-                      setSortField('checkin_date');
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    }}
-                  >
-                    Check In {sortField === 'checkin_date' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="px-6 py-4">Check Out</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white text-xs font-semibold text-gray-750">
-                {paginatedGuests.length === 0 ? (
+        {viewMode === 'list' ? (
+          <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden w-full">
+            <div className="overflow-x-auto w-full">
+              <table className="min-w-full divide-y divide-gray-100 text-left">
+                <thead className="bg-gray-50 text-[10px] font-black text-gray-455 uppercase tracking-widest">
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-gray-400 italic">No check-in records found matching your filters.</td>
-                  </tr>
-                ) : (
-                  paginatedGuests.map(g => (
-                    <tr 
-                      key={g.id}
-                      onClick={() => setSelectedGuest(g)}
-                      className="hover:bg-indigo-50/20 transition cursor-pointer"
+                    <th className="px-6 py-4">UID</th>
+                    <th 
+                      className="px-6 py-4 cursor-pointer hover:text-indigo-600 transition select-none"
+                      onClick={() => {
+                        setSortField('guest_name');
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      }}
                     >
-                      <td className="px-6 py-4 font-mono text-indigo-500 uppercase tracking-tighter">{g.uid || '—'}</td>
-                      <td className="px-6 py-4 font-bold text-gray-900">{g.guest_name}</td>
-                      <td className="px-6 py-4 font-normal text-gray-500">{g.guest_phone}</td>
-                      <td className="px-6 py-4 truncate max-w-[150px]">{g.properties?.name}</td>
-                      <td className="px-6 py-4 text-center">
-                        {g.room_number ? (
-                          <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black border border-emerald-100">
-                            {g.room_number}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-black">
-                          {g.num_people} Pax
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-600">{g.checkin_date || '—'}</td>
-                      <td className="px-6 py-4 font-medium text-gray-600">{g.checkout_date || '—'}</td>
-                      <td className="px-6 py-4 text-center">
-                        {g.status === 'checked_out' ? (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200 uppercase text-[9px] font-black tracking-wider">Checked Out</span>
-                        ) : g.status === 'draft' ? (
-                          <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100 uppercase text-[9px] font-black tracking-wider">Draft</span>
-                        ) : (
-                          <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 uppercase text-[9px] font-black tracking-wider">Checked In</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setSelectedGuest(g)}
-                          className="font-bold text-xs hover:text-indigo-650 rounded-lg"
-                        >
-                          View details
-                        </Button>
-                      </td>
+                      Guest Name {sortField === 'guest_name' && (sortOrder === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th className="px-6 py-4">Contact</th>
+                    <th className="px-6 py-4">Property</th>
+                    <th className="px-6 py-4 text-center">Room</th>
+                    <th className="px-6 py-4 text-center">Guests</th>
+                    <th 
+                      className="px-6 py-4 cursor-pointer hover:text-indigo-600 transition select-none"
+                      onClick={() => {
+                        setSortField('checkin_date');
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      }}
+                    >
+                      Check In {sortField === 'checkin_date' && (sortOrder === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th className="px-6 py-4">Check Out</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white text-xs font-semibold text-gray-750">
+                  {paginatedGuests.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center text-gray-400 italic">No check-in records found matching your filters.</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    paginatedGuests.map(g => (
+                      <tr 
+                        key={g.id}
+                        onClick={() => setSelectedGuest(g)}
+                        className="hover:bg-indigo-50/20 transition cursor-pointer"
+                      >
+                        <td className="px-6 py-4 font-mono text-indigo-500 uppercase tracking-tighter">{g.uid || '—'}</td>
+                        <td className="px-6 py-4 font-bold text-gray-900">{g.guest_name}</td>
+                        <td className="px-6 py-4 font-normal text-gray-500">{g.guest_phone}</td>
+                        <td className="px-6 py-4 truncate max-w-[150px]">{g.properties?.name}</td>
+                        <td className="px-6 py-4 text-center">
+                          {g.room_number ? (
+                            <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black border border-emerald-100">
+                              {g.room_number}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-black">
+                            {g.num_people} Pax
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-605">{g.checkin_date || '—'}</td>
+                        <td className="px-6 py-4 font-medium text-gray-650">{g.checkout_date || '—'}</td>
+                        <td className="px-6 py-4 text-center">
+                          {g.status === 'checked_out' ? (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200 uppercase text-[9px] font-black tracking-wider">Checked Out</span>
+                          ) : g.status === 'draft' ? (
+                            <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100 uppercase text-[9px] font-black tracking-wider">Draft</span>
+                          ) : (
+                            <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 uppercase text-[9px] font-black tracking-wider">Checked In</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                          <div className="flex justify-end gap-1.5">
+                            {g.status !== 'checked_out' && (
+                              <button
+                                onClick={() => setApproveModalId(g.id)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition shadow-sm cursor-pointer"
+                              >
+                                Check In / Assign Room
+                              </button>
+                            )}
+                            {g.status !== 'checked_out' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={processingId === `out-${g.id}`}
+                                onClick={() => handleCheckout(g.id)}
+                                className="h-8 rounded-lg font-bold text-xs border-gray-200"
+                              >
+                                {processingId === `out-${g.id}` ? 'Checking Out...' : 'Check Out'}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Pagination bar */}
-          {totalPages > 1 && (
-            <div className="bg-gray-50 border-t border-gray-100 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                Page {currentPage} of {totalPages} ({processedGuests.length} guests)
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="h-8 rounded-lg font-bold text-xs border-gray-200"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="h-8 rounded-lg font-bold text-xs border-gray-200"
-                >
-                  Next
-                </Button>
+            {/* Pagination bar */}
+            {totalPages > 1 && (
+              <div className="bg-gray-50 border-t border-gray-100 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                  Page {currentPage} of {totalPages} ({processedGuests.length} guests)
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="h-8 rounded-lg font-bold text-xs border-gray-200"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="h-8 rounded-lg font-bold text-xs border-gray-200"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-[1fr_380px] gap-6 items-start w-full">
+            {/* Calendar Box */}
+            <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50 border-gray-150">
+                <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
+                  <ChevronLeft className="w-5 h-5 text-gray-600" />
+                </button>
+                <span className="font-bold text-gray-900 text-sm">{monthLabel}</span>
+                <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
+                  <ChevronRight className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="p-4">
+                <div className="grid grid-cols-7 mb-2">
+                  {DAYS_OF_WEEK.map((d, i) => (
+                    <div key={i} className="text-center text-[10px] font-black text-gray-400 uppercase py-1">{d}</div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-1">
+                  {calendarDays.map((day, i) => {
+                    if (!day) return <div key={`pad-${i}`} />
+                    const key = format(day, 'yyyy-MM-dd')
+                    const dayGuests = guestsByDate[key] || []
+                    const hasGuests = dayGuests.length > 0
+                    const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                    const isSelected = selectedDate ? format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') : false
+
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => hasGuests ? setSelectedDate(isSelected ? null : day) : null}
+                        className={[
+                          'relative flex flex-col items-center justify-start pt-1.5 pb-1 rounded-xl h-14 transition-all duration-150 border',
+                          hasGuests ? 'cursor-pointer hover:bg-indigo-50/50 border-indigo-100' : 'cursor-default border-transparent',
+                          isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300 border-indigo-600 hover:bg-indigo-600' : '',
+                          isToday && !isSelected ? 'bg-indigo-50 font-bold text-indigo-700 border-indigo-100' : '',
+                          !isSelected && !isToday && hasGuests ? 'text-gray-700 bg-gray-50/40' : '',
+                          !isSelected && !isToday && !hasGuests ? 'text-gray-400' : ''
+                        ].join(' ')}
+                      >
+                        <span className="text-xs font-bold leading-none">{day.getDate()}</span>
+                        {hasGuests && (
+                          <div className="flex gap-0.5 mt-1.5 flex-wrap justify-center max-w-[36px]">
+                            {dayGuests.slice(0, 3).map((g, di) => (
+                              <span
+                                key={di}
+                                className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-indigo-500'}`}
+                              />
+                            ))}
+                            {dayGuests.length > 3 && (
+                              <span className={`text-[8px] font-bold leading-none mt-0.5 ${isSelected ? 'text-white/80' : 'text-indigo-600'}`}>
+                                +{dayGuests.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          )}
+
+            {/* Selected Date Guests Panel */}
+            <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[500px]">
+              <div className="px-5 py-4 border-b border-gray-150 bg-gray-50 flex items-center justify-between">
+                <span className="font-bold text-gray-900 text-xs uppercase tracking-wider">
+                  {selectedDate ? format(selectedDate, 'dd MMMM yyyy') : 'Select a date'}
+                </span>
+                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                  {guestsOnSelectedDate.length} {guestsOnSelectedDate.length === 1 ? 'Guest' : 'Guests'}
+                </span>
+              </div>
+              <div className="p-4 overflow-y-auto divide-y divide-gray-100 flex-1 min-h-[200px]">
+                {!selectedDate ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 italic py-12 text-xs">
+                    Select a date on the calendar with guests to view details.
+                  </div>
+                ) : guestsOnSelectedDate.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 italic py-12 text-xs">
+                    No check-ins on this date.
+                  </div>
+                ) : (
+                  guestsOnSelectedDate.map(g => (
+                    <div
+                      key={g.id}
+                      onClick={() => setSelectedGuest(g)}
+                      className="py-3 first:pt-0 last:pb-0 flex items-center justify-between cursor-pointer hover:bg-indigo-50/20 px-2 rounded-xl transition"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-gray-900 text-xs">{g.guest_name}</span>
+                        <span className="text-[10px] text-gray-400 font-mono uppercase">{g.uid}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] text-gray-500 font-bold">{g.room_number ? `Room ${g.room_number}` : 'No Room'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                          g.status === 'checked_out' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700'
+                        }`}>
+                          {g.status === 'checked_out' ? 'Out' : 'In'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         </div>
-      </div>
 
 
       {/* ── Live Room Visualizer Section ── */}
