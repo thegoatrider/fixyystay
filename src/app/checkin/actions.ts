@@ -74,12 +74,12 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     const { data: property, error: propError } = await (isUUID 
       ? supabaseAdmin
           .from('properties')
-          .select('owner_id, name, helpdesk_number, organization_id')
+          .select('id, owner_id, name, helpdesk_number, organization_id')
           .eq('id', propertyId)
           .single()
       : supabaseAdmin
           .from('properties')
-          .select('owner_id, name, helpdesk_number, organization_id')
+          .select('id, owner_id, name, helpdesk_number, organization_id')
           .eq('uid', propertyId)
           .single()
     )
@@ -104,7 +104,7 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     } : null
 
     const checkinRecord = {
-      property_id: propertyId,
+      property_id: property.id,
       owner_id: property.owner_id,
       organization_id: property.organization_id || null,
       guest_phone: guestPhone,
@@ -204,12 +204,12 @@ export async function saveRegisterGuests(
     const { data: property, error: propError } = await (isUUID 
       ? supabaseAdmin
           .from('properties')
-          .select('owner_id, organization_id')
+          .select('id, owner_id, organization_id')
           .eq('id', propertyId)
           .single()
       : supabaseAdmin
           .from('properties')
-          .select('owner_id, organization_id')
+          .select('id, owner_id, organization_id')
           .eq('uid', propertyId)
           .single()
     )
@@ -239,7 +239,7 @@ export async function saveRegisterGuests(
 
       // 2. Insert check-in record
       const checkinRecord: any = {
-        property_id: propertyId,
+        property_id: property.id,
         owner_id: property.owner_id,
         organization_id: property.organization_id || null,
         guest_phone: entry.mobile_number || '—',
