@@ -44,10 +44,35 @@ export default function OnboardingPage() {
     const propName = formData.get('propertyName') as string
 
     // 1. Check if email is already registered before proceeding
-    const checkRes = await checkEmailAvailability(email)
+    const checkRes = await checkEmailAvailability(email) as any
     if (checkRes.error) {
       setError(checkRes.error)
       setLoading(null)
+      return
+    }
+
+    if (checkRes.pendingRegistration) {
+      // User has already paid but their account registration is pending.
+      // Complete their onboarding directly without requesting payment again!
+      setLoading('Completing account setup...')
+      const submitData = new FormData()
+      submitData.append('name', name)
+      submitData.append('email', email)
+      submitData.append('password', password)
+      if (propName) submitData.append('propertyName', propName)
+
+      try {
+        const submitRes = await submitOnboarding(submitData)
+        if (submitRes.success) {
+          window.location.href = `/dashboard/owner`
+        } else {
+          setError(submitRes.error || 'Failed to complete registration')
+          setLoading(null)
+        }
+      } catch (err: any) {
+        setError(err.message || 'An unexpected error occurred.')
+        setLoading(null)
+      }
       return
     }
 

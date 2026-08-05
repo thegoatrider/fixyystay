@@ -297,7 +297,7 @@ export async function onboardPartner(formData: FormData) {
     }
 
     const name = formData.get('name') as string
-    const email = formData.get('email') as string
+    const email = (formData.get('email') as string || '').toLowerCase()
     const planName = formData.get('plan') as string
     const amount = parseFloat(formData.get('amount') as string) || 0
     const paymentRef = formData.get('paymentRef') as string

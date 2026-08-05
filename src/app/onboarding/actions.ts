@@ -9,11 +9,23 @@ export async function checkEmailAvailability(email: string) {
   const supabaseAdmin = createAdminClient()
   const { data } = await supabaseAdmin
     .from('owners')
-    .select('id')
+    .select('id, user_id')
     .eq('email', email.toLowerCase())
     .maybeSingle()
 
   if (data) {
+    if (!data.user_id) {
+      // Check if they actually paid (active subscription) before allowing pendingRegistration
+      const { data: subscription } = await supabaseAdmin
+        .from('owner_subscriptions')
+        .select('status')
+        .eq('owner_id', data.id)
+        .maybeSingle()
+      
+      if (subscription && subscription.status === 'active') {
+        return { success: true, pendingRegistration: true }
+      }
+    }
     return { error: 'Email already registered. If this is you, please enter your correct password to continue onboarding.' }
   }
   return { success: true }
@@ -70,7 +82,7 @@ export async function submitOnboarding(formData: FormData) {
   const supabaseAdmin = createAdminClient()
 
   // 2. Get or Insert into owners table
-  const { data: existingOwner } = await supabaseAdmin.from('owners').select('id').eq('email', normalizedEmail).maybeSingle()
+  const { data: existingOwner } = await supabaseAdmin.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
   let ownerId = existingOwner?.id
 
   if (!existingOwner) {
@@ -86,6 +98,18 @@ export async function submitOnboarding(formData: FormData) {
       console.error('Failed to create owner record:', dbError)
     } else if (newOwner) {
       ownerId = newOwner.id
+    }
+  } else {
+    // If owner exists but user_id is null (webhook placeholder), link it!
+    if (!existingOwner.user_id) {
+      const { error: updateError } = await supabaseAdmin
+        .from('owners')
+        .update({ user_id: userId, name })
+        .eq('id', existingOwner.id)
+      
+      if (updateError) {
+        console.error('Failed to link existing owner record:', updateError)
+      }
     }
   }
 

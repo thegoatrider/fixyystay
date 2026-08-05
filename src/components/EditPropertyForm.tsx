@@ -330,7 +330,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
           id="city"
           name="city"
           required
-          defaultValue={property.city === "Alibag" ? "Raigad" : (property.city || "Raigad")}
+          defaultValue={property.city === "Alibag" || property.city === "Pending" ? "Raigad" : (property.city || "Raigad")}
           className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
         >
           <option value="Raigad">Raigad</option>

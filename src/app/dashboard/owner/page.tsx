@@ -19,12 +19,13 @@ export default async function OwnerDashboard() {
   
   if (!owner && user?.email) {
     const supabaseAdmin = createAdminClient()
+    const lowerEmail = user.email.toLowerCase()
     
     // Self-healing step 1: try to link by email if row exists
     const { data: updatedOwner } = await supabaseAdmin
       .from('owners')
       .update({ user_id: user.id })
-      .eq('email', user.email)
+      .eq('email', lowerEmail)
       .select('id, created_at')
       .maybeSingle()
     
@@ -36,7 +37,7 @@ export default async function OwnerDashboard() {
         .from('owners')
         .insert({
           user_id: user.id,
-          email: user.email,
+          email: lowerEmail,
           name: user.user_metadata?.name || user.email.split('@')[0],
           phone_number: ''
         })
