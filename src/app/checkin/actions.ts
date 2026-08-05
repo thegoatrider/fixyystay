@@ -221,6 +221,42 @@ export async function saveRegisterGuests(
 
     const savedCheckinIds: string[] = []
 
+    // Helper: Normalize date string into YYYY-MM-DD format
+    const normalizeDate = (dateStr: string | null | undefined): string | null => {
+      if (!dateStr) return null
+      dateStr = dateStr.trim()
+      
+      // Case 1: already YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr
+      }
+      
+      // Case 2: DD/MM/YYYY or DD-MM-YYYY
+      const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+      if (dmyMatch) {
+        const [_, d, m, y] = dmyMatch
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      }
+      
+      // Case 3: YYYY/MM/DD
+      const ymdMatch = dateStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+      if (ymdMatch) {
+        const [_, y, m, d] = ymdMatch
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      }
+
+      try {
+        const parsed = new Date(dateStr)
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().split('T')[0]
+        }
+      } catch (e) {}
+
+      return null
+    }
+
+    const registerDateSplit = registerDate ? registerDate.split(' to ') : []
+
     // Helper: Map government ID type to ENUM
     const mapIdTypeEnum = (typeStr: string | null | undefined): string => {
       if (!typeStr) return 'UNKNOWN'
@@ -245,12 +281,12 @@ export async function saveRegisterGuests(
         guest_phone: entry.mobile_number || '—',
         guest_name: entry.guest_name || 'Guest (Register OCR)',
         num_people: 1,
-        checkin_date: entry.checkin_date || registerDate || null,
-        checkout_date: entry.checkout_date || null,
+        checkin_date: normalizeDate(entry.checkin_date) || normalizeDate(registerDateSplit[0]) || null,
+        checkout_date: normalizeDate(entry.checkout_date) || normalizeDate(registerDateSplit[1]) || null,
         uid,
         status: 'completed',
         source: 'Register OCR',
-        register_date: registerDate || null,
+        register_date: normalizeDate(registerDateSplit[0]) || null,
         register_image_url: imageUrls.join(', ')
       }
 
