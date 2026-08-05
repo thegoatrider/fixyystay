@@ -137,11 +137,7 @@ function CheckinForm() {
         setRegisterStep('SELECT_DATE')
         setRegisterImages([])
         setRegisterGuests([])
-        setSuccessData({
-          propertyName: propertyInfo?.name || 'the property',
-          helpdesk: propertyInfo?.helpdesk_number || 'Contact Support'
-        })
-        setStep(2)
+        window.location.href = '/dashboard/owner?tab=guests'
       } else {
         setRegisterError(result.error || 'Failed to save register guests.')
       }
