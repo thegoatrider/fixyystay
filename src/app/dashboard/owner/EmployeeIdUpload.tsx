@@ -175,7 +175,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     }
 
     const ex = res.extracted!
-    const fs = res.status === 'VERIFIED' ? 'VERIFIED' : 'FAILED'
+    const fs = (res.status === 'VERIFIED' || res.status === 'MANUAL_REVIEW') ? res.status : 'FAILED'
 
     if (fs === 'FAILED') {
       setFrontStatus('FAILED')
@@ -185,6 +185,9 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
     }
 
     setFrontStatus(fs)
+    if (fs === 'MANUAL_REVIEW' && res.reason) {
+      setFrontReason(res.reason)
+    }
     setFrontUrl(res.frontUrl)
     setExtracted(ex)
 
