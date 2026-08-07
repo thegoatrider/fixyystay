@@ -465,7 +465,7 @@ export async function approveIdentity(identityId: string, manualName?: string, m
         const mimeType = response.headers.get('content-type') || 'image/jpeg'
 
         const generatePromise = ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-2.5-flash',
           contents: [{
             role: 'user',
             parts: [{ inlineData: { data: base64Data, mimeType } }]

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-3.5-flash'
+const MODEL_NAME = 'gemini-2.5-flash'
 
 const SYSTEM_PROMPT = `
 You are an expert Government ID verification AI.

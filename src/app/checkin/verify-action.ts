@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-3.5-flash'
+const MODEL_NAME = 'gemini-2.5-flash'
 
 const OCR_PROMPT = `
 You are a strict government ID verification engine. Your FIRST task is to determine whether the uploaded image is a genuine, government-issued identity document. You must REJECT any image that is not a government ID.
@@ -118,8 +118,8 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
   const modelsToTry = [
     contents.model || MODEL_NAME,
-    'gemini-3.5-flash',
-    'gemini-3.6-flash'
+    'gemini-2.5-flash',
+    'gemini-1.5-flash'
   ];
 
   let lastError: any = null;
