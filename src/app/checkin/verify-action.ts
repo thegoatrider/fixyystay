@@ -405,8 +405,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
               systemInstruction: SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
-              responseSchema: FRONT_RESPONSE_SCHEMA,
-              maxOutputTokens: 600
+              maxOutputTokens: 1500
             }
           });
           return response?.text || '{}';
@@ -767,8 +766,7 @@ export async function uploadBackImage(formData: FormData) {
               systemInstruction: BACK_SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
-              responseSchema: BACK_RESPONSE_SCHEMA,
-              maxOutputTokens: 600
+              maxOutputTokens: 1500
             }
           });
           return response?.text || '{}';
@@ -995,7 +993,6 @@ export async function verifyRegisterOCR(formData: FormData) {
               systemInstruction: prompt,
               temperature: 0.0,
               responseMimeType: 'application/json',
-              responseSchema: REGISTER_RESPONSE_SCHEMA,
               maxOutputTokens: 1500
             }
           });

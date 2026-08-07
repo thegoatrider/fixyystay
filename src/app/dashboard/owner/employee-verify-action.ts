@@ -295,8 +295,7 @@ export async function verifyEmployeeFrontId(formData: FormData) {
               systemInstruction: SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
-              responseSchema: EMP_FRONT_RESPONSE_SCHEMA,
-              maxOutputTokens: 600
+              maxOutputTokens: 1500
             }
           })
           return res?.text || '{}'
@@ -437,8 +436,7 @@ export async function uploadEmployeeBackId(formData: FormData) {
               systemInstruction: BACK_SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
-              responseSchema: BACK_RESPONSE_SCHEMA,
-              maxOutputTokens: 600
+              maxOutputTokens: 1500
             }
           })
           return res?.text || '{}'
