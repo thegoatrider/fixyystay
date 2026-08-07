@@ -42,31 +42,6 @@ const compressAndEnhanceImage = (file: File): Promise<File> => {
         
         ctx.drawImage(img, 0, 0, width, height);
         
-        try {
-          const imageData = ctx.getImageData(0, 0, width, height);
-          const data = imageData.data;
-          const factor = 1.3; // Contrast factor
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i+1];
-            const b = data[i+2];
-            // Convert to grayscale
-            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            
-            // Adjust contrast
-            let val = (gray - 128) * factor + 128;
-            if (val < 0) val = 0;
-            if (val > 255) val = 255;
-            
-            data[i] = val;
-            data[i+1] = val;
-            data[i+2] = val;
-          }
-          ctx.putImageData(imageData, 0, 0);
-        } catch (e) {
-          console.warn('[IMAGE-PREPROCESS] Canvas processing failed, falling back to resize only:', e);
-        }
-        
         canvas.toBlob((blob) => {
           if (!blob) return resolve(file);
           const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.jpg", {
