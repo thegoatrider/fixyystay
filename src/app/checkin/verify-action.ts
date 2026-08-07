@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai'
 import crypto from 'crypto'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-2.5-flash'
+const MODEL_NAME = 'gemini-2.0-flash'
 
 // Global map for in-flight requests to deduplicate concurrent uploads of identical files
 const inFlightRequests = new Map<string, Promise<any>>();
@@ -55,29 +55,94 @@ async function saveCachedOcr(imageHash: string, ocrJson: any, docType: string): 
   }
 }
 
-const OCR_PROMPT = `Analyze government ID image (Aadhaar/PAN/Passport/VoterID/DL). Return ONLY JSON:
+const OCR_PROMPT = `
+You are a strict government ID verification engine. Your FIRST task is to determine whether the uploaded image is a genuine, government-issued identity document. You must REJECT any image that is not a government ID.
+
+STEP 1 — DOCUMENT CLASSIFICATION (mandatory, do this first):
+Examine the image carefully. A valid government ID must:
+- Be an official identity document issued by a government authority.
+- Contain at least TWO of: a person's name, a unique ID number, a date of birth or expiry, and an official emblem/logo.
+- Be one of these accepted types: Aadhaar Card, PAN Card, Passport, Voter ID / EPIC Card, Driving Licence.
+
+REJECT the image (set is_government_id: false) if it is any of the following:
+- A selfie, portrait, or photo of a person without an ID document.
+- A random photograph (nature, objects, food, buildings, etc.).
+- A screenshot of a website, app, or digital content.
+- A business card, loyalty card, gym card, or any non-government card.
+- A receipt, invoice, bill, or any financial document.
+- A bank statement, utility bill, or address proof only (without photo ID).
+- A blank image, solid colour, or image with no readable text.
+- Anything that does not look like an official government-issued photo ID.
+
+STEP 2 — EXTRACTION (only if STEP 1 passes):
+If and only if the image IS a government ID, extract the following fields using these strict rules:
+- full_name: Extract the full name of the person. Do not miss it.
+- id_number: Extract the unique ID number. If it is a masked Aadhaar card (e.g. showing 'xxxx xxxx 1234' or 'XXXX-XXXX-5678'), extract it exactly as printed. If the number is partially blacked out or masked, extract the visible last 4 digits (e.g., 'XXXX-XXXX-1234' or '1234'). If it cannot be read at all, return null.
+- date_of_birth: Extract the date of birth (DOB) or year of birth (YOB) (e.g. 'DD/MM/YYYY' or 'YYYY').
+- address: Extract the full address if present (this is usually on the back side of the card). Look for labels like 'Address', 'S/O', 'D/O', 'W/O', 'C/O'.
+- gender: Extract the gender (Male/Female/Transgender). Look for labels like 'Gender', 'Sex', 'MALE', 'FEMALE', 'M/F', or symbols.
+- expiry_date: Extract the expiry date of the document if present.
+
+JSON Output structure:
 {
-  "is_government_id": true/false,
-  "rejection_reason": "why rejected or null",
-  "full_name": "Name or null",
-  "date_of_birth": "DD/MM/YYYY or YYYY or null",
-  "id_number": "number or mask (e.g. XXXX-XXXX-1234) or null",
+  "is_government_id": true,
+  "rejection_reason": null,
+  "full_name": "",
+  "date_of_birth": "",
+  "id_number": "",
   "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence",
-  "address": "Address or null",
-  "gender": "Male | Female | null",
-  "expiry_date": "Date or null",
+  "address": "",
+  "gender": "",
+  "expiry_date": "",
   "confidence": {
-    "overall": "high|medium|low",
-    "notes": "notes"
+    "overall": "high | medium | low",
+    "notes": "any field-level uncertainty notes here"
   }
 }
-Rules:
-1. Reject selfies, screenshots, receipts, utility bills (is_government_id: false).
-2. Extract exact values. Append "[partial]" or "[inferred]" if unsure. Use null if missing.
-3. No prose/markdown.`
+
+If the image is NOT a government ID, return ONLY this JSON and nothing else:
+{
+  "is_government_id": false,
+  "rejection_reason": "<one sentence describing why this image was rejected, e.g. 'This appears to be a selfie, not a government ID.' or 'This is a random photograph, not an identity document.'"
+}
+
+FALLBACK BEHAVIOR (only when is_government_id is true):
+- If a field cannot be read at all: use null.
+- If text is partially readable: extract the readable portion and add "[partial]" suffix.
+- If you are guessing: add "[inferred]" suffix to that field's value.
+
+Return ONLY the JSON. No explanations, no preamble, no markdown.
+`
 
 const SYSTEM_PROMPT = OCR_PROMPT
-const BACK_SYSTEM_PROMPT = OCR_PROMPT
+
+const BACK_SYSTEM_PROMPT = `
+You are an expert Government ID verification AI.
+Analyze the back side of the provided ID image and extract information strictly in JSON format.
+Your task is to identify and extract the address.
+
+Guidelines for cropped digital layouts and photographed physical cards:
+- Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
+- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
+- If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
+
+Return STRICTLY this JSON (no markdown, just raw JSON):
+{
+  "is_government_id": boolean,
+  "confidence": number,
+  "suspicious": boolean,
+  "reason": string,
+  "address": string,
+  "raw_ocr_text_back": string
+}
+
+Rules for abuse detection (set suspicious: true if any are met):
+- It is a selfie, meme, cartoon, or random picture.
+- It is clearly a handwritten note or forged text.
+
+Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
+If a field cannot be read, use empty string "".
+`
 
 // Helper functions for cleaning and mapping OCR fields
 function cleanFieldValue(val: string | null | undefined): string {

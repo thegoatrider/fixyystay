@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai'
 import crypto from 'crypto'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-2.5-flash'
+const MODEL_NAME = 'gemini-2.0-flash'
 
 // Global map for in-flight requests to deduplicate concurrent uploads of identical files
 const inFlightRequests = new Map<string, Promise<any>>();
@@ -55,36 +55,68 @@ async function saveCachedOcr(imageHash: string, ocrJson: any, docType: string): 
   }
 }
 
-const SYSTEM_PROMPT = `Analyze government ID image (Aadhaar/PAN/Passport/VoterID/DL). Return ONLY JSON:
-{
-  "is_government_id": boolean,
-  "document_type": "AADHAAR | PAN | PASSPORT | DRIVING_LICENSE | VOTER_ID | UNKNOWN",
-  "document_number": "string",
-  "full_name": "string",
-  "date_of_birth": "string",
-  "confidence": number (0.0 to 1.0),
-  "suspicious": boolean,
-  "reason": "string",
-  "raw_ocr_text": "string"
-}
-Rules:
-1. Reject selfies, screenshots, receipts (is_government_id: false).
-2. Set suspicious: true if suspicious or fake.
-3. No prose/markdown.`
+const SYSTEM_PROMPT = `
+You are an expert Government ID verification AI.
+Analyze the provided image and extract information strictly in JSON format.
 
-const BACK_SYSTEM_PROMPT = `Analyze back of government ID. Return ONLY JSON:
+Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
+
+Rules for abuse detection (set suspicious: true if any are met):
+- It is a selfie, meme, cartoon, or random picture.
+- It is clearly a handwritten note or forged text.
+- It only contains random numbers without the structural layout of a real ID.
+
+Guidelines for cropped digital layouts and photographed physical cards:
+- Direct screenshots of digital IDs, electronic card printouts (like PDF e-Aadhaar downloads), cropped electronic documents, or DigiLocker cards are COMPLETELY VALID government IDs. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
+- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
+- If the document is valid and the text is legible and readable, set the confidence to at least 0.85. Only set confidence below 0.50 if the text is completely unreadable, blurry beyond recognition, or obviously fake.
+
+Calculate confidence score (0.0 to 1.0):
+- 0.80-1.0: Good clarity, standard format matches, text is legible.
+- 0.50-0.79: Blurry or lower quality but recognisable and text is mostly legible.
+- Below 0.50: Unrecognisable, blank, or obviously fake.
+
+Return STRICTLY this JSON (no markdown, just raw JSON):
 {
   "is_government_id": boolean,
-  "confidence": number (0.0 to 1.0),
+  "document_type": string,
+  "document_number": string,
+  "full_name": string,
+  "date_of_birth": string,
+  "confidence": number,
   "suspicious": boolean,
-  "reason": "string",
-  "address": "string",
-  "raw_ocr_text_back": "string"
+  "reason": string,
+  "raw_ocr_text": string
 }
-Rules:
-1. Reject non-ID images.
-2. Extract full address.
-3. No prose/markdown.`
+`
+
+const BACK_SYSTEM_PROMPT = `
+You are an expert Government ID verification AI.
+Analyze the back side of the provided ID image and extract information strictly in JSON format.
+Your task is to identify and extract the address.
+
+Guidelines for cropped digital layouts and photographed physical cards:
+- Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
+- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
+- If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
+
+Return STRICTLY this JSON (no markdown, just raw JSON):
+{
+  "is_government_id": boolean,
+  "confidence": number,
+  "suspicious": boolean,
+  "reason": string,
+  "address": string,
+  "raw_ocr_text_back": string
+}
+
+Rules for abuse detection (set suspicious: true if any are met):
+- It is a selfie, meme, cartoon, or random picture.
+- It is clearly a handwritten note or forged text.
+
+Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
+If a field cannot be read, use empty string "".
+`
 
 // ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
