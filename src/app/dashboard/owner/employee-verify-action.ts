@@ -176,8 +176,7 @@ If a field cannot be read, use empty string "".
 // ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
   const modelsToTry = [
-    MODEL_NAME,
-    'gemini-1.5-flash'
+    MODEL_NAME
   ];
 
   let lastError: any = null;

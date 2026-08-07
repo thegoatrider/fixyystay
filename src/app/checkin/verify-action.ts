@@ -290,8 +290,7 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
 // ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
   const modelsToTry = [
-    MODEL_NAME,
-    'gemini-1.5-flash'
+    MODEL_NAME
   ];
 
   let lastError: any = null;
