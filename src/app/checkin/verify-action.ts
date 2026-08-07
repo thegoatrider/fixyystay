@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai'
 import crypto from 'crypto'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-const MODEL_NAME = 'gemini-2.0-flash'
+const MODEL_NAME = 'gemini-2.5-flash'
 
 // Global map for in-flight requests to deduplicate concurrent uploads of identical files
 const inFlightRequests = new Map<string, Promise<any>>();
@@ -242,8 +242,8 @@ async function generateContentWithRetry(contents: any, maxRetries = 2) {
 
         const shouldRetry = isRateLimit || isServerError || isTimeout;
         if (!shouldRetry) {
-          console.log(`[GEMINI] Non-retryable error: ${errMsg}. Failing immediately.`);
-          throw error;
+          console.log(`[GEMINI] Non-retryable error: ${errMsg}. Proceeding to next model.`);
+          break;
         }
 
         // If it's a rate limit or server error, wait with exponential backoff
