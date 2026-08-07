@@ -11,21 +11,96 @@ type DocumentUploadProps = {
   onVerified: (identityId: string) => void
 }
 
+const compressAndEnhanceImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1000;
+        const MAX_HEIGHT = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        try {
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const data = imageData.data;
+          const factor = 1.3; // Contrast factor
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            // Convert to grayscale
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // Adjust contrast
+            let val = (gray - 128) * factor + 128;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            
+            data[i] = val;
+            data[i+1] = val;
+            data[i+2] = val;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        } catch (e) {
+          console.warn('[IMAGE-PREPROCESS] Canvas processing failed, falling back to resize only:', e);
+        }
+        
+        canvas.toBlob((blob) => {
+          if (!blob) return resolve(file);
+          const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_compressed.jpg", {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        }, 'image/jpeg', 0.80);
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps) {
   const [preview, setPreview] = useState<string | null>(null)
   const [status, setStatus] = useState<'IDLE' | 'UPLOADING' | 'PROCESSING' | 'EXTRACTING' | 'VERIFIED' | 'FAILED' | 'MANUAL_REVIEW'>('IDLE')
   const [reason, setReason] = useState<string>('')
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const originalFile = e.target.files?.[0]
+    if (!originalFile) return
 
-    const url = URL.createObjectURL(file)
-    setPreview(url)
     setStatus('UPLOADING')
     setReason('')
 
     try {
+      const file = await compressAndEnhanceImage(originalFile)
+      const url = URL.createObjectURL(file)
+      setPreview(url)
+      
       const formData = new FormData()
       formData.append('image', file)
 

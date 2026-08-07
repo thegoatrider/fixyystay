@@ -2,72 +2,146 @@
 
 import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
+import crypto from 'crypto'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.5-flash'
 
-const SYSTEM_PROMPT = `
-You are an expert Government ID verification AI.
-Analyze the provided image and extract information strictly in JSON format.
+// Global map for in-flight requests to deduplicate concurrent uploads of identical files
+const inFlightRequests = new Map<string, Promise<any>>();
 
-Allowed document_type values: AADHAAR, PAN, PASSPORT, DRIVING_LICENSE, VOTER_ID, UNKNOWN.
+async function getCachedOcr(imageHash: string): Promise<any | null> {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { data, error } = await supabaseAdmin
+      .from('ocr_cache')
+      .select('ocr_json')
+      .eq('image_hash', imageHash)
+      .maybeSingle()
 
-Rules for abuse detection (set suspicious: true if any are met):
-- It is a selfie, meme, cartoon, or random picture.
-- It is clearly a handwritten note or forged text.
-- It only contains random numbers without the structural layout of a real ID.
-
-Guidelines for cropped digital layouts and photographed physical cards:
-- Direct screenshots of digital IDs, electronic card printouts (like PDF e-Aadhaar downloads), cropped electronic documents, or DigiLocker cards are COMPLETELY VALID government IDs. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
-- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
-- If the document is valid and the text is legible and readable, set the confidence to at least 0.85. Only set confidence below 0.50 if the text is completely unreadable, blurry beyond recognition, or obviously fake.
-
-Calculate confidence score (0.0 to 1.0):
-- 0.80-1.0: Good clarity, standard format matches, text is legible.
-- 0.50-0.79: Blurry or lower quality but recognisable and text is mostly legible.
-- Below 0.50: Unrecognisable, blank, or obviously fake.
-
-Return STRICTLY this JSON (no markdown, just raw JSON):
-{
-  "is_government_id": boolean,
-  "document_type": string,
-  "document_number": string,
-  "full_name": string,
-  "date_of_birth": string,
-  "confidence": number,
-  "suspicious": boolean,
-  "reason": string,
-  "raw_ocr_text": string
-}
-`
-
-const BACK_SYSTEM_PROMPT = `
-You are an expert Government ID verification AI.
-Analyze the back side of the provided ID image and extract information strictly in JSON format.
-Your task is to identify and extract the address.
-
-Guidelines for cropped digital layouts and photographed physical cards:
-- Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
-- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
-- If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
-
-Return STRICTLY this JSON (no markdown, just raw JSON):
-{
-  "is_government_id": boolean,
-  "confidence": number,
-  "suspicious": boolean,
-  "reason": string,
-  "address": string,
-  "raw_ocr_text_back": string
+    if (error) {
+      console.error('[CACHE-DB] Error querying OCR cache:', error)
+      return null
+    }
+    
+    if (data) {
+      console.log(`[CACHE-DB] Cache HIT for image hash: ${imageHash}`)
+      return data.ocr_json
+    }
+  } catch (e) {
+    console.error('[CACHE-DB] Failed to query cache:', e)
+  }
+  return null
 }
 
-Rules for abuse detection (set suspicious: true if any are met):
-- It is a selfie, meme, cartoon, or random picture.
-- It is clearly a handwritten note or forged text.
+async function saveCachedOcr(imageHash: string, ocrJson: any, docType: string): Promise<void> {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
+      .from('ocr_cache')
+      .insert([{
+        image_hash: imageHash,
+        ocr_json: ocrJson,
+        document_type: docType
+      }])
 
-Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
-If a field cannot be read, use empty string "".
-`
+    if (error) {
+      console.error('[CACHE-DB] Error saving to OCR cache:', error)
+    } else {
+      console.log(`[CACHE-DB] Cache SAVED for image hash: ${imageHash}`)
+    }
+  } catch (e) {
+    console.error('[CACHE-DB] Failed to save cache:', e)
+  }
+}
+
+const SYSTEM_PROMPT = `Analyze government ID image (Aadhaar/PAN/Passport/VoterID/DL). Return ONLY JSON:
+{
+  "is_government_id": boolean,
+  "document_type": "AADHAAR | PAN | PASSPORT | DRIVING_LICENSE | VOTER_ID | UNKNOWN",
+  "document_number": "string",
+  "full_name": "string",
+  "date_of_birth": "string",
+  "confidence": number (0.0 to 1.0),
+  "suspicious": boolean,
+  "reason": "string",
+  "raw_ocr_text": "string"
+}
+Rules:
+1. Reject selfies, screenshots, receipts (is_government_id: false).
+2. Set suspicious: true if suspicious or fake.
+3. No prose/markdown.`
+
+const BACK_SYSTEM_PROMPT = `Analyze back of government ID. Return ONLY JSON:
+{
+  "is_government_id": boolean,
+  "confidence": number (0.0 to 1.0),
+  "suspicious": boolean,
+  "reason": "string",
+  "address": "string",
+  "raw_ocr_text_back": "string"
+}
+Rules:
+1. Reject non-ID images.
+2. Extract full address.
+3. No prose/markdown.`
+
+// ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
+async function generateContentWithRetry(contents: any, maxRetries = 2) {
+  const modelsToTry = [
+    MODEL_NAME,
+    'gemini-1.5-flash'
+  ];
+
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        console.log(`[GEMINI] Attempting content generation with model: ${model} (attempt ${i + 1}/${maxRetries})...`)
+        const generatePromise = ai.models.generateContent({
+          ...contents,
+          model: model
+        });
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
+        );
+        
+        const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+        
+        if (response?.usageMetadata) {
+          const usage = response.usageMetadata;
+          console.log(`[GEMINI-USAGE] Model: ${model}. Input Tokens: ${usage.promptTokenCount}, Output Tokens: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`);
+        }
+        
+        return response;
+      } catch (error: any) {
+        lastError = error;
+        const errMsg = error.message || String(error);
+        console.warn(`[GEMINI] Model ${model} attempt ${i + 1} failed:`, errMsg);
+
+        const isRateLimit = errMsg.includes('429') || errMsg.includes('TooManyRequests') || errMsg.includes('Quota');
+        const isServerError = errMsg.includes('500') || errMsg.includes('503') || errMsg.includes('Unavailable');
+        const isTimeout = errMsg === 'AI_TIMEOUT';
+
+        const shouldRetry = isRateLimit || isServerError || isTimeout;
+        if (!shouldRetry) {
+          console.log(`[GEMINI] Non-retryable error: ${errMsg}. Failing immediately.`);
+          throw error;
+        }
+
+        if (i < maxRetries - 1) {
+          const delay = 1000 * Math.pow(2, i);
+          console.log(`[GEMINI] Retryable error. Waiting ${delay}ms before next attempt.`);
+          await new Promise(res => setTimeout(res, delay));
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error('All Gemini models failed');
+}
 
 async function uploadToStorage(file: File, folder: string): Promise<string | null> {
   const admin = createAdminClient()
@@ -87,40 +161,76 @@ export async function verifyEmployeeFrontId(formData: FormData) {
     const file = formData.get('image') as File
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
 
+    // Hash file
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = Buffer.from(arrayBuffer)
+    const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    console.log(`[EMP-VERIFY-FRONT] File size: ${fileBuffer.length} bytes, SHA-256: ${imageHash}`)
+
+    // 1. Cache Check
+    const cachedResult = await getCachedOcr(imageHash)
+
     // Upload
     const frontUrl = await uploadToStorage(file, 'employee_ids')
     if (!frontUrl) return { success: false, error: 'Failed to upload image.' }
 
-    // OCR
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-
+    let result: any = null
     let aiText = '{}'
-    try {
-      const res = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: [{
-          role: 'user',
-          parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
-        }],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          temperature: 0.0,
-          responseMimeType: 'application/json'
-        }
-      })
-      aiText = res.text || '{}'
-    } catch (err) {
-      console.error('[EMP-VERIFY] Gemini error:', err)
-      return { success: false, error: 'AI verification temporarily unavailable.' }
-    }
+    let isFromCache = false
 
-    // Parse
-    let result: any = {}
-    try {
-      result = JSON.parse(aiText.replace(/^```json/g, '').replace(/```$/g, '').trim())
-    } catch {
-      result = { is_government_id: false, document_type: 'UNKNOWN', confidence: 0, suspicious: true, reason: 'Parse error', raw_ocr_text: '' }
+    if (cachedResult) {
+      result = cachedResult
+      aiText = JSON.stringify(cachedResult)
+      isFromCache = true
+      console.log('[EMP-VERIFY-FRONT] Using cached OCR result.')
+    } else {
+      console.log('[EMP-VERIFY-FRONT] Cache MISS. Calling Gemini AI...')
+      // Request deduplication
+      let activePromise = inFlightRequests.get(imageHash)
+      if (!activePromise) {
+        activePromise = (async () => {
+          const base64 = fileBuffer.toString('base64')
+          const res = await generateContentWithRetry({
+            contents: [{
+              role: 'user',
+              parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
+            }],
+            config: {
+              systemInstruction: SYSTEM_PROMPT,
+              temperature: 0.0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 600
+            }
+          })
+          return res?.text || '{}'
+        })()
+
+        inFlightRequests.set(imageHash, activePromise)
+        activePromise.finally(() => inFlightRequests.delete(imageHash))
+      } else {
+        console.log('[EMP-VERIFY-FRONT] Coalescing identical concurrent request...')
+      }
+
+      try {
+        aiText = await activePromise
+      } catch (err) {
+        console.error('[EMP-VERIFY] Gemini error:', err)
+        return { success: false, error: 'AI verification temporarily unavailable.' }
+      }
+
+      // Parse
+      let parseFailed = false
+      try {
+        result = JSON.parse(aiText.replace(/^```json/g, '').replace(/```$/g, '').trim())
+      } catch {
+        parseFailed = true
+        result = { is_government_id: false, document_type: 'UNKNOWN', confidence: 0, suspicious: true, reason: 'Parse error', raw_ocr_text: '' }
+      }
+
+      // Cache
+      if (!parseFailed && result && result.is_government_id !== false) {
+        await saveCachedOcr(imageHash, result, result.document_type || 'UNKNOWN')
+      }
     }
 
     // Validate
@@ -175,30 +285,61 @@ export async function uploadEmployeeBackId(formData: FormData) {
   try {
     const file = formData.get('image') as File
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
+
+    // Hash file
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = Buffer.from(arrayBuffer)
+    const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    console.log(`[EMP-VERIFY-BACK] File size: ${fileBuffer.length} bytes, SHA-256: ${imageHash}`)
+
+    // 1. Cache Check
+    const cachedResult = await getCachedOcr(imageHash)
+
     const backUrl = await uploadToStorage(file, 'employee_ids')
     if (!backUrl) return { success: false, error: 'Upload failed.' }
 
-    // OCR
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-
+    let resultParsed: any = null
     let aiText = '{}'
-    try {
-      const res = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: [{
-          role: 'user',
-          parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
-        }],
-        config: {
-          systemInstruction: BACK_SYSTEM_PROMPT,
-          temperature: 0.0,
-          responseMimeType: 'application/json'
-        }
-      })
-      aiText = res.text || '{}'
-    } catch (err) {
-      console.error('[EMP-VERIFY] Gemini error for back image:', err)
+    let isFromCache = false
+
+    if (cachedResult) {
+      resultParsed = cachedResult
+      aiText = JSON.stringify(cachedResult)
+      isFromCache = true
+      console.log('[EMP-VERIFY-BACK] Using cached OCR result.')
+    } else {
+      console.log('[EMP-VERIFY-BACK] Cache MISS. Calling Gemini AI...')
+      // Request deduplication
+      let activePromise = inFlightRequests.get(imageHash)
+      if (!activePromise) {
+        activePromise = (async () => {
+          const base64 = fileBuffer.toString('base64')
+          const res = await generateContentWithRetry({
+            contents: [{
+              role: 'user',
+              parts: [{ inlineData: { data: base64, mimeType: file.type || 'image/jpeg' } }]
+            }],
+            config: {
+              systemInstruction: BACK_SYSTEM_PROMPT,
+              temperature: 0.0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 600
+            }
+          })
+          return res?.text || '{}'
+        })()
+
+        inFlightRequests.set(imageHash, activePromise)
+        activePromise.finally(() => inFlightRequests.delete(imageHash))
+      } else {
+        console.log('[EMP-VERIFY-BACK] Coalescing identical concurrent request...')
+      }
+
+      try {
+        aiText = await activePromise
+      } catch (err) {
+        console.error('[EMP-VERIFY] Gemini error for back image:', err)
+      }
     }
 
     let address = ''
@@ -206,23 +347,37 @@ export async function uploadEmployeeBackId(formData: FormData) {
     let confidence = 0
     let suspicious = false
     let isGovtId = true
-    try {
-      const firstBrace = aiText.indexOf('{')
-      const lastBrace = aiText.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const jsonStr = aiText.substring(firstBrace, lastBrace + 1)
-        const result = JSON.parse(jsonStr)
-        address = result.address || ''
-        rawOcrTextBack = result.raw_ocr_text_back || aiText
-        confidence = result.confidence || 0
-        suspicious = result.suspicious || false
-        isGovtId = result.is_government_id !== false
-      } else {
-        return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
+
+    if (isFromCache) {
+      address = resultParsed.address || ''
+      rawOcrTextBack = resultParsed.raw_ocr_text_back || aiText
+      confidence = resultParsed.confidence || 0
+      suspicious = resultParsed.suspicious || false
+      isGovtId = resultParsed.is_government_id !== false
+    } else {
+      try {
+        const firstBrace = aiText.indexOf('{')
+        const lastBrace = aiText.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonStr = aiText.substring(firstBrace, lastBrace + 1)
+          const parsed = JSON.parse(jsonStr)
+          address = parsed.address || ''
+          rawOcrTextBack = parsed.raw_ocr_text_back || aiText
+          confidence = parsed.confidence || 0
+          suspicious = parsed.suspicious || false
+          isGovtId = parsed.is_government_id !== false
+          
+          // Cache
+          if (parsed && parsed.is_government_id !== false) {
+            await saveCachedOcr(imageHash, parsed, 'EMPLOYEE_BACK')
+          }
+        } else {
+          return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
+        }
+      } catch (e) {
+        console.warn('[EMP-VERIFY] Failed to parse AI JSON response for back image.')
+        return { success: false, error: 'Failed to process back image. Please re-upload.' }
       }
-    } catch (e) {
-      console.warn('[EMP-VERIFY] Failed to parse AI JSON response for back image.')
-      return { success: false, error: 'Failed to process back image. Please re-upload.' }
     }
 
     if (suspicious || !isGovtId || confidence < 0.50) {

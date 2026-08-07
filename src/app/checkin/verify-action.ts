@@ -2,68 +2,79 @@
 
 import { createAdminClient } from '@/utils/supabase/admin'
 import { GoogleGenAI } from '@google/genai'
+import crypto from 'crypto'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.5-flash'
 
-const OCR_PROMPT = `
-You are a strict government ID verification engine. Your FIRST task is to determine whether the uploaded image is a genuine, government-issued identity document. You must REJECT any image that is not a government ID.
+// Global map for in-flight requests to deduplicate concurrent uploads of identical files
+const inFlightRequests = new Map<string, Promise<any>>();
 
-STEP 1 — DOCUMENT CLASSIFICATION (mandatory, do this first):
-Examine the image carefully. A valid government ID must:
-- Be an official identity document issued by a government authority.
-- Contain at least TWO of: a person's name, a unique ID number, a date of birth or expiry, and an official emblem/logo.
-- Be one of these accepted types: Aadhaar Card, PAN Card, Passport, Voter ID / EPIC Card, Driving Licence.
+async function getCachedOcr(imageHash: string): Promise<any | null> {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { data, error } = await supabaseAdmin
+      .from('ocr_cache')
+      .select('ocr_json')
+      .eq('image_hash', imageHash)
+      .maybeSingle()
 
-REJECT the image (set is_government_id: false) if it is any of the following:
-- A selfie, portrait, or photo of a person without an ID document.
-- A random photograph (nature, objects, food, buildings, etc.).
-- A screenshot of a website, app, or digital content.
-- A business card, loyalty card, gym card, or any non-government card.
-- A receipt, invoice, bill, or any financial document.
-- A bank statement, utility bill, or address proof only (without photo ID).
-- A blank image, solid colour, or image with no readable text.
-- Anything that does not look like an official government-issued photo ID.
+    if (error) {
+      console.error('[CACHE-DB] Error querying OCR cache:', error)
+      return null
+    }
+    
+    if (data) {
+      console.log(`[CACHE-DB] Cache HIT for image hash: ${imageHash}`)
+      return data.ocr_json
+    }
+  } catch (e) {
+    console.error('[CACHE-DB] Failed to query cache:', e)
+  }
+  return null
+}
 
-STEP 2 — EXTRACTION (only if STEP 1 passes):
-If and only if the image IS a government ID, extract the following fields using these strict rules:
-- full_name: Extract the full name of the person. Do not miss it.
-- id_number: Extract the unique ID number. If it is a masked Aadhaar card (e.g. showing 'xxxx xxxx 1234' or 'XXXX-XXXX-5678'), extract it exactly as printed. If the number is partially blacked out or masked, extract the visible last 4 digits (e.g., 'XXXX-XXXX-1234' or '1234'). If it cannot be read at all, return null.
-- date_of_birth: Extract the date of birth (DOB) or year of birth (YOB) (e.g. 'DD/MM/YYYY' or 'YYYY').
-- address: Extract the full address if present (this is usually on the back side of the card). Look for labels like 'Address', 'S/O', 'D/O', 'W/O', 'C/O'.
-- gender: Extract the gender (Male/Female/Transgender). Look for labels like 'Gender', 'Sex', 'MALE', 'FEMALE', 'M/F', or symbols.
-- expiry_date: Extract the expiry date of the document if present.
+async function saveCachedOcr(imageHash: string, ocrJson: any, docType: string): Promise<void> {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
+      .from('ocr_cache')
+      .insert([{
+        image_hash: imageHash,
+        ocr_json: ocrJson,
+        document_type: docType
+      }])
 
-JSON Output structure:
-{
-  "is_government_id": true,
-  "rejection_reason": null,
-  "full_name": "",
-  "date_of_birth": "",
-  "id_number": "",
-  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence",
-  "address": "",
-  "gender": "",
-  "expiry_date": "",
-  "confidence": {
-    "overall": "high | medium | low",
-    "notes": "any field-level uncertainty notes here"
+    if (error) {
+      console.error('[CACHE-DB] Error saving to OCR cache:', error)
+    } else {
+      console.log(`[CACHE-DB] Cache SAVED for image hash: ${imageHash}`)
+    }
+  } catch (e) {
+    console.error('[CACHE-DB] Failed to save cache:', e)
   }
 }
 
-If the image is NOT a government ID, return ONLY this JSON and nothing else:
+const OCR_PROMPT = `Analyze government ID image (Aadhaar/PAN/Passport/VoterID/DL). Return ONLY JSON:
 {
-  "is_government_id": false,
-  "rejection_reason": "<one sentence describing why this image was rejected, e.g. 'This appears to be a selfie, not a government ID.' or 'This is a random photograph, not an identity document.'"
+  "is_government_id": true/false,
+  "rejection_reason": "why rejected or null",
+  "full_name": "Name or null",
+  "date_of_birth": "DD/MM/YYYY or YYYY or null",
+  "id_number": "number or mask (e.g. XXXX-XXXX-1234) or null",
+  "id_type": "Aadhaar | PAN | Passport | Voter ID | Driving Licence",
+  "address": "Address or null",
+  "gender": "Male | Female | null",
+  "expiry_date": "Date or null",
+  "confidence": {
+    "overall": "high|medium|low",
+    "notes": "notes"
+  }
 }
-
-FALLBACK BEHAVIOR (only when is_government_id is true):
-- If a field cannot be read at all: use null.
-- If text is partially readable: extract the readable portion and add "[partial]" suffix.
-- If you are guessing: add "[inferred]" suffix to that field's value.
-
-Return ONLY the JSON. No explanations, no preamble, no markdown.
-`
+Rules:
+1. Reject selfies, screenshots, receipts, utility bills (is_government_id: false).
+2. Extract exact values. Append "[partial]" or "[inferred]" if unsure. Use null if missing.
+3. No prose/markdown.`
 
 const SYSTEM_PROMPT = OCR_PROMPT
 const BACK_SYSTEM_PROMPT = OCR_PROMPT
@@ -117,8 +128,7 @@ async function uploadToStorage(file: File, folder: string): Promise<string | nul
 // ─── Helper: Retry wrapper for Gemini API with model fallbacks to prevent failures ────────
 async function generateContentWithRetry(contents: any, maxRetries = 2) {
   const modelsToTry = [
-    contents.model || MODEL_NAME,
-    'gemini-2.5-flash',
+    MODEL_NAME,
     'gemini-1.5-flash'
   ];
 
@@ -132,23 +142,42 @@ async function generateContentWithRetry(contents: any, maxRetries = 2) {
           ...contents,
           model: model
         });
+        
+        // Timeout after 15 seconds
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
         );
+        
         const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+        
+        // Log token usage!
+        if (response?.usageMetadata) {
+          const usage = response.usageMetadata;
+          console.log(`[GEMINI-USAGE] Model: ${model}. Input Tokens: ${usage.promptTokenCount}, Output Tokens: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`);
+        }
+        
         return response;
       } catch (error: any) {
         lastError = error;
-        console.warn(`[GEMINI] Model ${model} attempt ${i + 1} failed:`, error.message || error);
-        
-        // If it's a timeout, skip remaining retries for this model and try next model
-        if (error.message === 'AI_TIMEOUT') {
-          break;
+        const errMsg = error.message || String(error);
+        console.warn(`[GEMINI] Model ${model} attempt ${i + 1} failed:`, errMsg);
+
+        // Determine if we should retry this error
+        const isRateLimit = errMsg.includes('429') || errMsg.includes('TooManyRequests') || errMsg.includes('Quota');
+        const isServerError = errMsg.includes('500') || errMsg.includes('503') || errMsg.includes('Unavailable');
+        const isTimeout = errMsg === 'AI_TIMEOUT';
+
+        const shouldRetry = isRateLimit || isServerError || isTimeout;
+        if (!shouldRetry) {
+          console.log(`[GEMINI] Non-retryable error: ${errMsg}. Failing immediately.`);
+          throw error;
         }
-        
-        // Wait before retrying the same model
+
+        // If it's a rate limit or server error, wait with exponential backoff
         if (i < maxRetries - 1) {
-          await new Promise(res => setTimeout(res, 1500 * (i + 1)));
+          const delay = 1000 * Math.pow(2, i);
+          console.log(`[GEMINI] Retryable error. Waiting ${delay}ms before next attempt.`);
+          await new Promise(res => setTimeout(res, delay));
         }
       }
     }
@@ -165,50 +194,78 @@ export async function uploadAndVerifyFront(formData: FormData) {
     const file = formData.get('image') as File
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
 
-    // 1. Upload front image
+    // Calculate SHA-256 hash of image file
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = Buffer.from(arrayBuffer)
+    const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    console.log(`[VERIFY-FRONT] File size: ${fileBuffer.length} bytes, SHA-256: ${imageHash}`)
+
+    // 1. Check persistent cache
+    const cachedResult = await getCachedOcr(imageHash)
+
+    // 2. Upload front image to storage (we always do this so we have the public URL)
     const imageUrl = await uploadToStorage(file, 'temp_verification')
     if (!imageUrl) return { success: false, error: 'Failed to upload front image.' }
 
-    // 2. OCR with Gemini
-    console.log('[VERIFY-FRONT] Analyzing with Gemini AI...')
-    const arrayBuffer = await file.arrayBuffer()
-    const base64Data = Buffer.from(arrayBuffer).toString('base64')
-
+    let result: any = null
     let aiResponseText = '{}'
     let aiUnavailableError = ''
-    try {
-      const response = await generateContentWithRetry({
-        model: MODEL_NAME,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
-          }
-        ],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          temperature: 0.0,
-          responseMimeType: 'application/json'
-        }
-      });
+    let isFromCache = false
 
-      aiResponseText = response?.text || '{}'
-    } catch (aiError: any) {
-      console.error('[VERIFY-FRONT] AI call failed:', aiError)
-      if (aiError.message === 'AI_TIMEOUT') {
-        aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
+    if (cachedResult) {
+      result = cachedResult
+      aiResponseText = JSON.stringify(cachedResult)
+      isFromCache = true
+      console.log('[VERIFY-FRONT] Using cached OCR result.')
+    } else {
+      console.log('[VERIFY-FRONT] Cache MISS. Calling Gemini AI...')
+      // Request deduplication
+      let activePromise = inFlightRequests.get(imageHash)
+      if (!activePromise) {
+        activePromise = (async () => {
+          const base64Data = fileBuffer.toString('base64')
+          const response = await generateContentWithRetry({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+              }
+            ],
+            config: {
+              systemInstruction: SYSTEM_PROMPT,
+              temperature: 0.0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 600
+            }
+          });
+          return response?.text || '{}';
+        })();
+
+        inFlightRequests.set(imageHash, activePromise)
+        activePromise.finally(() => inFlightRequests.delete(imageHash))
       } else {
-        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        console.log('[VERIFY-FRONT] Coalescing identical concurrent request...')
+      }
+
+      try {
+        aiResponseText = await activePromise
+      } catch (aiError: any) {
+        console.error('[VERIFY-FRONT] AI call failed:', aiError)
+        if (aiError.message === 'AI_TIMEOUT') {
+          aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
+        } else {
+          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        }
       }
     }
 
     // 3. Parse JSON
-    let result: any = {}
+    let resultParsed: any = {}
     let parseFailed = false
     
     if (aiUnavailableError) {
       parseFailed = true
-      result = { 
+      resultParsed = { 
         is_government_id: false, 
         document_type: 'UNKNOWN', 
         confidence: 0, 
@@ -216,21 +273,23 @@ export async function uploadAndVerifyFront(formData: FormData) {
         reason: aiUnavailableError, 
         raw_ocr_text: aiResponseText 
       }
+    } else if (isFromCache) {
+      resultParsed = result
     } else {
       try {
-        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+        resultParsed = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
       } catch {
         try {
           const firstBrace = aiResponseText.indexOf('{')
           const lastBrace = aiResponseText.lastIndexOf('}')
           if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+            resultParsed = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
           } else {
             throw new Error('No JSON object found')
           }
         } catch (fallbackErr) {
           parseFailed = true
-          result = { 
+          resultParsed = { 
             is_government_id: false, 
             document_type: 'UNKNOWN', 
             confidence: 0, 
@@ -240,7 +299,14 @@ export async function uploadAndVerifyFront(formData: FormData) {
           }
         }
       }
+
+      // Save to cache if it was newly fetched and parsed successfully
+      if (!parseFailed && resultParsed && resultParsed.is_government_id !== false) {
+        await saveCachedOcr(imageHash, resultParsed, resultParsed.id_type || 'UNKNOWN')
+      }
     }
+
+    const result = resultParsed
 
     // 3.5 Normalize and map the fields if parsing succeeded
     let normalizedResult: any = {}
@@ -436,40 +502,68 @@ export async function uploadBackImage(formData: FormData) {
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
     if (!identityId) return { success: false, error: 'No identity ID provided.' }
 
+    // Calculate SHA-256 hash of back image file
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = Buffer.from(arrayBuffer)
+    const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    console.log(`[VERIFY-BACK] File size: ${fileBuffer.length} bytes, SHA-256: ${imageHash}`)
+
+    // 1. Check persistent cache
+    const cachedResult = await getCachedOcr(imageHash)
+
     // Upload back image to storage
     const backUrl = await uploadToStorage(file, 'temp_verification')
     if (!backUrl) return { success: false, error: 'Failed to upload back image.' }
 
-    // OCR with Gemini for back image
-    console.log('[VERIFY-BACK] Analyzing back image with Gemini AI...')
-    const arrayBuffer = await file.arrayBuffer()
-    const base64Data = Buffer.from(arrayBuffer).toString('base64')
-
+    let result: any = null
     let aiResponseText = '{}'
     let aiUnavailableError = ''
-    try {
-      const response = await generateContentWithRetry({
-        model: MODEL_NAME,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
-          }
-        ],
-        config: {
-          systemInstruction: BACK_SYSTEM_PROMPT,
-          temperature: 0.0,
-          responseMimeType: 'application/json'
-        }
-      });
+    let isFromCache = false
 
-      aiResponseText = response?.text || '{}'
-    } catch (aiError: any) {
-      console.error('[VERIFY-BACK] AI call failed:', aiError)
-      if (aiError.message === 'AI_TIMEOUT') {
-        aiUnavailableError = 'Back side scanning timed out. Please try again with a clearer image.'
+    if (cachedResult) {
+      result = cachedResult
+      aiResponseText = JSON.stringify(cachedResult)
+      isFromCache = true
+      console.log('[VERIFY-BACK] Using cached OCR result.')
+    } else {
+      console.log('[VERIFY-BACK] Cache MISS. Calling Gemini AI...')
+      // Request deduplication
+      let activePromise = inFlightRequests.get(imageHash)
+      if (!activePromise) {
+        activePromise = (async () => {
+          const base64Data = fileBuffer.toString('base64')
+          const response = await generateContentWithRetry({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+              }
+            ],
+            config: {
+              systemInstruction: BACK_SYSTEM_PROMPT,
+              temperature: 0.0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 600
+            }
+          });
+          return response?.text || '{}';
+        })();
+
+        inFlightRequests.set(imageHash, activePromise)
+        activePromise.finally(() => inFlightRequests.delete(imageHash))
       } else {
-        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        console.log('[VERIFY-BACK] Coalescing identical concurrent request...')
+      }
+
+      try {
+        aiResponseText = await activePromise
+      } catch (aiError: any) {
+        console.error('[VERIFY-BACK] AI call failed:', aiError)
+        if (aiError.message === 'AI_TIMEOUT') {
+          aiUnavailableError = 'Back side scanning timed out. Please try again with a clearer image.'
+        } else {
+          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        }
       }
     }
 
@@ -477,26 +571,32 @@ export async function uploadBackImage(formData: FormData) {
       return { success: false, error: aiUnavailableError }
     }
 
-    let result: any = {}
-    let parseFailed = false
-    try {
-      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-    } catch {
+    if (!isFromCache) {
+      let parseFailed = false
       try {
-        const firstBrace = aiResponseText.indexOf('{')
-        const lastBrace = aiResponseText.lastIndexOf('}')
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-        } else {
-          throw new Error('No JSON object found')
+        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+      } catch {
+        try {
+          const firstBrace = aiResponseText.indexOf('{')
+          const lastBrace = aiResponseText.lastIndexOf('}')
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+          } else {
+            throw new Error('No JSON object found')
+          }
+        } catch (fallbackErr) {
+          parseFailed = true
         }
-      } catch (fallbackErr) {
-        parseFailed = true
       }
-    }
 
-    if (parseFailed) {
-      return { success: false, error: 'AI could not read the back side image. Please ensure the image is clear and try again.' }
+      if (parseFailed) {
+        return { success: false, error: 'AI could not read the back side image. Please ensure the image is clear and try again.' }
+      }
+
+      // Cache it!
+      if (result && result.is_government_id !== false) {
+        await saveCachedOcr(imageHash, result, result.id_type || 'UNKNOWN')
+      }
     }
 
     if (result.is_government_id === false) {
@@ -613,71 +713,84 @@ export async function verifyRegisterOCR(formData: FormData) {
     const file = formData.get('image') as File
     if (!file || file.size === 0) return { success: false, error: 'No image provided.' }
 
-    // 1. Upload register page image to storage
+    // Calculate SHA-256 hash of register image file
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = Buffer.from(arrayBuffer)
+    const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    console.log(`[VERIFY-REGISTER-OCR] File size: ${fileBuffer.length} bytes, SHA-256: ${imageHash}`)
+
+    // 1. Check persistent cache
+    const cachedResult = await getCachedOcr(imageHash)
+
+    // Upload register page image to storage
     const imageUrl = await uploadToStorage(file, 'temp_registers')
     if (!imageUrl) return { success: false, error: 'Failed to upload register image.' }
 
-    // 2. OCR with Gemini
-    console.log('[VERIFY-REGISTER-OCR] Analyzing with Gemini AI...')
-    const arrayBuffer = await file.arrayBuffer()
-    const base64Data = Buffer.from(arrayBuffer).toString('base64')
-
-    const prompt = `
-You are an expert handwritten text extraction (OCR) engine specialized in transcribing guest registers from hotels/stays.
-Analyze the uploaded register image and extract all guest records.
-
-For each guest entry on the page, identify and extract:
-- guest_name: Full name of the guest.
-- mobile_number: Mobile number (usually 10 digits). If not visible or blank, return null.
-- id_type: Mapped to one of these values: "Aadhaar Card", "Driving Licence", "Voter ID", "Passport", "Other", or "None".
-- id_number: Document number of the ID. If not visible or blank, return null.
-- checkin_date: Extract check-in date. If written as DD/MM/YYYY or DD-MM-YYYY, convert it to YYYY-MM-DD. If cannot be parsed, use null.
-- checkout_date: Extract check-out date. Convert to YYYY-MM-DD. If blank or cannot be parsed, return null.
-
-Return a JSON array of objects with the following structure:
+    const prompt = `Extract handwritten guest records. Return ONLY JSON:
 {
   "guests": [
     {
-      "guest_name": "...",
-      "mobile_number": "...",
+      "guest_name": "Name",
+      "mobile_number": "10-digit number or null",
       "id_type": "Aadhaar Card | Driving Licence | Voter ID | Passport | Other | None",
-      "id_number": "...",
+      "id_number": "ID or null",
       "checkin_date": "YYYY-MM-DD",
-      "checkout_date": "YYYY-MM-DD",
+      "checkout_date": "YYYY-MM-DD or null",
       "confidence": "high | medium | low",
-      "uncertain_fields": ["guest_name", "id_number"]
+      "uncertain_fields": ["field_name"]
     }
   ]
-}
+}`;
 
-Only return JSON. Do not include markdown formatting, explanations, or preambles.
-`;
-
+    let result: any = null
     let aiResponseText = '{}'
     let aiUnavailableError = ''
-    try {
-      const response = await generateContentWithRetry({
-        model: MODEL_NAME,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
-          }
-        ],
-        config: {
-          systemInstruction: prompt,
-          temperature: 0.0,
-          responseMimeType: 'application/json'
-        }
-      });
+    let isFromCache = false
 
-      aiResponseText = response?.text || '{}'
-    } catch (aiError: any) {
-      console.error('[VERIFY-REGISTER-OCR] AI call failed:', aiError)
-      if (aiError.message === 'AI_TIMEOUT') {
-        aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
+    if (cachedResult) {
+      result = cachedResult
+      aiResponseText = JSON.stringify(cachedResult)
+      isFromCache = true
+      console.log('[VERIFY-REGISTER-OCR] Using cached OCR result.')
+    } else {
+      console.log('[VERIFY-REGISTER-OCR] Cache MISS. Calling Gemini AI...')
+      // Request deduplication
+      let activePromise = inFlightRequests.get(imageHash)
+      if (!activePromise) {
+        activePromise = (async () => {
+          const base64Data = fileBuffer.toString('base64')
+          const response = await generateContentWithRetry({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ inlineData: { data: base64Data, mimeType: file.type || 'image/jpeg' } }]
+              }
+            ],
+            config: {
+              systemInstruction: prompt,
+              temperature: 0.0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 1500
+            }
+          });
+          return response?.text || '{}';
+        })();
+
+        inFlightRequests.set(imageHash, activePromise)
+        activePromise.finally(() => inFlightRequests.delete(imageHash))
       } else {
-        aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        console.log('[VERIFY-REGISTER-OCR] Coalescing identical concurrent request...')
+      }
+
+      try {
+        aiResponseText = await activePromise
+      } catch (aiError: any) {
+        console.error('[VERIFY-REGISTER-OCR] AI call failed:', aiError)
+        if (aiError.message === 'AI_TIMEOUT') {
+          aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
+        } else {
+          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+        }
       }
     }
 
@@ -685,21 +798,26 @@ Only return JSON. Do not include markdown formatting, explanations, or preambles
       return { success: false, error: aiUnavailableError }
     }
 
-    // 3. Parse JSON
-    let result: any = {}
-    try {
-      result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-    } catch {
+    if (!isFromCache) {
       try {
-        const firstBrace = aiResponseText.indexOf('{')
-        const lastBrace = aiResponseText.lastIndexOf('}')
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-        } else {
-          throw new Error('No JSON object found')
+        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
+      } catch {
+        try {
+          const firstBrace = aiResponseText.indexOf('{')
+          const lastBrace = aiResponseText.lastIndexOf('}')
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
+          } else {
+            throw new Error('No JSON object found')
+          }
+        } catch (fallbackErr) {
+          return { success: false, error: 'AI could not format register data correctly. Please upload a clearer image.' }
         }
-      } catch (fallbackErr) {
-        return { success: false, error: 'AI could not format register data correctly. Please upload a clearer image.' }
+      }
+
+      // Cache it!
+      if (result && result.guests && result.guests.length > 0) {
+        await saveCachedOcr(imageHash, result, 'REGISTER')
       }
     }
 
