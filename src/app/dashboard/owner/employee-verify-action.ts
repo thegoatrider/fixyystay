@@ -7,6 +7,61 @@ import crypto from 'crypto'
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.5-flash'
 
+const EMP_FRONT_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_government_id: { type: 'BOOLEAN' },
+    document_type: { type: 'STRING' },
+    document_number: { type: 'STRING' },
+    full_name: { type: 'STRING' },
+    date_of_birth: { type: 'STRING' },
+    confidence: { type: 'NUMBER' },
+    suspicious: { type: 'BOOLEAN' },
+    reason: { type: 'STRING' },
+    raw_ocr_text: { type: 'STRING' }
+  },
+  required: ['is_government_id']
+}
+
+const BACK_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_government_id: { type: 'BOOLEAN' },
+    confidence: { type: 'NUMBER' },
+    suspicious: { type: 'BOOLEAN' },
+    reason: { type: 'STRING' },
+    address: { type: 'STRING' },
+    raw_ocr_text_back: { type: 'STRING' }
+  },
+  required: ['is_government_id', 'confidence', 'suspicious', 'address']
+}
+
+function safeJsonParse(str: string): any {
+  let cleanStr = str.replace(/^```json/gi, '').replace(/```$/g, '').trim()
+  const firstBrace = cleanStr.indexOf('{')
+  const lastBrace = cleanStr.lastIndexOf('}')
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error('No JSON object found')
+  }
+  cleanStr = cleanStr.substring(firstBrace, lastBrace + 1)
+
+  try {
+    return JSON.parse(cleanStr)
+  } catch (e) {
+    try {
+      const sanitized = cleanStr.replace(/"([^"\\]|\\.)*"/g, (match) => {
+        return match
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t')
+      })
+      return JSON.parse(sanitized)
+    } catch (e2) {
+      throw e2
+    }
+  }
+}
+
 // Global map for in-flight requests to deduplicate concurrent uploads of identical files
 const inFlightRequests = new Map<string, Promise<any>>();
 
@@ -240,6 +295,7 @@ export async function verifyEmployeeFrontId(formData: FormData) {
               systemInstruction: SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
+              responseSchema: EMP_FRONT_RESPONSE_SCHEMA,
               maxOutputTokens: 600
             }
           })
@@ -282,7 +338,7 @@ export async function verifyEmployeeFrontId(formData: FormData) {
       // Parse
       let parseFailed = false
       try {
-        result = JSON.parse(aiText.replace(/^```json/g, '').replace(/```$/g, '').trim())
+        result = safeJsonParse(aiText)
       } catch {
         parseFailed = true
         result = { is_government_id: false, document_type: 'UNKNOWN', confidence: 0, suspicious: true, reason: 'Parse error', raw_ocr_text: '' }
@@ -381,6 +437,7 @@ export async function uploadEmployeeBackId(formData: FormData) {
               systemInstruction: BACK_SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
+              responseSchema: BACK_RESPONSE_SCHEMA,
               maxOutputTokens: 600
             }
           })
@@ -419,32 +476,25 @@ export async function uploadEmployeeBackId(formData: FormData) {
       isGovtId = resultParsed.is_government_id !== false
     } else {
       try {
-        const firstBrace = aiText.indexOf('{')
-        const lastBrace = aiText.lastIndexOf('}')
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          const jsonStr = aiText.substring(firstBrace, lastBrace + 1)
-          const parsed = JSON.parse(jsonStr)
-          address = parsed.address || ''
-          rawOcrTextBack = parsed.raw_ocr_text_back || aiText
-          confidence = parsed.confidence || 0
-          suspicious = parsed.suspicious || false
-          isGovtId = parsed.is_government_id !== false
-          
-          // Cache
-          if (parsed && parsed.is_government_id !== false) {
-            await saveCachedOcr(imageHash, parsed, 'EMPLOYEE_BACK')
-          }
-        } else {
-          return { success: false, error: 'Back image is not clear enough. Please re-upload.' }
+        const parsed = safeJsonParse(aiText)
+        address = parsed.address || ''
+        rawOcrTextBack = parsed.raw_ocr_text_back || aiText
+        confidence = parsed.confidence || 0
+        suspicious = parsed.suspicious || false
+        isGovtId = parsed.is_government_id !== false
+        
+        // Cache
+        if (parsed && parsed.is_government_id !== false) {
+          await saveCachedOcr(imageHash, parsed, 'EMPLOYEE_BACK')
         }
       } catch (e) {
         console.warn('[EMP-VERIFY] Failed to parse AI JSON response for back image.')
-        return { success: false, error: 'Failed to process back image. Please re-upload.' }
+        return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
       }
     }
 
     if (suspicious || !isGovtId || confidence < 0.50) {
-      return { success: false, error: 'Back image is not clear enough or suspicious. Please re-upload a clear photo.' }
+      return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: rawOcrTextBack }
     }
 
     return { success: true, backUrl, address, raw_ocr_text_back: rawOcrTextBack }

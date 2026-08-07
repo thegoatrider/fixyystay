@@ -7,6 +7,103 @@ import crypto from 'crypto'
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const MODEL_NAME = 'gemini-2.5-flash'
 
+const FRONT_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_government_id: { type: 'BOOLEAN' },
+    rejection_reason: { type: 'STRING' },
+    full_name: { type: 'STRING' },
+    date_of_birth: { type: 'STRING' },
+    id_number: { type: 'STRING' },
+    id_type: { type: 'STRING' },
+    address: { type: 'STRING' },
+    gender: { type: 'STRING' },
+    expiry_date: { type: 'STRING' },
+    confidence: {
+      type: 'OBJECT',
+      properties: {
+        overall: { type: 'STRING' },
+        notes: { type: 'STRING' }
+      },
+      required: ['overall']
+    }
+  },
+  required: ['is_government_id']
+}
+
+const BACK_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_government_id: { type: 'BOOLEAN' },
+    confidence: { type: 'NUMBER' },
+    suspicious: { type: 'BOOLEAN' },
+    reason: { type: 'STRING' },
+    address: { type: 'STRING' },
+    raw_ocr_text_back: { type: 'STRING' }
+  },
+  required: ['is_government_id', 'confidence', 'suspicious', 'address']
+}
+
+const REGISTER_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    guests: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          guest_name: { type: 'STRING' },
+          mobile_number: { type: 'STRING' },
+          id_type: { type: 'STRING' },
+          id_number: { type: 'STRING' },
+          checkin_date: { type: 'STRING' },
+          checkout_date: { type: 'STRING' },
+          confidence: { type: 'STRING' },
+          uncertain_fields: {
+            type: 'ARRAY',
+            items: { type: 'STRING' }
+          }
+        },
+        required: ['guest_name', 'id_type', 'checkin_date']
+      }
+    }
+  },
+  required: ['guests']
+}
+
+function safeJsonParse(str: string): any {
+  let cleanStr = str.replace(/^```json/gi, '').replace(/```$/g, '').trim()
+  const firstBrace = cleanStr.indexOf('{')
+  const lastBrace = cleanStr.lastIndexOf('}')
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    const firstBracket = cleanStr.indexOf('[')
+    const lastBracket = cleanStr.lastIndexOf(']')
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      cleanStr = cleanStr.substring(firstBracket, lastBracket + 1)
+    } else {
+      throw new Error('No JSON object or array found')
+    }
+  } else {
+    cleanStr = cleanStr.substring(firstBrace, lastBrace + 1)
+  }
+
+  try {
+    return JSON.parse(cleanStr)
+  } catch (e) {
+    try {
+      const sanitized = cleanStr.replace(/"([^"\\]|\\.)*"/g, (match) => {
+        return match
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t')
+      })
+      return JSON.parse(sanitized)
+    } catch (e2) {
+      throw e2
+    }
+  }
+}
+
 // Global map for in-flight requests to deduplicate concurrent uploads of identical files
 const inFlightRequests = new Map<string, Promise<any>>();
 
@@ -308,6 +405,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
               systemInstruction: SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
+              responseSchema: FRONT_RESPONSE_SCHEMA,
               maxOutputTokens: 600
             }
           });
@@ -379,26 +477,16 @@ export async function uploadAndVerifyFront(formData: FormData) {
       resultParsed = result
     } else {
       try {
-        resultParsed = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-      } catch {
-        try {
-          const firstBrace = aiResponseText.indexOf('{')
-          const lastBrace = aiResponseText.lastIndexOf('}')
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            resultParsed = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-          } else {
-            throw new Error('No JSON object found')
-          }
-        } catch (fallbackErr) {
-          parseFailed = true
-          resultParsed = { 
-            is_government_id: false, 
-            document_type: 'UNKNOWN', 
-            confidence: 0, 
-            suspicious: false, 
-            reason: 'AI could not format data correctly. Manual review required.', 
-            raw_ocr_text: aiResponseText 
-          }
+        resultParsed = safeJsonParse(aiResponseText)
+      } catch (fallbackErr) {
+        parseFailed = true
+        resultParsed = { 
+          is_government_id: false, 
+          document_type: 'UNKNOWN', 
+          confidence: 0, 
+          suspicious: false, 
+          reason: 'AI could not format data correctly. Manual review required.', 
+          raw_ocr_text: aiResponseText 
         }
       }
 
@@ -679,6 +767,7 @@ export async function uploadBackImage(formData: FormData) {
               systemInstruction: BACK_SYSTEM_PROMPT,
               temperature: 0.0,
               responseMimeType: 'application/json',
+              responseSchema: BACK_RESPONSE_SCHEMA,
               maxOutputTokens: 600
             }
           });
@@ -738,19 +827,9 @@ export async function uploadBackImage(formData: FormData) {
     if (!isFromCache) {
       let parseFailed = false
       try {
-        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-      } catch {
-        try {
-          const firstBrace = aiResponseText.indexOf('{')
-          const lastBrace = aiResponseText.lastIndexOf('}')
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-          } else {
-            throw new Error('No JSON object found')
-          }
-        } catch (fallbackErr) {
-          parseFailed = true
-        }
+        result = safeJsonParse(aiResponseText)
+      } catch (fallbackErr) {
+        parseFailed = true
       }
 
       if (parseFailed) {
@@ -916,6 +995,7 @@ export async function verifyRegisterOCR(formData: FormData) {
               systemInstruction: prompt,
               temperature: 0.0,
               responseMimeType: 'application/json',
+              responseSchema: REGISTER_RESPONSE_SCHEMA,
               maxOutputTokens: 1500
             }
           });
@@ -946,19 +1026,9 @@ export async function verifyRegisterOCR(formData: FormData) {
 
     if (!isFromCache) {
       try {
-        result = JSON.parse(aiResponseText.replace(/^```json/gi, '').replace(/```$/g, '').trim())
-      } catch {
-        try {
-          const firstBrace = aiResponseText.indexOf('{')
-          const lastBrace = aiResponseText.lastIndexOf('}')
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            result = JSON.parse(aiResponseText.substring(firstBrace, lastBrace + 1))
-          } else {
-            throw new Error('No JSON object found')
-          }
-        } catch (fallbackErr) {
-          return { success: false, error: 'AI could not format register data correctly. Please upload a clearer image.' }
-        }
+        result = safeJsonParse(aiResponseText)
+      } catch (fallbackErr) {
+        return { success: false, error: 'AI could not format register data correctly. Please upload a clearer image.' }
       }
 
       // Cache it!
