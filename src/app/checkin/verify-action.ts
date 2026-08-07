@@ -457,11 +457,36 @@ export async function uploadAndVerifyFront(formData: FormData) {
     console.log('[VERIFY-FRONT] AI Result:', normalizedResult.document_type, 'Confidence:', normalizedResult.confidence)
 
     // 4. Validation and strict rejection
+    // 4. Validation and strict rejection
     if (parseFailed) {
-      return { 
-        success: false, 
-        error: normalizedResult.reason || 'AI verification service temporarily unavailable or timed out. Please try again with a clearer, well-lit image.' 
+      const status = 'MANUAL_REVIEW'
+      const finalReason = 'AI could not format data correctly. Saved for manual review.'
+      const supabaseAdmin = createAdminClient()
+      const identityRecord = {
+        document_type: 'UNKNOWN',
+        document_number: 'PENDING_REVIEW',
+        full_name: 'Guest (Manual Review)',
+        date_of_birth: '01/01/1990',
+        document_confidence: 0,
+        is_verified: true,
+        verification_status: status,
+        document_image_url: imageUrl,
+        back_image_url: null,
+        raw_ocr_text: aiResponseText,
+        ocr_json: {},
+        verification_reason: finalReason
       }
+      console.log(`[VERIFY-FRONT] Parse failed. Saving as MANUAL_REVIEW: ${finalReason}`)
+      const { data: inserted, error: dbError } = await supabaseAdmin
+        .from('guest_identity')
+        .insert([identityRecord])
+        .select('id, verification_status')
+        .single()
+      if (dbError) {
+        console.error('[VERIFY-FRONT] DB Insert failed:', dbError)
+        return { success: false, error: 'Database error while saving identity.' }
+      }
+      return { success: true, guest_identity_id: inserted.id, status: inserted.verification_status, reason: finalReason }
     }
 
     if (normalizedResult.is_government_id === false) {
@@ -470,55 +495,22 @@ export async function uploadAndVerifyFront(formData: FormData) {
       return { success: false, error: rejectionMsg }
     }
 
-    if (normalizedResult.document_type === 'UNKNOWN') {
-      return { 
-        success: false, 
-        error: 'The document type could not be recognized. Please upload a valid government ID (Aadhaar, PAN, Passport, Voter ID, or Driving Licence).' 
-      }
-    }
-
-    if (!normalizedResult.full_name || normalizedResult.full_name.trim() === '') {
-      return { 
-        success: false, 
-        error: 'Could not extract your name from the ID. Please ensure the front side is completely visible, glare-free, and try again.' 
-      }
-    }
-
-    if (!normalizedResult.date_of_birth || normalizedResult.date_of_birth.trim() === '') {
-      return { 
-        success: false, 
-        error: 'Could not extract your date of birth from the ID. Please ensure your date of birth is clearly visible on the document.' 
-      }
-    }
-
+    // Check validation criteria
+    const hasName = normalizedResult.full_name && normalizedResult.full_name.trim() !== ''
+    const hasDob = normalizedResult.date_of_birth && normalizedResult.date_of_birth.trim() !== ''
+    const isKnownType = normalizedResult.document_type !== 'UNKNOWN'
+    
     const docNumStr = normalizedResult.document_number || '';
     const cleanNum = docNumStr.trim().replace(/[\s-]/g, '');
-
-    if (normalizedResult.document_type !== 'AADHAAR') {
-      if (!docNumStr || docNumStr.trim() === '') {
-        return { 
-          success: false, 
-          error: `Could not extract the document number from your ${normalizedResult.document_type || 'ID'}. Please ensure the number is clearly visible.` 
-        }
-      }
-    }
-
-    if (normalizedResult.suspicious || normalizedResult.confidence < 0.40) {
-      return { 
-        success: false, 
-        error: 'Image quality is too poor or text is blurry. Please upload a sharper, glare-free photo of your ID.' 
-      }
-    }
-
+    const hasDocNum = normalizedResult.document_type === 'AADHAAR' ? true : (docNumStr && docNumStr.trim() !== '')
+    
+    // Check format
     let validFormat = true
-
     if (normalizedResult.document_type === 'AADHAAR') {
-      // Accept 12 digits, masked formats (with x, X, *), 4 digits (last 4), or empty
       const is12Digit = /^\d{12}$/.test(cleanNum)
       const isMasked = /^[xX*\d]{12}$/.test(cleanNum) && /[xX*]/.test(cleanNum)
       const isLast4 = /^\d{4}$/.test(cleanNum)
       const isEmpty = cleanNum === ''
-      
       if (!is12Digit && !isMasked && !isLast4 && !isEmpty) {
         validFormat = false
       }
@@ -541,10 +533,52 @@ export async function uploadAndVerifyFront(formData: FormData) {
       if (!modernFormat && !legacyFormat && !genericFormat) validFormat = false
     }
 
-    if (!validFormat) {
+    const isHighQuality = !normalizedResult.suspicious && normalizedResult.confidence >= 0.40
+
+    const isValid = hasName && hasDob && isKnownType && hasDocNum && validFormat && isHighQuality
+
+    if (!isValid) {
+      // Fallback to MANUAL_REVIEW instead of failing
+      const status = 'MANUAL_REVIEW'
+      let finalReason = 'Verification details incomplete. Saved for manual review.'
+      if (!isHighQuality) finalReason = 'Image text is blurry or low confidence. Saved for manual review.'
+      else if (!validFormat) finalReason = `Document number format is invalid (${normalizedResult.document_number}). Saved for manual review.`
+      else if (!isKnownType) finalReason = 'Document type could not be recognized. Saved for manual review.'
+      else if (!hasName || !hasDob) finalReason = 'Name or DOB missing from extraction. Saved for manual review.'
+
+      const supabaseAdmin = createAdminClient()
+      const identityRecord = {
+        document_type: normalizedResult.document_type,
+        document_number: normalizedResult.document_number || 'PENDING_REVIEW',
+        full_name: normalizedResult.full_name || 'Guest (Manual Review)',
+        date_of_birth: normalizedResult.date_of_birth || '01/01/1990',
+        document_confidence: normalizedResult.confidence,
+        is_verified: true,
+        verification_status: status,
+        document_image_url: imageUrl,
+        back_image_url: null,
+        raw_ocr_text: aiResponseText,
+        ocr_json: result,
+        verification_reason: finalReason
+      }
+
+      console.log(`[VERIFY-FRONT] ID failed validation. Saving as MANUAL_REVIEW: ${finalReason}`)
+      const { data: inserted, error: dbError } = await supabaseAdmin
+        .from('guest_identity')
+        .insert([identityRecord])
+        .select('id, verification_status')
+        .single()
+
+      if (dbError) {
+        console.error('[VERIFY-FRONT] DB Insert failed:', dbError)
+        return { success: false, error: 'Database error while saving identity.' }
+      }
+
       return {
-        success: false,
-        error: `The extracted ${normalizedResult.document_type || 'ID'} number "${normalizedResult.document_number}" does not match the expected format. Please ensure the card is clear and fully visible.`
+        success: true,
+        guest_identity_id: inserted.id,
+        status: inserted.verification_status,
+        reason: finalReason
       }
     }
 

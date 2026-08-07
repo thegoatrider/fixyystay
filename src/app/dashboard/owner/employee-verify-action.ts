@@ -295,10 +295,10 @@ export async function verifyEmployeeFrontId(formData: FormData) {
     }
 
     // Validate
-    let status = 'FAILED'
+    let status = 'VERIFIED'
     let reason = result.reason || ''
 
-    if (result.suspicious || !result.is_government_id) {
+    if (result.is_government_id === false) {
       status = 'FAILED'
       reason = result.reason || 'Not a valid government ID.'
     } else {
@@ -307,16 +307,13 @@ export async function verifyEmployeeFrontId(formData: FormData) {
       if (result.document_type === 'AADHAAR' && (!/^\d{12}$/.test(num))) validFormat = false
       if (result.document_type === 'PAN'    && (!/^[A-Z]{5}\d{4}[A-Z]$/i.test(num))) validFormat = false
 
-      if (!validFormat) {
-        status = 'FAILED'
-        reason = 'Document number does not match expected format or image is not clear enough. Please re-upload.'
-      } else {
-        if (result.confidence >= 0.50) {
-          status = 'VERIFIED'
-        } else {
-          status = 'FAILED'
-          reason = 'Confidence too low. Please upload a clearer image.'
-        }
+      const isHighQuality = !result.suspicious && result.confidence >= 0.50
+
+      if (!validFormat || !isHighQuality || result.document_type === 'UNKNOWN') {
+        status = 'MANUAL_REVIEW'
+        reason = !isHighQuality 
+          ? 'Image text is blurry or low confidence. Saved for manual review.' 
+          : (!validFormat ? 'Document number format is invalid. Saved for manual review.' : 'Document type unrecognized. Saved for manual review.')
       }
     }
 
