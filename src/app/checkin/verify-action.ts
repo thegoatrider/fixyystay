@@ -717,6 +717,24 @@ export async function uploadBackImage(formData: FormData) {
       return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
     }
 
+    const saveManualReview = async (reason: string) => {
+      try {
+        const supabaseAdmin = createAdminClient()
+        await supabaseAdmin
+          .from('guest_identity')
+          .update({
+            back_image_url: backUrl,
+            raw_ocr_text_back: aiResponseText,
+            verification_status: 'MANUAL_REVIEW',
+            verification_reason: reason
+          })
+          .eq('id', identityId)
+      } catch (dbErr) {
+        console.error('[VERIFY-BACK] DB update fallback failed:', dbErr)
+      }
+      return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
+    }
+
     if (!isFromCache) {
       let parseFailed = false
       try {
@@ -736,7 +754,7 @@ export async function uploadBackImage(formData: FormData) {
       }
 
       if (parseFailed) {
-        return { success: false, error: 'AI could not read the back side image. Please ensure the image is clear and try again.' }
+        return saveManualReview('Back side OCR parsing failed.')
       }
 
       // Cache it!
@@ -746,10 +764,7 @@ export async function uploadBackImage(formData: FormData) {
     }
 
     if (result.is_government_id === false) {
-      return {
-        success: false,
-        error: result.rejection_reason || 'This back side image does not appear to be a valid government ID. Please upload the back side of your ID.'
-      }
+      return saveManualReview(result.rejection_reason || 'Back side is not recognized as a government ID.')
     }
 
     const supabaseAdmin = createAdminClient()
@@ -768,10 +783,7 @@ export async function uploadBackImage(formData: FormData) {
     const frontIdType = existingRecord.document_type
 
     if (backIdType !== 'UNKNOWN' && frontIdType !== 'UNKNOWN' && backIdType !== frontIdType) {
-      return {
-        success: false,
-        error: `The back side document type (${backIdType}) does not match the front side document type (${frontIdType}). Please upload the back side of the same ID.`
-      }
+      return saveManualReview(`Back side document type (${backIdType}) does not match front side (${frontIdType}).`)
     }
 
     const backIdNumber = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
@@ -785,38 +797,26 @@ export async function uploadBackImage(formData: FormData) {
 
       if (digitsBack && digitsFront) {
         if (digitsBack.length === 12 && digitsFront.length === 12 && digitsBack !== digitsFront) {
-          return {
-            success: false,
-            error: 'The Aadhaar number on the back side does not match the front side. Please upload the back side of the same ID.'
-          }
+          return saveManualReview('Aadhaar number on back side does not match front side.')
         }
         
         const last4Back = digitsBack.slice(-4)
         const last4Front = digitsFront.slice(-4)
         if (last4Back.length === 4 && last4Front.length === 4 && last4Back !== last4Front) {
-          return {
-            success: false,
-            error: 'The document number on the back side does not match the front side. Please upload the back side of the same ID.'
-          }
+          return saveManualReview('Document number on back side does not match front side.')
         }
       }
     }
 
     const confidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
     if (confidence < 0.40) {
-      return {
-        success: false,
-        error: 'The back side image quality is too poor or text is blurry. Please upload a sharper, glare-free photo.'
-      }
+      return saveManualReview('Back side image quality is too poor or text is blurry.')
     }
 
     const address = cleanFieldValue(result.address)
     if (frontIdType !== 'PAN') {
       if (!address || address.trim() === '') {
-        return {
-          success: false,
-          error: 'Could not extract the address from the back side of your ID. Please ensure the address text is clear, glare-free, and try again.'
-        }
+        return saveManualReview('Could not extract address from back side.')
       }
     }
 
