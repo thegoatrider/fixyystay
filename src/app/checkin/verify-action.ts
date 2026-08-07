@@ -339,7 +339,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
       }
     }
 
-    const result = resultParsed
+    result = resultParsed
 
     // 3.5 Normalize and map the fields if parsing succeeded
     let normalizedResult: any = {}
