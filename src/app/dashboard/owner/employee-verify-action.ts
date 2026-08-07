@@ -254,14 +254,14 @@ export async function verifyEmployeeFrontId(formData: FormData) {
 
       try {
         aiText = await activePromise
-      } catch (err) {
+      } catch (err: any) {
         console.error('[EMP-VERIFY] Gemini error:', err)
-        aiText = 'GEMINI_FAILED'
+        aiText = `GEMINI_FAILED: ${err.message || String(err)}`
       }
 
-      if (aiText === 'GEMINI_FAILED') {
+      if (aiText.startsWith('GEMINI_FAILED')) {
         const status = 'MANUAL_REVIEW'
-        const reason = 'AI offline, saved for manual review.'
+        const reason = `AI offline (${aiText.replace('GEMINI_FAILED: ', '')}), saved for manual review.`
         return {
           success: true,
           status,
@@ -398,13 +398,13 @@ export async function uploadEmployeeBackId(formData: FormData) {
 
       try {
         aiText = await activePromise
-      } catch (err) {
+       } catch (err: any) {
         console.error('[EMP-VERIFY] Gemini error for back image:', err)
-        aiText = 'GEMINI_FAILED'
+        aiText = `GEMINI_FAILED: ${err.message || String(err)}`
       }
     }
 
-    if (aiText === 'GEMINI_FAILED') {
+    if (aiText.startsWith('GEMINI_FAILED')) {
       return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
     }
 

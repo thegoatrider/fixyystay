@@ -327,7 +327,7 @@ export async function uploadAndVerifyFront(formData: FormData) {
         if (aiError.message === 'AI_TIMEOUT') {
           aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
         } else {
-          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+          aiUnavailableError = `AI Error: ${aiError.message || String(aiError)}`
         }
       }
     }
@@ -664,7 +664,7 @@ export async function uploadBackImage(formData: FormData) {
         if (aiError.message === 'AI_TIMEOUT') {
           aiUnavailableError = 'Back side scanning timed out. Please try again with a clearer image.'
         } else {
-          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+          aiUnavailableError = `AI Error: ${aiError.message || String(aiError)}`
         }
       }
     }
@@ -901,7 +901,7 @@ export async function verifyRegisterOCR(formData: FormData) {
         if (aiError.message === 'AI_TIMEOUT') {
           aiUnavailableError = 'Scanning timed out. Please try again with a clearer, well-lit image.'
         } else {
-          aiUnavailableError = 'AI verification service temporarily unavailable. Please try again.'
+          aiUnavailableError = `AI Error: ${aiError.message || String(aiError)}`
         }
       }
     }
