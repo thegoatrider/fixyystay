@@ -218,10 +218,9 @@ export async function verifyEmployeeFrontId(formData: FormData) {
         aiText = 'GEMINI_FAILED'
       }
 
-      const isBypassActive = Date.now() < 1723043400000;
-      if (aiText === 'GEMINI_FAILED' || isBypassActive) {
+      if (aiText === 'GEMINI_FAILED') {
         const status = 'MANUAL_REVIEW'
-        const reason = isBypassActive ? 'Bypass mode active.' : 'AI offline, saved for manual review.'
+        const reason = 'AI offline, saved for manual review.'
         return {
           success: true,
           status,
@@ -364,8 +363,7 @@ export async function uploadEmployeeBackId(formData: FormData) {
       }
     }
 
-    const isBypassActive = Date.now() < 1723043400000;
-    if (aiText === 'GEMINI_FAILED' || isBypassActive) {
+    if (aiText === 'GEMINI_FAILED') {
       return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
     }
 

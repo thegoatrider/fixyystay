@@ -263,14 +263,10 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let resultParsed: any = {}
     let parseFailed = false
     
-    const isBypassActive = Date.now() < 1723043400000;
-    
-    if (aiUnavailableError || isBypassActive) {
+    if (aiUnavailableError) {
       // Bypassed or failed: Save to guest_identity directly as MANUAL_REVIEW
       const status = 'MANUAL_REVIEW'
-      const finalReason = isBypassActive 
-        ? 'Temporary bypass mode active. Saved for manual review.' 
-        : `AI Offline: ${aiUnavailableError}. Saved for manual review.`;
+      const finalReason = `AI Offline: ${aiUnavailableError}. Saved for manual review.`;
 
       const supabaseAdmin = createAdminClient()
       const identityRecord = {
@@ -600,8 +596,7 @@ export async function uploadBackImage(formData: FormData) {
       }
     }
 
-    const isBypassActive = Date.now() < 1723043400000;
-    if (aiUnavailableError || isBypassActive) {
+    if (aiUnavailableError) {
       const supabaseAdmin = createAdminClient()
       const { error: updateError } = await supabaseAdmin
         .from('guest_identity')
