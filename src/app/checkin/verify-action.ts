@@ -263,15 +263,48 @@ export async function uploadAndVerifyFront(formData: FormData) {
     let resultParsed: any = {}
     let parseFailed = false
     
-    if (aiUnavailableError) {
-      parseFailed = true
-      resultParsed = { 
-        is_government_id: false, 
-        document_type: 'UNKNOWN', 
-        confidence: 0, 
-        suspicious: false, 
-        reason: aiUnavailableError, 
-        raw_ocr_text: aiResponseText 
+    const isBypassActive = Date.now() < 1723043400000;
+    
+    if (aiUnavailableError || isBypassActive) {
+      // Bypassed or failed: Save to guest_identity directly as MANUAL_REVIEW
+      const status = 'MANUAL_REVIEW'
+      const finalReason = isBypassActive 
+        ? 'Temporary bypass mode active. Saved for manual review.' 
+        : `AI Offline: ${aiUnavailableError}. Saved for manual review.`;
+
+      const supabaseAdmin = createAdminClient()
+      const identityRecord = {
+        document_type: 'UNKNOWN',
+        document_number: 'PENDING_REVIEW',
+        full_name: 'Guest (Manual Review)',
+        date_of_birth: '01/01/1990',
+        document_confidence: 0,
+        is_verified: true,
+        verification_status: status,
+        document_image_url: imageUrl,    // front image
+        back_image_url: null,
+        raw_ocr_text: '',
+        ocr_json: {},
+        verification_reason: finalReason
+      }
+
+      console.log(`[VERIFY-FRONT] Bypassed/Failed. Saving for manual review. Status: ${status}`)
+      const { data: inserted, error: dbError } = await supabaseAdmin
+        .from('guest_identity')
+        .insert([identityRecord])
+        .select('id, verification_status')
+        .single()
+
+      if (dbError) {
+        console.error('[VERIFY-FRONT] DB Insert failed:', dbError)
+        return { success: false, error: 'Database error while saving identity.' }
+      }
+
+      return {
+        success: true,
+        guest_identity_id: inserted.id,
+        status: inserted.verification_status,
+        reason: finalReason
       }
     } else if (isFromCache) {
       resultParsed = result
@@ -567,8 +600,19 @@ export async function uploadBackImage(formData: FormData) {
       }
     }
 
-    if (aiUnavailableError) {
-      return { success: false, error: aiUnavailableError }
+    const isBypassActive = Date.now() < 1723043400000;
+    if (aiUnavailableError || isBypassActive) {
+      const supabaseAdmin = createAdminClient()
+      const { error: updateError } = await supabaseAdmin
+        .from('guest_identity')
+        .update({ back_image_url: backUrl })
+        .eq('id', identityId)
+
+      if (updateError) {
+        console.error('[VERIFY-BACK] DB update failed:', updateError)
+      }
+
+      return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
     }
 
     if (!isFromCache) {
