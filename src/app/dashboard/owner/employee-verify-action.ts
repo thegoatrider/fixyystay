@@ -136,11 +136,20 @@ async function generateContentWithRetry(contents: any, maxRetries = 2) {
           model: model
         });
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000)
-        );
+        // Timeout after 15 seconds
+        let timeoutId: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000);
+        });
         
-        const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+        let response: any;
+        try {
+          response = await Promise.race([generatePromise, timeoutPromise]);
+          clearTimeout(timeoutId);
+        } catch (err) {
+          clearTimeout(timeoutId);
+          throw err;
+        }
         
         if (response?.usageMetadata) {
           const usage = response.usageMetadata;
