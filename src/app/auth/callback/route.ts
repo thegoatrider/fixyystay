@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   // Standardize default redirect to the home page (/)
   const next = searchParams.get('next') ?? '/'
+  const source = searchParams.get('source')
 
   if (code) {
     const supabase = await createClient()
@@ -46,10 +47,17 @@ export async function GET(request: Request) {
         else if (role === 'influencer') finalNext = '/dashboard/influencer'
       }
 
+      if (source === 'app') {
+        return NextResponse.redirect(`com.fixystays.myapp://auth/callback?code=${code}&next=${encodeURIComponent(finalNext)}`)
+      }
+
       return NextResponse.redirect(`${origin}${finalNext}`)
     }
   }
 
   // return the user to an error page with instructions
+  if (source === 'app') {
+    return NextResponse.redirect(`com.fixystays.myapp://auth/auth-code-error`)
+  }
   return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

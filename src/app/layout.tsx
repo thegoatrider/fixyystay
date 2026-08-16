@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CapacitorBackButton } from '@/components/CapacitorBackButton'
+import { CapacitorDeepLink } from '@/components/CapacitorDeepLink'
 import { BottomNav } from '@/components/BottomNav'
 import { PullToRefresh } from '@/components/PullToRefresh'
 import Providers from "@/components/Providers";
@@ -94,6 +95,7 @@ export default function RootLayout({
         <Providers>
           <PullToRefresh />
           <CapacitorBackButton />
+          <CapacitorDeepLink />
           {children}
           <BottomNav />
         </Providers>

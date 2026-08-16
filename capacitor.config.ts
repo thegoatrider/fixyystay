@@ -8,6 +8,7 @@ const config: CapacitorConfig = {
     url: 'https://www.fixystays.com',
     cleartext: true
   },
+  appendUserAgent: 'FixyStaysApp',
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

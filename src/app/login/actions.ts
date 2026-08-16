@@ -155,11 +155,17 @@ export async function signup(formData: FormData) {
 export async function signInWithGoogle() {
   const supabase = await createClient()
   const origin = (await headers()).get('origin')
+  const userAgent = (await headers()).get('user-agent') || ''
+  const isApp = userAgent.includes('FixyStaysApp')
+
+  const redirectUrl = isApp 
+    ? `${origin}/auth/callback?next=/&source=app`
+    : `${origin}/auth/callback?next=/`
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${origin}/auth/callback?next=/`,
+      redirectTo: redirectUrl,
     },
   })
 
