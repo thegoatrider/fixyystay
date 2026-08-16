@@ -32,14 +32,14 @@ export default async function Index() {
       
       {/* Navigation (Floating/Sticky) */}
       <nav className="w-full flex justify-center pt-[env(safe-area-inset-top)] min-h-16 bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm">
-        <div className="w-full max-w-7xl flex justify-between items-center px-6 py-4 text-sm">
+        <div className="w-full max-w-7xl flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 text-sm">
           <div className="flex items-center gap-6">
-            <Link href="/" className="font-extrabold text-2xl text-blue-600 hover:text-blue-700 transition">
+            <Link href="/" className="font-extrabold text-xl sm:text-2xl text-blue-600 hover:text-blue-700 transition">
               FixyStays
             </Link>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-6">
+          <div className="flex items-center gap-1.5 xs:gap-3 sm:gap-6">
             <LanguageSwitcher />
             {user ? (
               <>
@@ -49,7 +49,7 @@ export default async function Index() {
                 
                 <Link 
                   href={`/dashboard/${user.email === 'superadmin@fixstay.com' ? 'admin' : (user.user_metadata?.role || 'guest')}`}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-blue-600 bg-blue-50 font-bold hover:bg-blue-100 transition-all text-sm shadow-sm"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-blue-600 bg-blue-50 font-bold hover:bg-blue-100 transition-all text-sm shadow-sm whitespace-nowrap"
                 >
                   <LayoutDashboard className="w-4 h-4" />
                   <span className="hidden xs:inline">Dashboard</span>
@@ -58,7 +58,7 @@ export default async function Index() {
                 <form action="/auth/signout" method="post">
                   <button 
                     type="submit" 
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                     title="Logout"
                   >
                     <LogOut className="w-5 h-5" />
@@ -66,8 +66,8 @@ export default async function Index() {
                 </form>
               </>
             ) : (
-              <div className="flex items-center gap-4">
-                <Link href="/login" className="px-4 py-2 text-gray-600 hover:text-blue-600 font-bold text-sm transition-colors">
+              <div className="flex items-center gap-1.5 sm:gap-4">
+                <Link href="/login" className="px-2 sm:px-4 py-2 text-gray-600 hover:text-blue-600 font-bold text-sm transition-colors whitespace-nowrap">
                   Log in
                 </Link>
                 <SignupDropdown />

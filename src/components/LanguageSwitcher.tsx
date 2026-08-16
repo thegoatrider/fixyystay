@@ -40,15 +40,15 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-1.5 bg-gray-50 border rounded-lg px-2 py-1">
-      <Languages className="w-4 h-4 text-gray-500" />
+    <div className="flex items-center gap-1 bg-gray-50/60 hover:bg-gray-100/80 border border-gray-200/60 rounded-xl px-2 py-1.5 transition-all shrink-0 shadow-sm">
+      <Languages className="w-3.5 h-3.5 text-gray-500 shrink-0" />
       <select
         value={currentLocale}
         onChange={handleLanguageChange}
-        className="bg-transparent text-sm font-medium text-gray-700 outline-none cursor-pointer"
+        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-0.5"
         aria-label="Select Language"
       >
-        <option value="en">English</option>
+        <option value="en">EN</option>
         <option value="hi">हिंदी</option>
         <option value="mr">मराठी</option>
       </select>
