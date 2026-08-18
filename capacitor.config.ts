@@ -9,6 +9,12 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   appendUserAgent: 'FixyStaysApp',
+  android: {
+    appendUserAgent: 'FixyStaysApp'
+  },
+  ios: {
+    appendUserAgent: 'FixyStaysApp'
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

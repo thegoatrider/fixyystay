@@ -166,8 +166,15 @@ export async function signup(formData: FormData) {
 export async function signInWithGoogle() {
   const supabase = await createClient()
   const origin = await getAbsoluteOrigin()
-  const userAgent = (await headers()).get('user-agent') || ''
-  const isApp = userAgent.includes('FixyStaysApp')
+  const reqHeaders = await headers()
+  const userAgent = reqHeaders.get('user-agent') || ''
+  const cookieHeader = reqHeaders.get('cookie') || ''
+
+  const isApp = 
+    cookieHeader.includes('is_native_app=true') || 
+    userAgent.includes('FixyStaysApp') || 
+    userAgent.includes('Capacitor') || 
+    userAgent.includes('wv')
 
   const redirectUrl = isApp 
     ? `${origin}/auth/callback?next=/&source=app`

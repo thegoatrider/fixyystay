@@ -2,12 +2,24 @@
 
 import { useEffect } from 'react'
 import { App as CapacitorApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { useRouter } from 'next/navigation'
 
 export function CapacitorDeepLink() {
   const router = useRouter()
 
   useEffect(() => {
+    // Set a cookie so Next.js server actions always recognize requests from the native app
+    if (typeof window !== 'undefined') {
+      try {
+        if (Capacitor.isNativePlatform() || (window as any).Capacitor) {
+          document.cookie = "is_native_app=true; path=/; max-age=31536000; SameSite=Lax"
+        }
+      } catch (e) {
+        // Ignore if Capacitor is not present
+      }
+    }
+
     let urlListener: any
 
     const setupListener = async () => {
