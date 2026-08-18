@@ -71,7 +71,9 @@ export default function BasePricingClient({
         theme: {
           color: themeColor,
         },
+        webview_intent: true,
         handler: async function (response: any) {
+
           setLoading('Processing...')
           const res = await verifyAndUpgrade(response.razorpay_order_id)
           if (res.success) {

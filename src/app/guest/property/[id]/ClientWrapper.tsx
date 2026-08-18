@@ -272,7 +272,9 @@ export default function PropertyDetailClient({
         theme: {
           color: "#2563eb",
         },
+        webview_intent: true,
         handler: async function (response: any) {
+
           // 3. Confirm Booking on Server
           setIsLoading(true)
           const confirmRes = await confirmBooking(
