@@ -212,13 +212,25 @@ export async function verifyAndUpgrade(
       ownerId = owner.id
     }
     
-    // 3. Calculate Expiry
+    // 3. Calculate Expiry (with bulletproof early renewal preservation)
+    const { data: existingSub } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('status, end_date')
+      .eq('owner_id', ownerId)
+      .maybeSingle()
+
+    let baseDate = new Date()
+    if (existingSub && existingSub.status === 'active' && new Date(existingSub.end_date) > new Date()) {
+      baseDate = new Date(existingSub.end_date)
+    }
+
     let monthsToAdd = 0
     if (planName.includes('3 Months') || planName.includes('Quarterly')) monthsToAdd = 3
     else if (planName.includes('6 Months')) monthsToAdd = 6
     else if (planName.includes('12 Months') || planName.includes('Yearly')) monthsToAdd = 12
     
-    const end_date = monthsToAdd > 0 ? addMonths(new Date(), monthsToAdd).toISOString() : addYears(new Date(), 99).toISOString()
+    const end_date = monthsToAdd > 0 ? addMonths(baseDate, monthsToAdd).toISOString() : addYears(baseDate, 99).toISOString()
+
     
     // 4. Log Payment in DB (Matching exact production schema)
     const { data: existingPayment } = await supabaseAdmin

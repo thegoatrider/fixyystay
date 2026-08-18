@@ -141,8 +141,8 @@ export default async function OwnerProfilePage() {
                {isPaid ? (
                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                       <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Expiry Date</p>
-                       <p className="text-2xl font-black text-gray-900">{subscription?.end_date ? format(new Date(subscription.end_date), 'MMMM dd, yyyy') : 'N/A'}</p>
+                       <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Expiry Date & Time</p>
+                       <p className="text-2xl font-black text-gray-900">{subscription?.end_date ? format(new Date(subscription.end_date), "MMMM dd, yyyy 'at' hh:mm a") : 'N/A'}</p>
                        <p className={cn("text-xs font-bold mt-1", "text-green-600")}>
                           Expires in {subscription?.end_date ? Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} days
                        </p>
@@ -160,8 +160,8 @@ export default async function OwnerProfilePage() {
                ) : isTrial ? (
                 <div className="grid sm:grid-cols-2 gap-6">
                    <div className="p-6 bg-yellow-50 rounded-2xl border border-yellow-100">
-                      <p className="text-[10px] font-black uppercase text-yellow-600 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Trial Ends</p>
-                      <p className="text-2xl font-black text-gray-900">{trialEndDate ? format(trialEndDate, 'MMMM dd, yyyy') : 'N/A'}</p>
+                      <p className="text-[10px] font-black uppercase text-yellow-600 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Trial Ends & Time</p>
+                      <p className="text-2xl font-black text-gray-900">{trialEndDate ? format(trialEndDate, "MMMM dd, yyyy 'at' hh:mm a") : 'N/A'}</p>
                       <p className="text-xs font-bold mt-1 text-yellow-600">
                          Ends in {trialEndDate ? Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} days
                       </p>
