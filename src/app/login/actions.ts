@@ -6,6 +6,17 @@ import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
+async function getAbsoluteOrigin() {
+  const reqHeaders = await headers()
+  let origin = reqHeaders.get('origin')
+  if (!origin) {
+    const host = reqHeaders.get('host') || 'www.fixystays.com'
+    const protocol = host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https'
+    origin = `${protocol}://${host}`
+  }
+  return origin
+}
+
 export async function login(formData: FormData) {
   const supabase = await createClient()
 
@@ -81,7 +92,7 @@ export async function signup(formData: FormData) {
   }
 
   // 1. Sign up user and store role in user_metadata
-  const origin = (await headers()).get('origin')
+  const origin = await getAbsoluteOrigin()
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
@@ -154,7 +165,7 @@ export async function signup(formData: FormData) {
 
 export async function signInWithGoogle() {
   const supabase = await createClient()
-  const origin = (await headers()).get('origin')
+  const origin = await getAbsoluteOrigin()
   const userAgent = (await headers()).get('user-agent') || ''
   const isApp = userAgent.includes('FixyStaysApp')
 
@@ -182,7 +193,7 @@ export async function signInWithGoogle() {
 export async function resetPassword(formData: FormData) {
   const supabase = await createClient()
   const email = formData.get('email') as string
-  const origin = (await headers()).get('origin')
+  const origin = await getAbsoluteOrigin()
 
   if (!email) {
     redirect('/login?message=Please enter your email to reset password')

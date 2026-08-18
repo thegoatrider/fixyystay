@@ -7,6 +7,17 @@ import { addMonths, addYears } from 'date-fns'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 
+async function getAbsoluteOrigin() {
+  const reqHeaders = await headers()
+  let origin = reqHeaders.get('origin')
+  if (!origin) {
+    const host = reqHeaders.get('host') || 'www.fixystays.com'
+    const protocol = host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https'
+    origin = `${protocol}://${host}`
+  }
+  return origin
+}
+
 export async function createOwnerOrder(planName: string, amount: number, email: string) {
   try {
     const normalizedEmail = email.toLowerCase()
@@ -92,7 +103,7 @@ export async function verifyAndUpgrade(
       // If we don't have signupData, fallback to default placeholder
       if (signupData && signupData.name && signupData.password) {
         console.log('Owner not found for email:', normalizedEmail, 'Performing auth signup and owner/property registration.')
-        const origin = (await headers()).get('origin')
+        const origin = await getAbsoluteOrigin()
         
         // A. Sign up the user in Supabase auth
         const { data: authData, error: authError } = await supabase.auth.signUp({

@@ -5,6 +5,17 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 
+async function getAbsoluteOrigin() {
+  const reqHeaders = await headers()
+  let origin = reqHeaders.get('origin')
+  if (!origin) {
+    const host = reqHeaders.get('host') || 'www.fixystays.com'
+    const protocol = host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https'
+    origin = `${protocol}://${host}`
+  }
+  return origin
+}
+
 export async function checkEmailAvailability(email: string) {
   const supabaseAdmin = createAdminClient()
   const { data } = await supabaseAdmin
@@ -46,7 +57,7 @@ export async function submitOnboarding(formData: FormData) {
   const normalizedEmail = email.toLowerCase()
 
   // 1. Sign up the user as an owner
-  const origin = (await headers()).get('origin')
+  const origin = await getAbsoluteOrigin()
   let { data: authData, error: authError } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
