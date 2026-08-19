@@ -11,7 +11,15 @@ async function getAbsoluteOrigin() {
   let origin = reqHeaders.get('origin')
   if (!origin) {
     const host = reqHeaders.get('host') || 'www.fixystays.com'
-    const protocol = host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https'
+    const isLocal = 
+      host.includes('localhost') || 
+      host.includes('127.0.0.1') || 
+      host.includes('10.0.2.2') || 
+      host.includes(':') ||
+      host.startsWith('192.168.') || 
+      host.startsWith('10.') || 
+      host.startsWith('172.')
+    const protocol = isLocal ? 'http' : 'https'
     origin = `${protocol}://${host}`
   }
   return origin
@@ -174,7 +182,8 @@ export async function signInWithGoogle() {
     cookieHeader.includes('is_native_app=true') || 
     userAgent.includes('FixyStaysApp') || 
     userAgent.includes('Capacitor') || 
-    userAgent.includes('wv')
+    userAgent.includes('; wv)') ||
+    userAgent.includes('WebView')
 
   const redirectUrl = isApp 
     ? `${origin}/auth/callback?next=/&source=app`
