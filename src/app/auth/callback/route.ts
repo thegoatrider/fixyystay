@@ -11,8 +11,13 @@ export async function GET(request: Request) {
 
   // 1. If request is from the app, return deep link HTML immediately WITHOUT consuming the auth code
   if (source === 'app' && code) {
-    const appUrl = `com.fixystays.myapp://auth/callback?code=${code}&next=${encodeURIComponent(next)}`
     const webUrl = `${origin}${next}`
+    const userAgent = request.headers.get('user-agent') || ''
+    const isAndroid = userAgent.toLowerCase().includes('android')
+
+    const appUrl = isAndroid
+      ? `intent://auth/callback?code=${code}&next=${encodeURIComponent(next)}#Intent;scheme=com.fixystays.myapp;package=com.fixystays.myapp;S.browser_fallback_url=${encodeURIComponent(webUrl)};end`
+      : `com.fixystays.myapp://auth/callback?code=${code}&next=${encodeURIComponent(next)}`
 
     return new NextResponse(
       `<!DOCTYPE html>
