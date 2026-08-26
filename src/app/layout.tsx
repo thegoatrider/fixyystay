@@ -21,10 +21,10 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.fixystays.com'),
   title: {
     template: '%s | Fixy Stays',
-    default: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels in Alibag',
+    default: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels',
   },
-  description: 'Book the best luxury villas, premium stays, cottages, and hotels in Alibag. Enjoy top-rated accommodations for your next vacation or getaway with Fixy Stays.',
-  keywords: ['Alibag stays', 'luxury villas in Alibag', 'premium cottages Alibag', 'hotels in Alibag', 'book villa Alibag', 'Alibag resorts', 'vacation rentals Alibag', 'best hotels Alibag', 'weekend getaway Alibag', 'Fixy Stays'],
+  description: 'Book the best luxury villas, premium stays, cottages, and hotels. Enjoy top-rated accommodations for your next vacation or getaway with Fixy Stays.',
+  keywords: ['premium stays', 'luxury villas', 'premium cottages', 'boutique hotels', 'book villa online', 'luxury resorts', 'vacation rentals', 'best weekend getaways', 'Fixy Stays'],
   authors: [{ name: 'Fixy Stays' }],
   creator: 'Fixy Stays',
   publisher: 'Fixy Stays',
@@ -33,8 +33,8 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     url: 'https://www.fixystays.com',
     siteName: 'Fixy Stays',
-    title: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels in Alibag',
-    description: 'Book the best luxury villas, premium stays, cottages, and hotels in Alibag. Enjoy top-rated accommodations for your next vacation or getaway with Fixy Stays.',
+    title: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels',
+    description: 'Book the best luxury villas, premium stays, cottages, and hotels. Enjoy top-rated accommodations for your next vacation or getaway with Fixy Stays.',
     images: [
       {
         url: '/logo.png',
@@ -46,8 +46,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels in Alibag',
-    description: 'Book the best luxury villas, premium stays, cottages, and hotels in Alibag.',
+    title: 'Fixy Stays | Premium Stays, Luxury Villas & Hotels',
+    description: 'Book the best luxury villas, premium stays, cottages, and hotels.',
     images: ['/logo.png'],
   },
   alternates: {
