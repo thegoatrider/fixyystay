@@ -86,11 +86,22 @@ CREATE TABLE IF NOT EXISTS public.influencer_clicks (
 CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
-  room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE,
+  room_id UUID REFERENCES public.rooms(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   influencer_id UUID REFERENCES public.influencers(id) ON DELETE SET NULL,
   guest_name TEXT NOT NULL,
+  guest_email TEXT,
   guest_phone TEXT NOT NULL,
   amount NUMERIC NOT NULL,
+  checkin_date DATE,
+  checkout_date DATE,
+  num_guests INTEGER DEFAULT 1,
+  num_rooms INTEGER DEFAULT 1,
+  room_details JSONB DEFAULT '[]'::jsonb,
+  razorpay_order_id TEXT,
+  razorpay_payment_id TEXT,
+  payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
+  status TEXT DEFAULT 'confirmed',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -112,11 +123,161 @@ CREATE TABLE IF NOT EXISTS public.guest_checkins (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
   owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  booking_id UUID REFERENCES public.bookings(id) ON DELETE SET NULL,
   guest_phone TEXT NOT NULL,
   guest_name TEXT NOT NULL,
   num_people INTEGER NOT NULL,
   checkin_date DATE,
   checkout_date DATE,
+  vehicle_number TEXT,
+  uid TEXT,
+  status TEXT DEFAULT 'completed',
   id_documents JSONB DEFAULT '[]'::jsonb,
+  form_c_details JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- =========================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =========================================================================
+
+-- 1. Owners
+ALTER TABLE public.owners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Owners can view own profile" ON public.owners
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Owners can update own profile" ON public.owners
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Owners can insert own profile" ON public.owners
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 2. Properties
+ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view approved properties" ON public.properties
+  FOR SELECT USING (approved = true);
+
+CREATE POLICY "Owners can view all their properties" ON public.properties
+  FOR SELECT USING (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));
+
+CREATE POLICY "Owners can insert their properties" ON public.properties
+  FOR INSERT WITH CHECK (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));
+
+CREATE POLICY "Owners can update their properties" ON public.properties
+  FOR UPDATE USING (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));
+
+CREATE POLICY "Owners can delete their properties" ON public.properties
+  FOR DELETE USING (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));
+
+-- 3. Rooms
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view rooms of approved properties" ON public.rooms
+  FOR SELECT USING (property_id IN (SELECT id FROM public.properties WHERE approved = true));
+
+CREATE POLICY "Owners can view rooms of their properties" ON public.rooms
+  FOR SELECT USING (property_id IN (SELECT id FROM public.properties WHERE owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+CREATE POLICY "Owners can insert rooms for their properties" ON public.rooms
+  FOR INSERT WITH CHECK (property_id IN (SELECT id FROM public.properties WHERE owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+CREATE POLICY "Owners can update rooms of their properties" ON public.rooms
+  FOR UPDATE USING (property_id IN (SELECT id FROM public.properties WHERE owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+CREATE POLICY "Owners can delete rooms of their properties" ON public.rooms
+  FOR DELETE USING (property_id IN (SELECT id FROM public.properties WHERE owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+-- 4. Room Rates
+ALTER TABLE public.room_rates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view rates of approved property rooms" ON public.room_rates
+  FOR SELECT USING (room_id IN (SELECT r.id FROM public.rooms r JOIN public.properties p ON r.property_id = p.id WHERE p.approved = true));
+
+CREATE POLICY "Owners can manage rates for their rooms" ON public.room_rates
+  FOR ALL USING (room_id IN (SELECT r.id FROM public.rooms r JOIN public.properties p ON r.property_id = p.id WHERE p.owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+-- 5. Room Availability
+ALTER TABLE public.room_availability ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view availability of approved property rooms" ON public.room_availability
+  FOR SELECT USING (room_id IN (SELECT r.id FROM public.rooms r JOIN public.properties p ON r.property_id = p.id WHERE p.approved = true));
+
+CREATE POLICY "Owners can manage availability for their rooms" ON public.room_availability
+  FOR ALL USING (room_id IN (SELECT r.id FROM public.rooms r JOIN public.properties p ON r.property_id = p.id WHERE p.owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+-- 6. Influencers
+ALTER TABLE public.influencers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Influencers can view own profile" ON public.influencers
+  FOR SELECT USING (user_id = auth.uid() OR email = (SELECT email FROM auth.users WHERE id = auth.uid()));
+
+CREATE POLICY "Influencers can update own profile" ON public.influencers
+  FOR UPDATE USING (user_id = auth.uid() OR email = (SELECT email FROM auth.users WHERE id = auth.uid()));
+
+-- 7. Influencer Properties
+ALTER TABLE public.influencer_properties ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Influencers can view assigned properties" ON public.influencer_properties
+  FOR SELECT USING (influencer_id IN (SELECT id FROM public.influencers WHERE user_id = auth.uid() OR email = (SELECT email FROM auth.users WHERE id = auth.uid())));
+
+-- 8. Influencer Clicks
+ALTER TABLE public.influencer_clicks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can log influencer clicks" ON public.influencer_clicks
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Influencers can view own clicks" ON public.influencer_clicks
+  FOR SELECT USING (influencer_id IN (SELECT id FROM public.influencers WHERE user_id = auth.uid() OR email = (SELECT email FROM auth.users WHERE id = auth.uid())));
+
+-- 9. Bookings
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Clients can create pending bookings" ON public.bookings
+  FOR INSERT WITH CHECK (
+    payment_status = 'pending' AND 
+    (user_id = auth.uid() OR user_id IS NULL)
+  );
+
+CREATE POLICY "Guests can view own bookings" ON public.bookings
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Guests can update own pending bookings" ON public.bookings
+  FOR UPDATE 
+  USING (user_id = auth.uid() AND payment_status = 'pending')
+  WITH CHECK (
+    user_id = auth.uid() AND 
+    payment_status = 'pending'
+  );
+
+CREATE POLICY "Owners can view bookings for their properties" ON public.bookings
+  FOR SELECT USING (property_id IN (SELECT id FROM public.properties WHERE owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid())));
+
+CREATE POLICY "Influencers can view bookings referred by them" ON public.bookings
+  FOR SELECT USING (influencer_id IN (SELECT id FROM public.influencers WHERE user_id = auth.uid() OR email = (SELECT email FROM auth.users WHERE id = auth.uid())));
+
+-- 10. Leads
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can submit leads" ON public.leads
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Owners can view and manage leads for their properties" ON public.leads
+  FOR ALL USING (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));
+
+-- 11. Guest Check-ins
+ALTER TABLE public.guest_checkins ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can submit guest checkins" ON public.guest_checkins
+  FOR INSERT WITH CHECK (
+    (user_id = auth.uid() OR user_id IS NULL) AND
+    (booking_id IS NULL OR booking_id IN (SELECT id FROM public.bookings WHERE user_id = auth.uid()))
+  );
+
+CREATE POLICY "Guests can view own checkins" ON public.guest_checkins
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Owners can view checkins for their properties" ON public.guest_checkins
+  FOR SELECT USING (owner_id IN (SELECT id FROM public.owners WHERE user_id = auth.uid()));

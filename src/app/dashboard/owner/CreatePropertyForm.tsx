@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import NextImage from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -449,8 +450,7 @@ export default function CreatePropertyForm() {
         {coverPreview && (
           <div className="relative w-full h-48 sm:h-64 rounded-xl overflow-hidden border-2 border-blue-200 shadow-md mt-4 group">
             <span className="absolute top-2 left-2 z-10 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-md">Main Cover</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+            <NextImage src={coverPreview} alt="Cover Preview" fill unoptimized className="object-cover" />
           </div>
         )}
       </div>
@@ -466,7 +466,7 @@ export default function CreatePropertyForm() {
           type="file" 
           accept="image/*" 
           multiple 
-          onChange={handleFileChange}
+          onChange={handleFileChange} 
           className="cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:rounded-md file:px-4 file:py-1 hover:file:bg-blue-700 transition-all"
         />
         
@@ -474,8 +474,7 @@ export default function CreatePropertyForm() {
           <div className="flex flex-wrap gap-3 mt-4 max-h-[500px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 shadow-inner">
             {previews.map((url, index) => (
               <div key={index} className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden border-2 bg-white group shadow-sm ring-1 ring-black/5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                <NextImage src={url} alt={`Preview ${index}`} fill unoptimized sizes="112px" className="object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(index)}

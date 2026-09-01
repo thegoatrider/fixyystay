@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       // Case A: Guest Booking
       const { data: booking } = await supabaseAdmin
         .from('bookings')
-        .select('*')
+        .select('id, payment_status')
         .eq('razorpay_order_id', orderId)
         .maybeSingle()
 

@@ -15,7 +15,7 @@ export async function GET() {
     // Find owners with no user_id (ghosts created by payment webhook case mismatch)
     const { data: ghosts, error: ghostError } = await supabaseAdmin
       .from('owners')
-      .select('*')
+      .select('id, email, name')
       .is('user_id', null)
 
     if (ghostError) report.errors.push(`Ghost fetch error: ${ghostError.message}`)
@@ -51,7 +51,7 @@ export async function GET() {
     // Find all paid payments
     const { data: payments, error: payError } = await supabaseAdmin
       .from('owner_payments')
-      .select('*')
+      .select('id, owner_id, email, amount, payment_date, payment_method, status, transaction_id, razorpay_order_id')
       .in('status', ['paid', 'completed'])
 
     if (payError) report.errors.push(`Payments fetch error: ${payError.message}`)

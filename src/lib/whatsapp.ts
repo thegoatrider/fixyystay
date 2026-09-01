@@ -58,7 +58,7 @@ export async function sendWhatsAppTemplate({
 
   const { data: account, error } = await supabase
     .from('whatsapp_accounts')
-    .select('*')
+    .select('phone_number_id, access_token')
     .eq('owner_id', ownerId)
     .single();
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import NextImage from 'next/image'
 import { Camera, Image as ImageIcon, CheckCircle, AlertTriangle, Loader2, FlipHorizontal, X } from 'lucide-react'
 import { uploadAndVerifyFront, uploadBackImage } from './verify-action'
 import { cn } from '@/lib/utils'
@@ -85,7 +86,7 @@ function SingleSideUpload({
       <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-0.5">{label}</span>
       <div className="relative aspect-[3/2] rounded-xl overflow-hidden border-2 border-dashed border-gray-200 bg-gray-50">
         {preview ? (
-          <img src={preview} alt={label} className="w-full h-full object-cover" />
+          <NextImage src={preview} alt={label} fill unoptimized className="object-cover" />
         ) : (
           <div className="absolute inset-0 flex flex-col gap-1.5 items-center justify-center p-2">
             <label
@@ -303,10 +304,12 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
           )}>
             {frontPreview ? (
               <>
-                <img
+                <NextImage
                   src={frontPreview}
                   alt="Front ID"
-                  className={cn("w-full h-full object-cover", frontStatus === 'PROCESSING' && "opacity-40 blur-sm")}
+                  fill
+                  unoptimized
+                  className={cn("object-cover", frontStatus === 'PROCESSING' && "opacity-40 blur-sm")}
                 />
                 {frontStatus === 'PROCESSING' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white gap-1">
@@ -384,10 +387,12 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
           )}>
             {backPreview ? (
               <>
-                <img
+                <NextImage
                   src={backPreview}
                   alt="Back ID"
-                  className={cn("w-full h-full object-cover", backStatus === 'UPLOADING' && "opacity-40 blur-sm")}
+                  fill
+                  unoptimized
+                  className={cn("object-cover", backStatus === 'UPLOADING' && "opacity-40 blur-sm")}
                 />
                 {backStatus === 'UPLOADING' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white gap-1">

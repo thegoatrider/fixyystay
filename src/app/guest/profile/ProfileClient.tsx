@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   User, 
   Mail, 
@@ -91,10 +92,9 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
         <div className="bg-white border rounded-3xl p-8 shadow-xl shadow-blue-900/5 sticky top-24">
           <div className="flex flex-col items-center text-center">
             <div className="relative group mb-6">
-              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-blue-50 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-blue-50 flex items-center justify-center relative">
                 {profile.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+                  <Image src={profile.avatar_url} alt={profile.full_name} fill sizes="128px" className="object-cover" />
                 ) : (
                   <User className="w-16 h-16 text-blue-200" />
                 )}
@@ -196,10 +196,9 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
                     onClick={() => setSelectedBooking(booking)}
                     className="p-5 border-2 border-gray-50 bg-gray-50/30 rounded-3xl hover:border-blue-100 hover:bg-white transition-all cursor-pointer group flex flex-col md:flex-row gap-6 items-center"
                   >
-                    <div className="w-full md:w-32 h-24 rounded-2xl overflow-hidden bg-blue-100 flex-shrink-0">
+                    <div className="w-full md:w-32 h-24 rounded-2xl overflow-hidden bg-blue-100 flex-shrink-0 relative">
                       {booking.properties?.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={booking.properties.image_url} alt={booking.properties.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <Image src={booking.properties.image_url} alt={booking.properties.name} fill sizes="(max-width: 768px) 100vw, 128px" className="object-cover group-hover:scale-110 transition-transform duration-500" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-blue-300">
                           <Building2 className="w-10 h-10" />
@@ -323,14 +322,13 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-400">
             
             <div className="relative h-56 w-full">
-               {selectedBooking.properties?.image_url ? (
-                 // eslint-disable-next-line @next/next/no-img-element
-                 <img src={selectedBooking.properties.image_url} alt={selectedBooking.properties.name} className="w-full h-full object-cover" />
-               ) : (
-                 <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white">
-                   <Building2 className="w-20 h-20 opacity-20" />
-                 </div>
-               )}
+                {selectedBooking.properties?.image_url ? (
+                  <Image src={selectedBooking.properties.image_url} alt={selectedBooking.properties.name} fill sizes="(max-width: 768px) 100vw, 672px" className="object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white">
+                    <Building2 className="w-20 h-20 opacity-20" />
+                  </div>
+                )}
                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                <button 
                   onClick={() => setSelectedBooking(null)}

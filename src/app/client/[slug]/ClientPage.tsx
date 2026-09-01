@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -92,7 +93,7 @@ function CheckinForm({ org }: { org: Organization }) {
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl border max-w-md text-center">
           {org.logo_url ? (
-            <img src={org.logo_url} alt={org.name} className="h-16 mx-auto mb-4 object-contain opacity-50 grayscale" />
+            <Image src={org.logo_url} alt={org.name} width={160} height={64} className="h-16 w-auto mx-auto mb-4 object-contain opacity-50 grayscale" />
           ) : (
             <HelpCircle className="w-16 h-16 mx-auto mb-4" style={{ color: org.primary_color, opacity: 0.5 }} />
           )}
@@ -182,7 +183,7 @@ function CheckinForm({ org }: { org: Organization }) {
       <div className="max-w-2xl mx-auto flex flex-col gap-8">
         <div className="text-center">
           {org.logo_url ? (
-            <img src={org.logo_url} alt={org.name} className="h-16 mx-auto mb-4 object-contain" />
+            <Image src={org.logo_url} alt={org.name} width={160} height={64} className="h-16 w-auto mx-auto mb-4 object-contain" />
           ) : (
             <div className="font-bold text-2xl mb-4 inline-block" style={{ color: org.primary_color }}>
               {org.name}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -131,8 +132,7 @@ export default function AddRoomForm({ propertyId }: AddRoomFormProps) {
             <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-dashed border-gray-200">
               {previews.map((url, index) => (
                 <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border bg-white shadow-sm group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                  <Image src={url} alt={`Preview ${index}`} fill unoptimized sizes="64px" className="object-cover" />
                   <button
                     type="button"
                     onClick={() => removeImage(index)}

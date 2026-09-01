@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/utils/supabase/admin'
+import { createClient } from '@/utils/supabase/server'
 import { backupCheckinToGoogleDrive } from '@/lib/google-drive'
 
 /**
@@ -10,6 +11,11 @@ import { backupCheckinToGoogleDrive } from '@/lib/google-drive'
  */
 export async function submitCheckin(formData: FormData, identityIds: string[]) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
+    const bookingId = (formData.get('bookingId') as string) || null
+
     const supabaseAdmin = createAdminClient()
 
     const propertyId = formData.get('propertyId') as string
@@ -107,6 +113,8 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
       property_id: property.id,
       owner_id: property.owner_id,
       organization_id: property.organization_id || null,
+      user_id: userId,
+      booking_id: bookingId,
       guest_phone: guestPhone,
       guest_name: guestName,
       num_people: numPeople,

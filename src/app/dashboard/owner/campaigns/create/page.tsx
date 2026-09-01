@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Rocket, AlertCircle } from 'lucide-react';
@@ -18,12 +18,8 @@ export default function CreateCampaignPage() {
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   useEffect(() => {
+    const supabase = createClient();
     async function loadData() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
@@ -37,13 +33,13 @@ export default function CreateCampaignPage() {
       setLeadsCount(count || 0);
 
       // Templates
-      const { data: tpData } = await supabase.from('whatsapp_templates').select('*');
+      const { data: tpData } = await supabase.from('whatsapp_templates').select('id, name, category, language, status, components, header_type, body_text');
       if (tpData) setTemplates(tpData);
 
       setLoading(false);
     }
     loadData();
-  }, [supabase]);
+  }, []);
 
   const handleCreate = async () => {
     if (!selectedTemplate) return alert('Please select a template');

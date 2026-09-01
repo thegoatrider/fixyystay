@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getPropertyBySlug, getTopProperties, getPropertiesForSEO } from '@/lib/seo-fetchers'
 import { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, CheckCircle, Wifi, Car, Coffee, Wind, Building } from 'lucide-react'
 
 // Revalidate every hour
@@ -10,12 +11,13 @@ export const revalidate = 3600
 // Generate the most popular property pages at build time
 export async function generateStaticParams() {
   const properties = await getTopProperties()
-  return properties.map((prop) => ({
+  return properties.map((prop: any) => ({
     slug: prop.slug || prop.id, // Fallback to ID if slug is not yet generated
   }))
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params
   const property = await getPropertyBySlug(params.slug)
   if (!property) return {}
   
@@ -46,7 +48,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function PropertyListingPage({ params }: { params: { slug: string } }) {
+export default async function PropertyListingPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params
   const property = await getPropertyBySlug(params.slug)
   if (!property) notFound()
 
@@ -101,8 +104,13 @@ export default async function PropertyListingPage({ params }: { params: { slug: 
 
             {/* Main Image */}
             <div className="w-full h-64 sm:h-96 rounded-3xl overflow-hidden border-4 border-white shadow-xl relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={property.image_url || '/placeholder.jpg'} alt={property.name} className="w-full h-full object-cover" />
+              <Image 
+                src={property.image_url || '/placeholder.jpg'} 
+                alt={property.name} 
+                fill 
+                sizes="(max-width: 768px) 100vw, 66vw"
+                className="object-cover" 
+              />
             </div>
 
             {/* Description */}
@@ -170,8 +178,15 @@ export default async function PropertyListingPage({ params }: { params: { slug: 
           <div className="grid md:grid-cols-3 gap-6">
             {relatedStays.map((prop: any) => (
               <div key={prop.id} className="bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition">
-                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                 <img src={prop.image_url || '/placeholder.jpg'} alt={prop.name} className="w-full h-48 object-cover" />
+                 <div className="relative w-full h-48">
+                   <Image 
+                     src={prop.image_url || '/placeholder.jpg'} 
+                     alt={prop.name} 
+                     fill 
+                     sizes="(max-width: 768px) 100vw, 33vw"
+                     className="object-cover" 
+                   />
+                 </div>
                  <div className="p-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-1 truncate">{prop.name}</h3>
                     <p className="text-sm text-gray-500 mb-3">{prop.city_area || property.city}</p>

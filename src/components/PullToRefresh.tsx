@@ -12,6 +12,13 @@ export function PullToRefresh() {
   const threshold = 120 // Distance to trigger refresh
   const router = useRouter()
 
+  const pullDistanceRef = useRef(0)
+  const isRefreshingRef = useRef(false)
+
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing
+  }, [isRefreshing])
+
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
       // Only start pulling if we are at the top of the page
@@ -22,21 +29,18 @@ export function PullToRefresh() {
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isPulling.current || isRefreshing) return
+      if (!isPulling.current || isRefreshingRef.current) return
 
       const currentY = e.touches[0].pageY
       const diff = currentY - startY.current
 
-      if (diff > 0) {
+      if (diff > 0 && window.scrollY === 0) {
         // Apply resistance
         const distance = Math.min(diff * 0.4, threshold + 20)
+        pullDistanceRef.current = distance
         setPullDistance(distance)
-        
-        // Prevent default scrolling when pulling down
-        if (diff > 10 && e.cancelable) {
-          e.preventDefault()
-        }
       } else {
+        pullDistanceRef.current = 0
         setPullDistance(0)
       }
     }
@@ -45,23 +49,24 @@ export function PullToRefresh() {
       if (!isPulling.current) return
       isPulling.current = false
 
-      if (pullDistance >= threshold) {
+      if (pullDistanceRef.current >= threshold && !isRefreshingRef.current) {
         handleRefresh()
       } else {
+        pullDistanceRef.current = 0
         setPullDistance(0)
       }
     }
 
-    window.addEventListener('touchstart', handleTouchStart, { passive: false })
-    window.addEventListener('touchmove', handleTouchMove, { passive: false })
-    window.addEventListener('touchend', handleTouchEnd)
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+    window.addEventListener('touchend', handleTouchEnd, { passive: true })
 
     return () => {
       window.removeEventListener('touchstart', handleTouchStart)
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [pullDistance, isRefreshing])
+  }, [])
 
   const handleRefresh = () => {
     setIsRefreshing(true)

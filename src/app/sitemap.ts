@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ])
 
     // Generate /stays-in-[city] routes
-    const cityRoutes = locations.map((loc) => ({
+    const cityRoutes = locations.map((loc: any) => ({
       url: `${baseUrl}/stays-in-${loc.slug}`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
@@ -35,8 +35,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // Generate /[propertyType]-in-[city] routes
     const categoryRoutes = []
-    for (const loc of locations) {
-      for (const pt of propertyTypes) {
+    for (const loc of locations as any[]) {
+      for (const pt of propertyTypes as any[]) {
         categoryRoutes.push({
           url: `${baseUrl}/${pt.slug}-in-${loc.slug}`,
           lastModified: new Date(),
@@ -47,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // Generate /property/[slug] routes
-    const propertyRoutes = properties.map((prop) => ({
+    const propertyRoutes = properties.map((prop: any) => ({
       url: `${baseUrl}/property/${prop.slug || prop.id}`,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,

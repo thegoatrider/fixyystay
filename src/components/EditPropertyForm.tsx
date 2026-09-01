@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import NextImage from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +30,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     const supabase = createClient()
     const { data } = await supabase
       .from('property_rooms')
-      .select('*')
+      .select('id, property_id, room_number, room_type, status, floor_number')
       .eq('property_id', property.id)
       .order('room_number', { ascending: true })
     if (data) setRooms(data)
@@ -503,8 +504,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         <div className="relative w-full sm:w-72 h-48 rounded-2xl overflow-hidden border-2 border-dashed border-gray-300 bg-white group hover:border-blue-400 transition-colors">
           {coverImagePreview ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={coverImagePreview} alt="Cover Preview" className="w-full h-full object-cover" />
+              <NextImage src={coverImagePreview} alt="Cover Preview" fill unoptimized className="object-cover" />
               {coverImageFile && (
                 <div className="absolute top-2 left-2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
                   NEW COVER
@@ -519,7 +519,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
           )}
           <Input 
             id="coverImage"
-            name="coverImage"
+            name="coverImage" 
             type="file" 
             accept="image/*" 
             onChange={handleCoverChange} 
@@ -540,7 +540,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
           <div className="relative">
             <input 
               id="galleryImages"
-              name="galleryImages"
+              name="galleryImages" 
               type="file" 
               multiple 
               accept="image/*" 
@@ -556,12 +556,11 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {existingPhotos.map((url, i) => (
             <div key={`exist-${i}`} className="relative aspect-square rounded-2xl overflow-hidden group border border-gray-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="Property existing" className="w-full h-full object-cover" />
+              <NextImage src={url} alt="Property existing" fill sizes="120px" className="object-cover" />
               <button 
                 type="button" 
                 onClick={() => removeExistingPhoto(i)}
-                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform"
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform z-10"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -570,15 +569,14 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
           {newPreviews.map((url, i) => (
             <div key={`new-${i}`} className="relative aspect-square rounded-2xl overflow-hidden group border-2 border-dashed border-blue-400">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="Property new" className="w-full h-full object-cover opacity-80" />
+              <NextImage src={url} alt="Property new" fill unoptimized sizes="120px" className="object-cover opacity-80" />
               <div className="absolute inset-0 bg-blue-900/10 flex items-center justify-center pointer-events-none">
                 <span className="bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md">NEW</span>
               </div>
               <button 
                 type="button" 
                 onClick={() => removeNewPhoto(i)}
-                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform"
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform z-10"
               >
                 <X className="w-3 h-3" />
               </button>

@@ -37,13 +37,13 @@ export default async function AdminDashboard() {
   // 3. Influencers (Approved)
   const { data: influencers } = await supabase
     .from('influencers')
-    .select('*')
+    .select('id, name, email, instagram, approved, commission_rate, created_at')
     .eq('approved', true)
 
   // 3b. Pending Influencers
   const { data: pendingInfluencers } = await supabase
     .from('influencers')
-    .select('*')
+    .select('id, name, email, instagram, approved, commission_rate, created_at')
     .eq('approved', false)
     .order('created_at', { ascending: false })
 
@@ -58,8 +58,8 @@ export default async function AdminDashboard() {
       influencers(name, commission_rate)
     `)
 
-  const { data: clicks } = await supabase.from('influencer_clicks').select('*')
-  const { data: bookings } = await supabase.from('bookings').select('*')
+  const { data: clicks } = await supabase.from('influencer_clicks').select('id, property_id, influencer_id, created_at')
+  const { data: bookings } = await supabase.from('bookings').select('id, property_id, influencer_id, amount, status, created_at')
 
   const promotions = promotionData?.map(promo => {
     const promoClicks = clicks?.filter(c => c.property_id === promo.property_id && c.influencer_id === promo.influencer_id).length || 0
@@ -84,11 +84,11 @@ export default async function AdminDashboard() {
   let walletTransactions: any[] = []
   let pendingPayoutsRaw: any[] = []
   try {
-    const { data: wt } = await supabase.from('wallet_transactions').select('*')
+    const { data: wt } = await supabase.from('wallet_transactions').select('id, user_id, amount, transaction_type, created_at')
     walletTransactions = wt || []
     const { data: pr } = await supabase
       .from('payout_requests')
-      .select('*')
+      .select('id, user_id, amount, status, upi_id, created_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
     pendingPayoutsRaw = pr || []
@@ -133,26 +133,33 @@ export default async function AdminDashboard() {
   // 6. Inbound Business Leads (New Property Owners)
   const { data: inboundLeads } = await supabase
     .from('property_owner_leads')
-    .select('*')
+    .select('id, full_name, area, city, google_link, created_at')
     .order('created_at', { ascending: false })
+    .limit(100)
 
   // 7. Global Influencer Promotion Requests
   const { data: promotionRequests } = await supabase
     .from('influencer_promotion_requests')
     .select(`
-      *,
+      id,
+      influencer_id,
+      property_id,
+      status,
+      pitch,
+      created_at,
       influencers(name, email),
       properties(name)
     `)
     .order('created_at', { ascending: false })
+    .limit(100)
 
   // 8. Feature Usage Metrics (SQL View Fallback to JS)
   let leadUsageBreakdown: any[] = []
   let checkinUsageBreakdown: any[] = []
   
   try {
-    const { data: leadUsage } = await supabase.from('owner_lead_usage').select('*').order('total_leads', { ascending: false })
-    const { data: checkinUsage } = await supabase.from('owner_checkin_usage').select('*').order('total_checkins', { ascending: false })
+    const { data: leadUsage } = await supabase.from('owner_lead_usage').select('owner_id, owner_name, total_leads').order('total_leads', { ascending: false }).limit(50)
+    const { data: checkinUsage } = await supabase.from('owner_checkin_usage').select('owner_id, owner_name, total_checkins').order('total_checkins', { ascending: false }).limit(50)
     
     leadUsageBreakdown = leadUsage || []
     checkinUsageBreakdown = checkinUsage || []

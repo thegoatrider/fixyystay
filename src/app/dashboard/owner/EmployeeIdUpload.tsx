@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import NextImage from 'next/image'
 import {
   Camera, Image as ImageIcon, CheckCircle, AlertTriangle,
   Loader2, FlipHorizontal, ShieldCheck, User, AlertCircle, X
@@ -309,7 +310,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
           )}>
             {frontPreview ? (
               <>
-                <img src={frontPreview} alt="Front ID" className={cn('w-full h-full object-cover', frontStatus === 'PROCESSING' && 'opacity-40 blur-sm')} />
+                <NextImage src={frontPreview} alt="Front ID" fill unoptimized className={cn('object-cover', frontStatus === 'PROCESSING' && 'opacity-40 blur-sm')} />
                 {frontStatus === 'PROCESSING' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white gap-1">
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -376,7 +377,7 @@ export function EmployeeIdUpload({ enteredName, enteredDob, onComplete, onReset 
           )}>
             {backPreview ? (
               <>
-                <img src={backPreview} alt="Back ID" className={cn('w-full h-full object-cover', backStatus === 'UPLOADING' && 'opacity-40 blur-sm')} />
+                <NextImage src={backPreview} alt="Back ID" fill unoptimized className={cn('object-cover', backStatus === 'UPLOADING' && 'opacity-40 blur-sm')} />
                 {backStatus === 'UPLOADING' && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Loader2 className="w-5 h-5 text-white animate-spin" /></div>
                 )}

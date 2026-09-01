@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 import { getSupportMessages, sendSupportMessage, markSupportAsRead } from '@/app/dashboard/messages/support-actions'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,7 @@ export default function SupportWidget() {
         table: 'support_messages',
         filter: `owner_id=eq.${ownerId}`
       },
-      (payload) => {
+      (payload: any) => {
         const newMsg = payload.new
         setMessages((prev) => {
           // Prevent duplicates from optimistic updates
@@ -258,9 +259,11 @@ export default function SupportWidget() {
                       {msg.attachment_url && (
                         <div className="mb-2 rounded-lg overflow-hidden flex justify-center max-w-full">
                           {msg.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                            <img
+                            <Image
                               src={msg.attachment_url}
                               alt="Support attachment"
+                              width={300}
+                              height={192}
                               className="max-w-full max-h-48 object-contain rounded bg-black/5"
                             />
                           ) : (

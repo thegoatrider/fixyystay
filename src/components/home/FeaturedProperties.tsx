@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Heart, Star, ShieldCheck, Zap } from 'lucide-react';
 
@@ -68,9 +69,11 @@ export function FeaturedProperties() {
             >
               {/* Image Gallery area (simplified to 1 image for now, but styled for gallery) */}
               <div className="relative w-full aspect-[4/3] overflow-hidden">
-                <img 
+                <Image 
                   src={property.image} 
                   alt={property.name} 
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                 />
                 

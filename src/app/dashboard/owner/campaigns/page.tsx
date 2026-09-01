@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Users, Send, AlertCircle, BarChart } from 'lucide-react';
@@ -12,12 +12,8 @@ export default function CampaignsOverviewPage() {
   const [stats, setStats] = useState({ totalSent: 0, totalDelivered: 0, totalRead: 0 });
   const [loading, setLoading] = useState(true);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   useEffect(() => {
+    const supabase = createClient();
     async function fetchCampaigns() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
@@ -27,7 +23,7 @@ export default function CampaignsOverviewPage() {
 
       const { data } = await supabase
         .from('campaigns')
-        .select('*')
+        .select('id, owner_id, name, template_name, audience_type, status, total_recipients, total_sent, total_failed, scheduled_at, created_at')
         .eq('owner_id', owner.id)
         .order('created_at', { ascending: false });
 
@@ -35,14 +31,14 @@ export default function CampaignsOverviewPage() {
         setCampaigns(data);
         
         let sent = 0;
-        data.forEach(c => sent += (c.total_sent || 0));
+        data.forEach((c: any) => sent += (c.total_sent || 0));
         setStats(prev => ({ ...prev, totalSent: sent }));
         // Note: For actual delivered/read, we'd need to count from campaign_logs table. MVP keeps it simple.
       }
       setLoading(false);
     }
     fetchCampaigns();
-  }, [supabase]);
+  }, []);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-8">

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { 
@@ -459,7 +460,7 @@ export default function PoliceDashboardClient({
                             <div className="space-y-2">
                               <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">▣ Front Side</p>
                               <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
-                                <img src={doc.document_image_url} alt="Front ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                <Image src={doc.document_image_url} alt="Front ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                 <a href={doc.document_image_url} target="_blank" rel="noopener noreferrer"
                                   className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                                   <ExternalLink className="w-5 h-5" /> Open Full Image
@@ -472,7 +473,7 @@ export default function PoliceDashboardClient({
                             <div className="space-y-2">
                               <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">◫ Back Side</p>
                               <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
-                                <img src={doc.back_image_url} alt="Back ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                <Image src={doc.back_image_url} alt="Back ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                 <a href={doc.back_image_url} target="_blank" rel="noopener noreferrer"
                                   className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                                   <ExternalLink className="w-5 h-5" /> Open Full Image
@@ -499,7 +500,7 @@ export default function PoliceDashboardClient({
                           <div className="space-y-3">
                             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Front Side</p>
                             <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
-                              <img src={person.frontUrl} alt="Front ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <Image src={person.frontUrl} alt="Front ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                               <a href={person.frontUrl} target="_blank" rel="noopener noreferrer"
                                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                                 <ExternalLink className="w-5 h-5" /> Open Full Image
@@ -511,7 +512,7 @@ export default function PoliceDashboardClient({
                           <div className="space-y-3">
                             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Person {person.personIndex || idx + 1} — Back Side</p>
                             <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3] sm:aspect-video">
-                              <img src={person.backUrl} alt="Back ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <Image src={person.backUrl} alt="Back ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                               <a href={person.backUrl} target="_blank" rel="noopener noreferrer"
                                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                                 <ExternalLink className="w-5 h-5" /> Open Full Image
@@ -585,7 +586,7 @@ export default function PoliceDashboardClient({
                        <div className="space-y-2">
                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">▣ Front Side</p>
                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
-                           <img src={selectedEmployee.govt_doc_front_url} alt="Front ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                           <Image src={selectedEmployee.govt_doc_front_url} alt="Front ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                            <a href={selectedEmployee.govt_doc_front_url} target="_blank" rel="noopener noreferrer"
                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                              <ExternalLink className="w-5 h-5" /> Open Full Image
@@ -598,7 +599,7 @@ export default function PoliceDashboardClient({
                        <div className="space-y-2">
                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">◫ Back Side</p>
                          <div className="group relative bg-white border-4 border-white rounded-3xl overflow-hidden shadow-md aspect-[4/3]">
-                           <img src={selectedEmployee.govt_doc_back_url} alt="Back ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                           <Image src={selectedEmployee.govt_doc_back_url} alt="Back ID" fill sizes="(max-width: 768px) 100vw, 300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                            <a href={selectedEmployee.govt_doc_back_url} target="_blank" rel="noopener noreferrer"
                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2 backdrop-blur-[2px]">
                              <ExternalLink className="w-5 h-5" /> Open Full Image

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -448,8 +449,7 @@ function CheckinForm() {
                       <div className="flex flex-wrap gap-3">
                         {registerImages.map((file, i) => (
                           <div key={i} className="relative aspect-[3/4] w-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={URL.createObjectURL(file)} alt={`Page ${i+1}`} className="w-full h-full object-cover" />
+                            <Image src={URL.createObjectURL(file)} alt={`Page ${i+1}`} fill unoptimized sizes="96px" className="object-cover" />
                             <button
                               type="button"
                               onClick={() => setRegisterImages(prev => prev.filter((_, idx) => idx !== i))}

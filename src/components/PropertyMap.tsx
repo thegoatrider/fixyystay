@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { MapPin, ExternalLink, CheckCircle } from 'lucide-react'
 import { getApproxLocation } from '@/utils/getApproxLocation'
 import 'mapbox-gl/dist/mapbox-gl.css'
@@ -78,10 +79,13 @@ export default function PropertyMap({ lat, lng, isConfirmed, pincode, areaName, 
         {!isInteractive ? (
           <>
             {/* Static View */}
-            <img 
+            <Image 
               src={staticMapUrl} 
               alt="Location map" 
-              className="w-full h-full object-cover"
+              fill
+              unoptimized
+              sizes="(max-width: 768px) 100vw, 800px"
+              className="object-cover"
             />
             
             {/* Overlay if not confirmed */}

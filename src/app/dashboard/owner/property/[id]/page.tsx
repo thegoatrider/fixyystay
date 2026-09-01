@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,20 +28,20 @@ export default async function PropertyDetailPage(
 
   const { data: property, error } = await supabase
     .from('properties')
-    .select('*')
+    .select('id, uid, name, type, description, amenities, highlights, address, city, area_name, pincode, contact_number, helpdesk_number, image_url, images, base_price, location, is_active, approved, room_categories')
     .eq('id', propertyId)
     .eq('owner_id', owner.id)
     .single()
 
   if (error || !property) redirect('/dashboard/owner')
 
-  const { data: rooms } = await supabase.from('rooms').select('*').eq('property_id', propertyId)
+  const { data: rooms } = await supabase.from('rooms').select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url').eq('property_id', propertyId)
   const roomIds = rooms?.map(r => r.id) || []
   
   // Fetch calendar needed data
-  const { data: bookings } = await supabase.from('bookings').select('*').in('room_id', roomIds)
-  const { data: rates } = await supabase.from('room_rates').select('*').in('room_id', roomIds)
-  const { data: availability } = await supabase.from('room_availability').select('*').in('room_id', roomIds)
+  const { data: bookings } = await supabase.from('bookings').select('id, room_id, checkin_date, checkout_date, status, guest_name, total_amount').in('room_id', roomIds)
+  const { data: rates } = await supabase.from('room_rates').select('id, room_id, date, price').in('room_id', roomIds)
+  const { data: availability } = await supabase.from('room_availability').select('id, room_id, date, is_available').in('room_id', roomIds)
 
   return (
     <div className="flex flex-col gap-8">
@@ -90,10 +91,9 @@ export default async function PropertyDetailPage(
                   {rooms?.map(room => (
                     <div key={room.id} className="border p-3 flex justify-between rounded-md bg-gray-50 items-center gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0">
+                        <div className="bg-blue-100 text-blue-600 rounded-md overflow-hidden aspect-square w-12 h-12 flex-shrink-0 relative">
                           {room.image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={room.image_url} alt={room.name} className="object-cover w-full h-full" />
+                            <Image src={room.image_url} alt={room.name} fill sizes="48px" className="object-cover" />
                           ) : (
                             <div className="flex w-full h-full items-center justify-center">
                               <span className="text-xs font-bold text-blue-400">V</span>

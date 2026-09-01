@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { searchPoliceRecords } from './actions'
 import { Search, ShieldAlert, FileText, User, Home, MapPin, Phone, Lock, Calendar, AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -210,7 +211,7 @@ export default function PoliceDashboard() {
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Document Image</p>
                       {record.document_image_url ? (
                         <a href={record.document_image_url} target="_blank" rel="noopener noreferrer" className="block relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-[4/3]">
-                          <img src={record.document_image_url} alt="ID Document" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <Image src={record.document_image_url} alt="ID Document" fill sizes="(max-width: 640px) 100vw, 160px" className="object-cover transition-transform group-hover:scale-105" />
                           <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <span className="text-white text-xs font-bold px-3 py-1.5 bg-blue-600 rounded-lg">View Full</span>
                           </div>

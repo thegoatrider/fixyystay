@@ -62,7 +62,7 @@ export async function getSupportMessages(ownerId: string) {
     const supabaseAdmin = createAdminClient()
     const { data, error } = await supabaseAdmin
       .from('support_messages')
-      .select('*')
+      .select('id, owner_id, sender_type, content, attachment_url, is_read, created_at')
       .eq('owner_id', ownerId)
       .order('created_at', { ascending: true })
 
@@ -130,7 +130,7 @@ export async function getSupportOwners() {
     // Fetch all owners
     const { data: owners, error: ownersError } = await supabaseAdmin
       .from('owners')
-      .select('*')
+      .select('id, user_id, name, email, phone')
 
     if (ownersError) throw ownersError
 
@@ -144,7 +144,7 @@ export async function getSupportOwners() {
     // Fetch all support messages to calculate unread counts and latest messages
     const { data: messages, error: msgError } = await supabaseAdmin
       .from('support_messages')
-      .select('*')
+      .select('id, owner_id, sender_type, content, attachment_url, is_read, created_at')
       .order('created_at', { ascending: false })
 
     if (msgError) throw msgError

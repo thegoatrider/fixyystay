@@ -18,7 +18,7 @@ export async function searchPoliceRecords(query: string, authPin: string) {
     // 1. Search for matching identities
     const { data: identities, error: identityError } = await supabase
       .from('guest_identity')
-      .select('*')
+      .select('id, full_name, document_type, document_number, dob, address, document_image_url, checkin_id, created_at')
       .or(`document_number.ilike.%${query}%,full_name.ilike.%${query}%`)
       .limit(50)
 
@@ -41,7 +41,14 @@ export async function searchPoliceRecords(query: string, authPin: string) {
     const { data: checkins, error: checkinError } = await supabase
       .from('guest_checkins')
       .select(`
-        *,
+        id,
+        guest_name,
+        guest_phone,
+        checkin_date,
+        checkout_date,
+        num_people,
+        room_number,
+        vehicle_number,
         properties:property_id (
           name,
           city,

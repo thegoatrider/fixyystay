@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 import { getMessages, sendMessage, markAsRead } from '@/app/dashboard/messages/actions'
 import { Button } from '@/components/ui/button'
@@ -32,7 +33,7 @@ export default function OwnerMessagesPage() {
             table: 'messages',
             filter: `owner_id=eq.${ownerId}` 
           }, 
-          (payload) => {
+          (payload: any) => {
             setMessages((prev) => [...prev, payload.new])
             if (payload.new.sender_type === 'police') {
               markAsRead(ownerId, 'owner')
@@ -158,7 +159,7 @@ export default function OwnerMessagesPage() {
                   {msg.attachment_url && (
                     <div className="mb-2 rounded-lg overflow-hidden flex justify-center">
                       {msg.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                        <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-64 object-contain rounded-md bg-black/5" />
+                        <Image src={msg.attachment_url} alt="Attachment" width={400} height={256} className="max-w-full max-h-64 object-contain rounded-md bg-black/5" />
                       ) : (
                         <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-white/20 rounded-md hover:bg-white/30 transition-colors w-full border border-black/10">
                           <FileText className="w-8 h-8 shrink-0" />

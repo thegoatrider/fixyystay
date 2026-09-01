@@ -258,7 +258,7 @@ export async function processPayout(requestId: string, action: 'approve' | 'reje
     }
 
     // 1. Fetch the request
-    const { data: request } = await supabaseAdmin.from('payout_requests').select('*').eq('id', requestId).single()
+    const { data: request } = await supabaseAdmin.from('payout_requests').select('id, user_id, amount, status, bank_details').eq('id', requestId).single()
     if (!request || request.status !== 'pending') {
       return { error: 'Invalid or already processed request' }
     }

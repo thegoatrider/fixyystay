@@ -12,7 +12,7 @@ export async function getUserProfile() {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, full_name, email, phone, avatar_url, updated_at')
     .eq('id', user.id)
     .single()
 
@@ -121,7 +121,16 @@ export async function getUserBookings() {
   const { data: bookings, error } = await supabase
     .from('bookings')
     .select(`
-      *,
+      id,
+      user_id,
+      property_id,
+      room_id,
+      checkin_date,
+      checkout_date,
+      total_amount,
+      status,
+      guest_name,
+      guest_phone,
       properties (name, city_area, image_url),
       rooms (category)
     `)

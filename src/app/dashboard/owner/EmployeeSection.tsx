@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -160,7 +161,7 @@ export default function EmployeeSection({
                   <div className="space-y-2">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">▣ Front Side</p>
                     <div className="group relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100">
-                      <img src={viewingEmployee.govt_doc_front_url} alt="Front ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image src={viewingEmployee.govt_doc_front_url} alt="Front ID" fill sizes="(max-width: 768px) 50vw, 250px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       <a href={viewingEmployee.govt_doc_front_url} target="_blank" rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity">
                         <ExternalLink className="w-4 h-4" /> Open
@@ -177,7 +178,7 @@ export default function EmployeeSection({
                   <div className="space-y-2">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">◫ Back Side</p>
                     <div className="group relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100">
-                      <img src={viewingEmployee.govt_doc_back_url} alt="Back ID" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image src={viewingEmployee.govt_doc_back_url} alt="Back ID" fill sizes="(max-width: 768px) 50vw, 250px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       <a href={viewingEmployee.govt_doc_back_url} target="_blank" rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity">
                         <ExternalLink className="w-4 h-4" /> Open

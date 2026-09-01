@@ -1,6 +1,7 @@
 'use client'
 
 import { QRCodeCanvas } from 'qrcode.react'
+import NextImage from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Printer, Download, Globe } from 'lucide-react'
 import { useRef, useEffect, useState } from 'react'
@@ -369,9 +370,12 @@ export default function WebsiteQR() {
               If the download didn't start automatically, you can long-press the image below and select <span className="text-blue-600">"Save Image"</span> or click the Download button.
             </p>
             <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-2">
-              <img 
+              <NextImage 
                 src={downloadImageUrl} 
                 alt="Website QR Code" 
+                width={192}
+                height={192}
+                unoptimized
                 className="w-48 h-48 object-contain shadow-md rounded-xl"
               />
             </div>

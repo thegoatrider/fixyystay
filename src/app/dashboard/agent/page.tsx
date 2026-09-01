@@ -13,7 +13,7 @@ export default async function AgentDashboard() {
   // 1. Get Influencer Details
   const { data: influencer } = await supabase
     .from('influencers')
-    .select('*')
+    .select('id, user_id, name, email, instagram, approved, commission_rate')
     .eq('user_id', user.id)
     .single()
 
@@ -30,14 +30,14 @@ export default async function AgentDashboard() {
   // 3. Get Generated Links
   const { data: links } = await supabase
     .from('influencer_links')
-    .select(`*, properties(name)`)
+    .select('id, influencer_id, property_id, tracking_code, created_at, properties(name)')
     .eq('influencer_id', influencer.id)
     .order('created_at', { ascending: false })
 
   // 4. Wallet Info
   const { data: transactions } = await supabase
     .from('wallet_transactions')
-    .select('*')
+    .select('id, user_id, amount, transaction_type, created_at')
     .eq('user_id', user.id)
 
   const earnings = transactions?.filter(t => t.transaction_type === 'earning').reduce((acc, t) => acc + Number(t.amount), 0) || 0

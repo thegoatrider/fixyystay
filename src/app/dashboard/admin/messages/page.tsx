@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 import {
   getSupportOwners,
@@ -83,7 +84,7 @@ export default function AdminSupportMessagesPage() {
           table: 'support_messages',
           filter: `owner_id=eq.${selectedOwnerId}`
         },
-        (payload) => {
+        (payload: any) => {
           const newMsg = payload.new
           setMessages((prev) => {
             // Prevent duplicates
@@ -573,9 +574,11 @@ export default function AdminSupportMessagesPage() {
                         {msg.attachment_url && (
                           <div className="mb-2 rounded-lg overflow-hidden flex justify-center">
                             {msg.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                              <img
+                              <Image
                                 src={msg.attachment_url}
                                 alt="Attachment"
+                                width={400}
+                                height={256}
                                 className="max-w-full max-h-64 object-contain rounded-md bg-black/5"
                               />
                             ) : (

@@ -24,11 +24,19 @@
 .DS_Store
 *.pem
 
-# debug
+# debug and build logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+*build*.txt
+*gen_log*.txt
+errors.txt
+debug_*.ts
+scratch*.js
+*.jks
+*.keystore
 
 # env files (can opt-in for committing if needed)
 .env*

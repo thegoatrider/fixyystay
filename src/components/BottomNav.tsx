@@ -9,9 +9,9 @@ import { createClient } from '@/utils/supabase/client'
 export function BottomNav() {
   const pathname = usePathname()
   const [role, setRole] = useState<string | null>(null)
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
     async function getRole() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -23,7 +23,7 @@ export function BottomNav() {
       }
     }
     getRole()
-  }, [supabase])
+  }, [])
 
   // Don't show on login/signup pages or if we can't determine role yet (optional)
   const hideOn = ['/login', '/signup']

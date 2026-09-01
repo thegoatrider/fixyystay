@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { submitPromotionRequest } from './influencer-requests-actions'
 import React, { useState, useMemo, useEffect } from 'react'
+import Image from 'next/image'
 
 export default function InfluencerDashboardClient({ 
   influencerId, 
@@ -206,7 +207,13 @@ export default function InfluencerDashboardClient({
                 return (
                   <div key={prop.id} className="bg-white flex flex-col rounded-[2.5rem] border border-gray-100 shadow-md hover:shadow-2xl transition-all duration-500 overflow-hidden group">
                     <div className="relative h-56 overflow-hidden">
-                       <img src={prop.image_url || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={prop.name} />
+                       <Image 
+                          src={prop.image_url || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80'} 
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover group-hover:scale-110 transition-transform duration-700" 
+                          alt={prop.name} 
+                        />
                        <div className="absolute top-4 left-4 z-10">
                           <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black text-gray-900 border border-white/20 uppercase tracking-widest shadow-sm">
                             {prop.type}

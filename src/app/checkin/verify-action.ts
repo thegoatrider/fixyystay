@@ -846,7 +846,7 @@ export async function uploadBackImage(formData: FormData) {
     const supabaseAdmin = createAdminClient()
     const { data: existingRecord, error: fetchError } = await supabaseAdmin
       .from('guest_identity')
-      .select('*')
+      .select('id, document_type, document_number, dob, address, is_verified, verification_status')
       .eq('id', identityId)
       .single()
 

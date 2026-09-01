@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,12 +15,8 @@ export default function WhatsAppInbox() {
   const [inputText, setInputText] = useState('');
   const [ownerId, setOwnerId] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   useEffect(() => {
+    const supabase = createClient();
     async function loadData() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user) return;
@@ -43,15 +39,16 @@ export default function WhatsAppInbox() {
       if (convs) setConversations(convs);
     }
     loadData();
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (!activeConv) return;
+    const supabase = createClient();
     
     async function loadMessages() {
       const { data: msgs } = await supabase
         .from('messages')
-        .select('*')
+        .select('id, conversation_id, sender_type, content, attachment_url, is_read, created_at')
         .eq('conversation_id', activeConv.id)
         .order('created_at', { ascending: true });
         
@@ -64,17 +61,18 @@ export default function WhatsAppInbox() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeConv.id}` },
-        (payload) => {
+        (payload: any) => {
           setMessages((prev) => [...prev, payload.new]);
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [activeConv, supabase]);
+  }, [activeConv]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !activeConv) return;
+    const supabase = createClient();
     
     // In a real app, you would call an API route here (/api/whatsapp/send)
     // For MVP, we insert directly into DB to trigger worker or webhook mock

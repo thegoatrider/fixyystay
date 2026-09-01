@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     url: 'https://www.fixystays.com',
-    cleartext: true
+    cleartext: false
   },
   appendUserAgent: 'FixyStaysApp',
   android: {

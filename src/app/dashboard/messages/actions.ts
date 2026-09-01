@@ -57,7 +57,7 @@ export async function getMessages(ownerId: string) {
     const supabaseAdmin = createAdminClient()
     const { data, error } = await supabaseAdmin
       .from('messages')
-      .select('*')
+      .select('id, owner_id, sender_type, content, attachment_url, is_read, created_at')
       .eq('owner_id', ownerId)
       .order('created_at', { ascending: true })
 
@@ -111,7 +111,7 @@ export async function getOwnersWithProperties() {
     // Fetch directly from owners table to avoid auth.admin.listUsers() limits
     const { data: owners, error: ownersError } = await supabaseAdmin
       .from('owners')
-      .select('*')
+      .select('id, user_id, name, email, phone')
 
     if (ownersError) throw ownersError
     

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 
@@ -70,9 +71,11 @@ export function FeaturedDestinations() {
               >
                 {/* Background Image */}
                 <div className="absolute inset-0 w-full h-full">
-                <img 
+                <Image 
                   src={dest.image} 
                   alt={dest.name} 
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out"
                 />
                 {/* Gradient Overlay for text readability */}

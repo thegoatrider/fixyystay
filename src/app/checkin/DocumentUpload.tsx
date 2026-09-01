@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import NextImage from 'next/image'
 import { Camera, Image as ImageIcon, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { uploadAndVerifyDocument } from './verify-action'
@@ -142,7 +143,7 @@ export function DocumentUpload({ label, idKey, onVerified }: DocumentUploadProps
         
         {preview ? (
           <div className={`absolute inset-0 rounded-xl overflow-hidden border-2 ${status === 'VERIFIED' ? 'border-green-400' : status === 'FAILED' ? 'border-red-400' : 'border-blue-400'}`}>
-            <img src={preview} alt="ID Preview" className={`w-full h-full object-cover ${status !== 'VERIFIED' && status !== 'IDLE' && status !== 'FAILED' ? 'opacity-50 blur-sm' : ''}`} />
+            <NextImage src={preview} alt="ID Preview" fill unoptimized className={`object-cover ${status !== 'VERIFIED' && status !== 'IDLE' && status !== 'FAILED' ? 'opacity-50 blur-sm' : ''}`} />
             
             {(status === 'UPLOADING' || status === 'PROCESSING' || status === 'EXTRACTING') && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white z-10">

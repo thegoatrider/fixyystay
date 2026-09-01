@@ -29,7 +29,7 @@ export default async function OwnerProfilePage() {
 
   const { data: subscription } = await supabase
     .from('owner_subscriptions')
-    .select('*')
+    .select('id, owner_id, plan_type, plan_name, status, start_date, end_date, price_paid')
     .eq('owner_id', owner.id)
     .maybeSingle()
 
@@ -41,7 +41,7 @@ export default async function OwnerProfilePage() {
 
   const { data: payments } = await supabase
     .from('owner_payments')
-    .select('*')
+    .select('id, owner_id, amount, payment_date, payment_method, status, transaction_id')
     .eq('owner_id', owner.id)
     .order('payment_date', { ascending: false })
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -120,7 +121,7 @@ export default function OrganizationsManagement({ organizations }: { organizatio
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full shadow-inner border border-black/10" style={{ backgroundColor: org.primary_color }}></div>
                       {org.logo_url ? (
-                        <img src={org.logo_url} alt="logo" className="h-6 object-contain" />
+                        <Image src={org.logo_url} alt="logo" width={60} height={24} className="h-6 w-auto object-contain" />
                       ) : (
                         <span className="text-xs text-gray-400 italic">No logo</span>
                       )}

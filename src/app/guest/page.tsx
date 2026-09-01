@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, Star } from 'lucide-react'
 import { format, eachDayOfInterval, subDays, isSameDay } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -187,8 +188,13 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
       )}>
         <div className="h-56 bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center p-4 relative overflow-hidden">
           {getPropImage(prop) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={getPropImage(prop)} alt={prop.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <Image 
+              src={getPropImage(prop)} 
+              alt={prop.name} 
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
           ) : (
             <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🏨</span>
           )}

@@ -284,7 +284,7 @@ export async function getActiveAccessToken(ownerId: string): Promise<string | nu
   const supabaseAdmin = createAdminClient()
   const { data: tokens, error: tokensError } = await supabaseAdmin
     .from('owner_google_tokens')
-    .select('*')
+    .select('access_token, refresh_token, expiry_date')
     .eq('owner_id', ownerId)
     .maybeSingle()
 
@@ -333,7 +333,7 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
     // 1. Fetch checkin record
     const { data: checkin, error: checkinError } = await supabaseAdmin
       .from('guest_checkins')
-      .select('*')
+      .select('id, uid, owner_id, guest_name, guest_phone, checkin_date, checkout_date, num_people, room_number, vehicle_number, property_id')
       .eq('id', checkinId)
       .single()
 
@@ -351,7 +351,7 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
     // 4. Fetch associated guest identities
     const { data: identities, error: identityError } = await supabaseAdmin
       .from('guest_identity')
-      .select('*')
+      .select('id, checkin_id, full_name, document_type, document_number, dob, address, document_image_url, back_image_url')
       .eq('checkin_id', checkinId)
 
     if (identityError || !identities) {

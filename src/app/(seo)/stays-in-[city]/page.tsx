@@ -4,6 +4,7 @@ import { PropertyCard } from '@/components/PropertyCard'
 import { generateSEOContent } from '@/lib/seo-utils'
 import { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, Star, Building } from 'lucide-react'
 
 // Revalidate every hour
@@ -12,13 +13,14 @@ export const revalidate = 3600
 // Generate Top 50 City Pages at Build Time
 export async function generateStaticParams() {
   const locations = await getTopLocations()
-  return locations.map((loc) => ({
+  return locations.map((loc: any) => ({
     city: loc.slug,
   }))
 }
 
 // Generate Dynamic SEO Metadata
-export async function generateMetadata({ params }: { params: { city: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ city: string }> }): Promise<Metadata> {
+  const params = await props.params
   const location = await getLocationDetails(params.city)
   if (!location) return {}
   
@@ -46,7 +48,8 @@ export async function generateMetadata({ params }: { params: { city: string } })
   }
 }
 
-export default async function CityPage({ params }: { params: { city: string } }) {
+export default async function CityPage(props: { params: Promise<{ city: string }> }) {
+  const params = await props.params
   const location = await getLocationDetails(params.city)
   if (!location) notFound()
 
@@ -112,12 +115,17 @@ export default async function CityPage({ params }: { params: { city: string } })
         
         {properties.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {properties.map(prop => (
-              // Note: PropertyCard from dashboard might need to be adapted or a new public one used.
-              // For SEO we want it to link to /property/[slug]
+            {properties.map((prop: any) => (
               <div key={prop.id} className="bg-white rounded-2xl border overflow-hidden hover:shadow-lg transition">
-                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                 <img src={prop.image_url || '/placeholder.jpg'} alt={prop.name} className="w-full h-48 object-cover" />
+                 <div className="relative w-full h-48">
+                   <Image 
+                     src={prop.image_url || '/placeholder.jpg'} 
+                     alt={prop.name} 
+                     fill 
+                     sizes="(max-width: 768px) 100vw, 33vw"
+                     className="object-cover" 
+                   />
+                 </div>
                  <div className="p-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-1">{prop.name}</h3>
                     <p className="text-sm text-gray-500 mb-3">{prop.city_area || location.name}</p>
@@ -147,7 +155,7 @@ export default async function CityPage({ params }: { params: { city: string } })
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "ItemList",
-            "itemListElement": properties.map((prop, index) => ({
+            "itemListElement": properties.map((prop: any, index: number) => ({
               "@type": "ListItem",
               "position": index + 1,
               "item": {

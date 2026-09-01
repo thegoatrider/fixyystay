@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HERO_IMAGES = [
@@ -28,17 +29,23 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
       {/* Background Images Carousel */}
       <div className="absolute inset-0 z-0 bg-gray-900 overflow-hidden rounded-[2rem] md:rounded-[3rem]">
         <AnimatePresence mode="popLayout">
-          <motion.img
+          <motion.div
             key={currentImage}
-            src={HERO_IMAGES[currentImage]}
-            alt="Beautiful travel destination"
             initial={{ opacity: 0, scale: 1.05 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.5, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-          />
+            className="absolute inset-0 w-full h-full"
+          >
+            <Image
+              src={HERO_IMAGES[currentImage]}
+              alt="Beautiful travel destination"
+              fill
+              priority={currentImage === 0}
+              sizes="100vw"
+              className="object-cover"
+            />
+          </motion.div>
         </AnimatePresence>
         {/* Soft overlay to ensure text remains readable */}
         <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>

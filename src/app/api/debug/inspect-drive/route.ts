@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const { data: token } = await supabaseAdmin
       .from('owner_google_tokens')
-      .select('*')
+      .select('google_email, access_token, refresh_token, expiry_date, root_folder_id')
       .eq('owner_id', owner.id)
       .single()
 
@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
     return NextResponse.json({
-      googleEmail: token.google_email,
-      rootFolderId: token.root_folder_id,
+      googleEmail: token?.google_email || null,
+      rootFolderId: token?.root_folder_id || null,
       files: data.files || []
     })
 

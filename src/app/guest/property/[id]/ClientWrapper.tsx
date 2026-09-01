@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { logClick, createBookingOrder, confirmBooking } from './actions'
 import Script from 'next/script'
@@ -253,7 +254,20 @@ export default function PropertyDetailClient({
     
     try {
       // 1. Create Razorpay Order
-      const orderRes = await createBookingOrder(property.id, selectedRoomSelections, totalPrice, checkin, checkout)
+      const orderRes = await createBookingOrder(
+        property.id, 
+        selectedRoomSelections, 
+        totalPrice, 
+        checkin, 
+        checkout,
+        {
+          name: guestName,
+          email: guestEmail,
+          phone: guestPhone,
+          influencerId,
+          numGuests: guestCount
+        }
+      )
       if (orderRes.error) throw new Error(orderRes.error)
 
       // 2. Open Razorpay Checkout
@@ -401,12 +415,15 @@ export default function PropertyDetailClient({
                       setLightboxIndex(idx >= 0 ? idx : 0)
                       setIsLightboxOpen(true)
                     }}
-                    className="w-full h-full text-left"
+                    className="w-full h-full text-left relative"
                   >
-                    <img 
+                    <Image 
                       src={mainImg} 
                       alt={property.name} 
-                      className="w-full h-full object-cover transition-all duration-700 hover:scale-105" 
+                      fill
+                      priority
+                      sizes="(max-width: 1024px) 100vw, 66vw"
+                      className="object-cover transition-all duration-700 hover:scale-105" 
                     />
                   </button>
                 )
@@ -455,7 +472,7 @@ export default function PropertyDetailClient({
                           : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
                       )}
                     >
-                      <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover bg-gray-50" />
+                      <Image src={url} alt={`Thumbnail ${i + 1}`} fill sizes="96px" className="object-cover bg-gray-50" />
                       <div className={cn(
                         "absolute inset-0 transition-colors",
                         (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
@@ -575,7 +592,7 @@ export default function PropertyDetailClient({
                       >
                         <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border relative">
                           {room.image_url ? (
-                            <img src={room.image_url} alt={room.category} className="w-full h-full object-cover" />
+                            <Image src={room.image_url} alt={room.category} fill sizes="56px" className="object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs font-bold">No Img</div>
                           )}
@@ -765,8 +782,8 @@ export default function PropertyDetailClient({
           </div>
           <div id="lightbox-scroll-container" className="flex-1 flex overflow-x-auto snap-x snap-mandatory hide-scrollbar items-center">
             {allImages.map((src, i) => (
-              <div key={i} className="flex-shrink-0 w-full h-full flex items-center justify-center snap-center p-4">
-                <img src={src} className="max-w-full max-h-full object-contain" alt={`View ${i + 1}`} />
+              <div key={i} className="flex-shrink-0 w-full h-full relative flex items-center justify-center snap-center p-4">
+                <Image src={src} fill sizes="100vw" className="object-contain p-4" alt={`View ${i + 1}`} />
               </div>
             ))}
           </div>

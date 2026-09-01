@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { format } from 'date-fns'
 import { ChevronLeft, ChevronRight, Users, FileText, ExternalLink, X, AlertCircle, Search, Download, Printer, Share2, Lock, CheckCircle, Globe } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -936,8 +937,7 @@ function GuestList({
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Original Register Sheet</span>
                   <div className="bg-gray-55 border border-gray-100 rounded-2xl p-4 flex flex-col gap-3">
                     <div className="relative aspect-[3/2] rounded-xl overflow-hidden border border-gray-150 bg-gray-50">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={selectedGuest.register_image_url} alt="Original Register Sheet" className="w-full h-full object-cover" />
+                      <Image src={selectedGuest.register_image_url} alt="Original Register Sheet" fill sizes="(max-width: 768px) 100vw, 500px" className="object-cover" />
                       <a
                         href={selectedGuest.register_image_url}
                         target="_blank"
@@ -992,8 +992,7 @@ function GuestList({
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-0.5">{sideLabel}</span>
                           <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={sideLabel} className="w-full h-full object-cover" />
+                            <Image src={url} alt={sideLabel} fill sizes="(max-width: 768px) 50vw, 250px" className="object-cover" />
                             <a
                               href={url}
                               target="_blank"
@@ -1253,10 +1252,11 @@ function GuestList({
           </div>
           
           <div className="flex-1 overflow-auto flex items-center justify-center p-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
+            <Image 
               src={printUrl} 
               alt="ID Document" 
+              width={800}
+              height={600}
               className="max-w-full max-h-[80vh] object-contain shadow-2xl rounded-lg"
               onLoad={() => {
                 setTimeout(() => window.print(), 300)

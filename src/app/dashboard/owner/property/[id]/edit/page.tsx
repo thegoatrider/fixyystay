@@ -19,7 +19,7 @@ export default async function EditPropertyPage(
 
   const { data: property, error } = await supabase
     .from('properties')
-    .select('*')
+    .select('id, name, type, description, amenities, highlights, address, city, area_name, pincode, contact_number, helpdesk_number, image_url, images, base_price, location, is_active')
     .eq('id', propertyId)
     .eq('owner_id', owner.id)
     .single()
@@ -28,7 +28,7 @@ export default async function EditPropertyPage(
 
   const { data: rooms } = await supabase
     .from('rooms')
-    .select('*')
+    .select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url')
     .eq('property_id', propertyId)
 
   return (

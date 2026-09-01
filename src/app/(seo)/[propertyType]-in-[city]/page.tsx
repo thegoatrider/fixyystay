@@ -3,6 +3,7 @@ import { getTopLocations, getTopPropertyTypes, getLocationDetails, getProperties
 import { generateSEOContent } from '@/lib/seo-utils'
 import { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin } from 'lucide-react'
 
 // Revalidate every hour
@@ -28,7 +29,8 @@ export async function generateStaticParams() {
   return params
 }
 
-export async function generateMetadata({ params }: { params: { propertyType: string, city: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ propertyType: string, city: string }> }): Promise<Metadata> {
+  const params = await props.params
   const location = await getLocationDetails(params.city)
   if (!location) return {}
   
@@ -57,7 +59,8 @@ export async function generateMetadata({ params }: { params: { propertyType: str
   }
 }
 
-export default async function PropertyTypeCityPage({ params }: { params: { propertyType: string, city: string } }) {
+export default async function PropertyTypeCityPage(props: { params: Promise<{ propertyType: string, city: string }> }) {
+  const params = await props.params
   const location = await getLocationDetails(params.city)
   if (!location) notFound()
 
@@ -90,10 +93,17 @@ export default async function PropertyTypeCityPage({ params }: { params: { prope
         
         {properties.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {properties.map(prop => (
+            {properties.map((prop: any) => (
               <div key={prop.id} className="bg-white rounded-2xl border overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300">
-                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                 <img src={prop.image_url || '/placeholder.jpg'} alt={prop.name} className="w-full h-56 object-cover" />
+                 <div className="relative w-full h-56">
+                   <Image 
+                     src={prop.image_url || '/placeholder.jpg'} 
+                     alt={prop.name} 
+                     fill 
+                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                     className="object-cover" 
+                   />
+                 </div>
                  <div className="p-5">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">{prop.type}</span>
@@ -137,7 +147,7 @@ export default async function PropertyTypeCityPage({ params }: { params: { prope
             "@type": "ItemList",
             "name": seo.h1,
             "description": seo.metaDescription,
-            "itemListElement": properties.map((prop, index) => ({
+            "itemListElement": properties.map((prop: any, index: number) => ({
               "@type": "ListItem",
               "position": index + 1,
               "item": {

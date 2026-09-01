@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: '500mb',
+      bodySizeLimit: '10mb',
     },
   },
   images: {
@@ -16,10 +16,23 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.fixystays.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'fixystays.com',
+      },
     ],
-  },
-  typescript: {
-    ignoreBuildErrors: true,
   },
   async headers() {
     return [
