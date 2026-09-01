@@ -11,7 +11,7 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/login')
+    redirect('/login?next=/guest/profile')
   }
 
   // Initial fetch for server-side hydration (or pass it down)
