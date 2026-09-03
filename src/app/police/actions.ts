@@ -18,7 +18,7 @@ export async function searchPoliceRecords(query: string, authPin: string) {
     // 1. Search for matching identities
     const { data: identities, error: identityError } = await supabase
       .from('guest_identity')
-      .select('id, full_name, document_type, document_number, dob, address, document_image_url, checkin_id, created_at')
+      .select('id, full_name, document_type, document_number, date_of_birth, address, document_image_url, checkin_id, created_at')
       .or(`document_number.ilike.%${query}%,full_name.ilike.%${query}%`)
       .limit(50)
 

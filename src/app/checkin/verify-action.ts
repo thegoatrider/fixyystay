@@ -846,7 +846,7 @@ export async function uploadBackImage(formData: FormData) {
     const supabaseAdmin = createAdminClient()
     const { data: existingRecord, error: fetchError } = await supabaseAdmin
       .from('guest_identity')
-      .select('id, document_type, document_number, dob, address, is_verified, verification_status')
+      .select('id, document_type, document_number, date_of_birth, address, is_verified, verification_status')
       .eq('id', identityId)
       .single()
 
@@ -884,7 +884,9 @@ export async function uploadBackImage(formData: FormData) {
       }
     }
 
-    const confidence = mapConfidenceToNumeric(result.confidence?.overall || (result.confidence && typeof result.confidence === 'string' ? result.confidence : 'medium'))
+    const confidence = typeof result.confidence === 'number'
+      ? result.confidence
+      : mapConfidenceToNumeric(result.confidence?.overall || (typeof result.confidence === 'string' ? result.confidence : 'medium'))
     if (confidence < 0.40) {
       return saveManualReview('Back side image quality is too poor or text is blurry.')
     }
