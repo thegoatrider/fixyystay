@@ -31,10 +31,22 @@ export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  const { error } = await supabase.auth.signInWithPassword({
+  let { error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
+
+  // If Supabase blocked login due to unconfirmed email, auto-confirm it via admin and retry
+  if (error && error.message?.toLowerCase().includes('email not confirmed')) {
+    const supabaseAdmin = createAdminClient()
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+    const targetUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    if (targetUser) {
+      await supabaseAdmin.auth.admin.updateUserById(targetUser.id, { email_confirm: true })
+      const retry = await supabase.auth.signInWithPassword({ email, password })
+      error = retry.error
+    }
+  }
 
   const next = formData.get('next') as string || '/'
 

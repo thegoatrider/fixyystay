@@ -113,25 +113,42 @@ export async function verifyAndUpgrade(
         console.log('Owner not found for email:', normalizedEmail, 'Performing auth signup and owner/property registration.')
         const origin = await getAbsoluteOrigin()
         
-        // A. Sign up the user in Supabase auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // A. Create or update user in Supabase auth with auto-confirmed email
+        let userId: string | null = null
+        const { data: adminAuthData, error: adminAuthError } = await supabaseAdmin.auth.admin.createUser({
           email: normalizedEmail,
           password: signupData.password,
-          options: {
-            data: {
-              name: signupData.name,
-              role: 'owner',
-            },
-            emailRedirectTo: `${origin}/auth/callback`,
+          email_confirm: true,
+          user_metadata: {
+            name: signupData.name,
+            role: 'owner',
           },
         })
 
-        if (authError || !authData?.user) {
-          console.error('Failed to create auth user:', authError)
-          return { error: authError?.message || 'Failed to create account' }
+        if (!adminAuthError && adminAuthData?.user) {
+          userId = adminAuthData.user.id
+        } else if (adminAuthError?.message?.toLowerCase().includes('already registered') || adminAuthError?.message?.toLowerCase().includes('already exists')) {
+          const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+          const existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+          if (existingUser) {
+            userId = existingUser.id
+            await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+              password: signupData.password,
+              email_confirm: true,
+              user_metadata: {
+                name: signupData.name,
+                role: 'owner',
+              }
+            })
+          }
+        } else {
+          console.error('Failed to create auth user:', adminAuthError)
+          return { error: adminAuthError?.message || 'Failed to create account' }
         }
 
-        const userId = authData.user.id
+        if (!userId) {
+          return { error: 'Failed to establish user account' }
+        }
 
         // B. Insert into owners table
         const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
