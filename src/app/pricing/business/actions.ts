@@ -26,7 +26,7 @@ async function getAbsoluteOrigin() {
   return origin
 }
 
-export async function createOwnerOrder(planName: string, amount: number, email: string) {
+export async function createOwnerOrder(planName: string, amount: number, email: string, ownerId?: string) {
   try {
     const normalizedEmail = email.toLowerCase()
 
@@ -42,14 +42,19 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
     })
 
     // 1. Create Razorpay Order
+    const notes: Record<string, string> = {
+      plan: planName,
+      email: normalizedEmail
+    }
+    if (ownerId) {
+      notes.owner_id = ownerId
+    }
+
     const options = {
       amount: amount * 100, // Razorpay works in paise
       currency: "INR",
       receipt: `receipt_owner_${Date.now()}`,
-      notes: {
-        plan: planName,
-        email: normalizedEmail
-      }
+      notes
     }
 
     const order = await razorpay.orders.create(options)
@@ -98,143 +103,134 @@ export async function verifyAndUpgrade(
     }
     
     const normalizedEmail = email.toLowerCase()
+    const ownerIdFromNotes = (order.notes as any)?.owner_id as string | undefined
     
-    // 2. Get owner by email OR create if missing
+    // 2. Get owner by ID from notes OR email
     let ownerId: string | null = null
-    const { data: owner } = await supabaseAdmin
-      .from('owners')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle()
-      
+    let ownerName = signupData?.name || ''
+    
+    let { data: owner } = ownerIdFromNotes 
+      ? await supabaseAdmin.from('owners').select('id, user_id, name').eq('id', ownerIdFromNotes).maybeSingle()
+      : { data: null }
+
     if (!owner) {
-      // If we don't have signupData, fallback to default placeholder
-      if (signupData && signupData.name && signupData.password) {
-        console.log('Owner not found for email:', normalizedEmail, 'Performing auth signup and owner/property registration.')
-        const origin = await getAbsoluteOrigin()
-        
-        // A. Create or update user in Supabase auth with auto-confirmed email
-        let userId: string | null = null
+      const { data: ownerByEmail } = await supabaseAdmin
+        .from('owners')
+        .select('id, user_id, name')
+        .eq('email', normalizedEmail)
+        .maybeSingle()
+      owner = ownerByEmail
+    }
+
+    // If owner exists, check if user_id needs linking
+    if (owner) {
+      ownerId = owner.id
+      ownerName = owner.name || ownerName
+      if (!owner.user_id) {
+        // Auto-link to existing auth user if present
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+        const match = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+        if (match) {
+          await supabaseAdmin.from('owners').update({ user_id: match.id }).eq('id', owner.id)
+        }
+      }
+    } else {
+      // Owner does not exist yet: check if auth user exists first
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+      let existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+      let userId = existingUser?.id || null
+
+      if (!userId) {
+        // Create user in Supabase auth
+        const defaultPassword = signupData?.password || 'fixystays123'
+        const displayName = signupData?.name || normalizedEmail.split('@')[0]
         const { data: adminAuthData, error: adminAuthError } = await supabaseAdmin.auth.admin.createUser({
           email: normalizedEmail,
-          password: signupData.password,
+          password: defaultPassword,
           email_confirm: true,
           user_metadata: {
-            name: signupData.name,
+            name: displayName,
             role: 'owner',
           },
         })
 
         if (!adminAuthError && adminAuthData?.user) {
           userId = adminAuthData.user.id
-        } else if (adminAuthError?.message?.toLowerCase().includes('already registered') || adminAuthError?.message?.toLowerCase().includes('already exists')) {
-          const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-          const existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
-          if (existingUser) {
-            userId = existingUser.id
-            await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-              password: signupData.password,
-              email_confirm: true,
-              user_metadata: {
-                name: signupData.name,
-                role: 'owner',
-              }
-            })
-          }
+          ownerName = displayName
         } else {
-          console.error('Failed to create auth user:', adminAuthError)
-          return { error: adminAuthError?.message || 'Failed to create account' }
+          console.error('Failed to create auth user in verifyAndUpgrade:', adminAuthError)
         }
-
-        if (!userId) {
-          return { error: 'Failed to establish user account' }
-        }
-
-        // B. Insert into owners table
-        const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
-          {
-            user_id: userId,
-            name: signupData.name,
-            email: normalizedEmail,
-          },
-        ]).select('id').single()
-
-        if (dbError || !newOwner) {
-          console.error('Failed to create owner record:', dbError)
-          return { error: 'Failed to create owner profile during payment verification.' }
-        }
-        ownerId = newOwner.id
-
-        // C. Create dummy property if propertyName is provided
-        if (signupData.propertyName && ownerId) {
-          const { error: propError } = await supabaseAdmin.from('properties').insert([
-            {
-              owner_id: ownerId,
-              name: signupData.propertyName,
-              city: 'Pending',
-              type: 'multi-room property',
-            }
-          ])
-          if (propError) {
-            console.error('Failed to create onboarding property:', propError)
-          }
-        }
-
-        // D. Send welcome email via Resend
-        const apiKey = process.env.RESEND_API_KEY
-        if (apiKey && apiKey !== 're_xxxxxxxxx') {
-          const resend = new Resend(apiKey)
-          try {
-            await resend.emails.send({
-              from: 'FixStay Onboarding <onboarding@resend.dev>',
-              to: normalizedEmail,
-              subject: 'Welcome to FixyStays! Your Owner Account is Ready',
-              html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-                  <h1 style="color: #4F46E5;">Welcome to FixyStays, ${signupData.name}!</h1>
-                  <p>Your property owner account has been successfully created.</p>
-                  <p>Here is what you need to know:</p>
-                  <ul>
-                    <li><strong>Dashboard Access:</strong> You can log in at any time to view your properties, bookings, and revenue.</li>
-                    <li><strong>Support:</strong> If you need any help setting up, please contact us.</li>
-                  </ul>
-                  <p>Thank you for partnering with us!</p>
-                  <br />
-                  <p>Best regards,<br/>The FixyStays Team</p>
-                </div>
-              `
-            })
-          } catch (e) {
-            console.error('Failed to send welcome email:', e)
-          }
-        }
-
-        // E. Sign the user in so their session is active
-        await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password: signupData.password,
-        })
-
-      } else {
-        console.log('Owner not found for email:', normalizedEmail, 'Creating default placeholder owner record.')
-        const { data: newOwner, error: createError } = await supabaseAdmin
-          .from('owners')
-          .insert({
-            email: normalizedEmail,
-            name: normalizedEmail.split('@')[0],
-            phone_number: ''
-          })
-          .select('id')
-          .single()
-          
-        if (createError || !newOwner) {
-          console.error('Failed to create placeholder owner:', createError)
-          return { error: 'Failed to create owner profile during payment verification.' }
-        }
-        ownerId = newOwner.id
       }
-    } else {
-      ownerId = owner.id
+
+      // Create owner record tied to the user
+      const displayName = ownerName || signupData?.name || normalizedEmail.split('@')[0]
+      const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
+        {
+          user_id: userId,
+          name: displayName,
+          email: normalizedEmail,
+        },
+      ]).select('id').single()
+
+      if (dbError || !newOwner) {
+        console.error('Failed to create owner record:', dbError)
+        return { error: 'Failed to create owner profile during payment verification.' }
+      }
+      ownerId = newOwner.id
+      ownerName = displayName
+
+      // Create dummy property if propertyName is provided
+      if (signupData?.propertyName && ownerId) {
+        await supabaseAdmin.from('properties').insert([
+          {
+            owner_id: ownerId,
+            name: signupData.propertyName,
+            city: 'Pending',
+            type: 'multi-room property',
+          }
+        ])
+      }
+    }
+
+    if (!ownerId) {
+      return { error: 'Could not associate payment with an owner account.' }
+    }
+
+    // Auto-sign in if password was provided and in browser context
+    if (signupData?.password) {
+      await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: signupData.password,
+      }).catch(() => {})
+    }
+
+    // Send welcome email via Resend
+    const apiKey = process.env.RESEND_API_KEY
+    if (apiKey && apiKey !== 're_xxxxxxxxx') {
+      const resend = new Resend(apiKey)
+      try {
+        await resend.emails.send({
+          from: 'FixStay Onboarding <onboarding@resend.dev>',
+          to: normalizedEmail,
+          subject: 'Welcome to FixyStays! Your Owner Account is Activated',
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+              <h1 style="color: #4F46E5;">Welcome to FixyStays, ${ownerName || 'Partner'}!</h1>
+              <p>Your subscription is active and your property owner dashboard is now fully unlocked.</p>
+              <p>Here is what you need to know:</p>
+              <ul>
+                <li><strong>Dashboard Access:</strong> You can log in at any time to manage properties, bookings, and view earnings.</li>
+                <li><strong>Support:</strong> If you need any help setting up, please contact us.</li>
+              </ul>
+              <p>Thank you for partnering with us!</p>
+              <br />
+              <p>Best regards,<br/>The FixyStays Team</p>
+            </div>
+          `
+        })
+      } catch (e) {
+        console.error('Failed to send welcome email:', e)
+      }
     }
     
     // 3. Calculate Expiry (with bulletproof early renewal preservation)

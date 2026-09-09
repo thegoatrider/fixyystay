@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { submitOnboarding, checkEmailAvailability } from './actions'
 import { createOwnerOrder, verifyAndUpgrade } from '../pricing/business/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check } from 'lucide-react'
+import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle } from 'lucide-react'
 import Script from 'next/script'
+import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
 
 const SHARED_FEATURES = [
   "List Unlimited Properties",
@@ -23,14 +25,33 @@ const PLANS = [
   { name: "12 Months", price: 1200, discount: 0, bestValue: false, icon: Crown }
 ]
 
-export default function OnboardingPage() {
-  const [step, setStep] = useState(1)
+function OnboardingContent() {
+  const searchParams = useSearchParams()
+  const initialStep = searchParams.get('step') === 'payment' ? 2 : 1
+  const isUnpaidRedirect = searchParams.get('reason') === 'unpaid'
+
+  const [step, setStep] = useState(initialStep)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
-  const [userPassword, setUserPassword] = useState('')
-  const [propertyName, setPropertyName] = useState('')
+  const [ownerId, setOwnerId] = useState<string | null>(null)
+
+  // If redirected with step=payment, fetch current session email
+  useEffect(() => {
+    const fetchCurrentSession = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user?.email) {
+        setUserEmail(user.email)
+        setUserName(user.user_metadata?.name || user.email.split('@')[0])
+        const { data: owner } = await supabase.from('owners').select('id').eq('email', user.email.toLowerCase()).maybeSingle()
+        if (owner?.id) setOwnerId(owner.id)
+        if (searchParams.get('step') === 'payment') setStep(2)
+      }
+    }
+    fetchCurrentSession()
+  }, [searchParams])
 
   const handleAccountCreation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -38,12 +59,10 @@ export default function OnboardingPage() {
     setError(null)
     
     const formData = new FormData(e.currentTarget)
-    const email = formData.get('email') as string
+    const email = (formData.get('email') as string)?.trim()
     const name = formData.get('name') as string
-    const password = formData.get('password') as string
-    const propName = formData.get('propertyName') as string
 
-    // 1. Check if email is already registered before proceeding
+    // 1. Check if email is already registered and has an active subscription
     const checkRes = await checkEmailAvailability(email) as any
     if (checkRes.error) {
       setError(checkRes.error)
@@ -51,45 +70,33 @@ export default function OnboardingPage() {
       return
     }
 
-    if (checkRes.pendingRegistration) {
-      // User has already paid but their account registration is pending.
-      // Complete their onboarding directly without requesting payment again!
-      setLoading('Completing account setup...')
-      const submitData = new FormData()
-      submitData.append('name', name)
-      submitData.append('email', email)
-      submitData.append('password', password)
-      if (propName) submitData.append('propertyName', propName)
-
-      try {
-        const submitRes = await submitOnboarding(submitData)
-        if (submitRes.success) {
-          window.location.href = `/dashboard/owner`
-        } else {
-          setError(submitRes.error || 'Failed to complete registration')
-          setLoading(null)
-        }
-      } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred.')
+    // 2. Register and create account in Supabase FIRST before proceeding to payment
+    try {
+      const regRes = await submitOnboarding(formData)
+      if (regRes.error) {
+        setError(regRes.error)
         setLoading(null)
+        return
       }
-      return
-    }
 
-    // 2. Save credentials in local state and transition to Step 2
-    setUserEmail(email)
-    setUserName(name)
-    setUserPassword(password)
-    setPropertyName(propName)
-    setStep(2)
-    setLoading(null)
+      setUserEmail(email)
+      setUserName(name)
+      if (regRes.ownerId) {
+        setOwnerId(regRes.ownerId)
+      }
+      setStep(2)
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred during account registration.')
+    } finally {
+      setLoading(null)
+    }
   }
 
   const handlePayment = async (planName: string, amount: number) => {
     setLoading(planName)
     try {
       const fullName = `Business ${planName}`
-      const res = await createOwnerOrder(fullName, amount, userEmail)
+      const res = await createOwnerOrder(fullName, amount, userEmail, ownerId || undefined)
       if (res.error) throw new Error(res.error)
 
       const options = {
@@ -103,16 +110,12 @@ export default function OnboardingPage() {
         theme: { color: "#4F46E5" },
         handler: async function (response: any) {
           setLoading('Processing...')
-          // Call verifyAndUpgrade passing registration details as signupData
-          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id, {
-            name: userName,
-            password: userPassword,
-            propertyName: propertyName || undefined
-          })
+          // Verify and activate subscription
+          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id)
           if (verifyRes.success) {
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           } else {
-            alert(`Payment Successful, but account setup failed: ${verifyRes.error}. Please contact support.`)
+            alert(`Payment Successful, updating dashboard access: ${verifyRes.error || 'Done'}`)
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           }
         },
@@ -252,6 +255,12 @@ export default function OnboardingPage() {
           </div>
         ) : (
           <div className="flex flex-col items-center">
+            {isUnpaidRedirect && (
+              <div className="mb-8 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl max-w-xl text-sm font-semibold shadow-sm">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>Your account is registered! Please select a subscription plan below to activate your account and access the Owner Dashboard.</span>
+              </div>
+            )}
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4">Select Your Plan</h2>
               <p className="text-gray-500 text-lg font-medium">Your account <span className="text-blue-600 font-bold">{userEmail}</span> is ready. Choose a subscription to activate it.</p>
@@ -309,5 +318,17 @@ export default function OnboardingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
+        Loading...
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   )
 }

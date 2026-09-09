@@ -15,7 +15,7 @@ export default async function OwnerDashboard() {
   const isSuperAdmin = user?.email === 'superadmin@fixstay.com' || user?.user_metadata?.role === 'admin'
   
   // 2. Initial owner lookup (fast)
-  let { data: owner } = await supabase.from('owners').select('id, created_at').eq('user_id', user?.id).maybeSingle()
+  let { data: owner } = await supabase.from('owners').select('id, created_at, free_tier_enabled').eq('user_id', user?.id).maybeSingle()
   
   if (!owner && user?.email) {
     const supabaseAdmin = createAdminClient()
@@ -26,7 +26,7 @@ export default async function OwnerDashboard() {
       .from('owners')
       .update({ user_id: user.id })
       .eq('email', lowerEmail)
-      .select('id, created_at')
+      .select('id, created_at, free_tier_enabled')
       .maybeSingle()
     
     if (updatedOwner) {
@@ -41,14 +41,35 @@ export default async function OwnerDashboard() {
           name: user.user_metadata?.name || user.email.split('@')[0],
           phone_number: ''
         })
-        .select('id, created_at')
+        .select('id, created_at, free_tier_enabled')
         .single()
         
       if (newOwner) owner = newOwner
     }
   }
 
-  // 3. Fetch Google token status
+  // 3. Strict Subscription & Payment Gating
+  if (!isSuperAdmin) {
+    if (!owner) {
+      redirect('/onboarding?step=payment&reason=unpaid')
+    }
+
+    const isFreeTier = (owner as any)?.free_tier_enabled === true
+    if (!isFreeTier) {
+      const { data: sub } = await supabase
+        .from('owner_subscriptions')
+        .select('status, end_date')
+        .eq('owner_id', owner.id)
+        .maybeSingle()
+
+      const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+      if (!isSubActive) {
+        redirect('/onboarding?step=payment&reason=unpaid')
+      }
+    }
+  }
+
+  // 4. Fetch Google token status
   let hasGoogleDrive = false
   let googleEmail: string | null = null
   if (owner) {

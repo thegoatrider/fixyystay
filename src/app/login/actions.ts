@@ -78,7 +78,22 @@ export async function login(formData: FormData) {
     
     // If they are logging in without a 'next' param, redirect them to their dashboard
     if (next === '/') {
-      if (role === 'owner') return redirect('/dashboard/owner')
+      if (role === 'owner') {
+        const isSuperAdmin = user?.email === 'superadmin@fixstay.com' || user?.user_metadata?.role === 'admin'
+        if (!isSuperAdmin && owner) {
+          const { data: sub } = await supabase
+            .from('owner_subscriptions')
+            .select('status, end_date')
+            .eq('owner_id', owner.id)
+            .maybeSingle()
+          const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+          const isFreeTier = (owner as any)?.free_tier_enabled === true
+          if (!isSubActive && !isFreeTier) {
+            return redirect('/onboarding?step=payment&reason=unpaid')
+          }
+        }
+        return redirect('/dashboard/owner')
+      }
       if (role === 'influencer') return redirect('/dashboard/influencer')
       if (role === 'admin') return redirect('/dashboard/admin')
       if (role === 'autowala' || role === 'agent') return redirect('/dashboard/agent')
@@ -175,7 +190,7 @@ export async function signup(formData: FormData) {
   if (next && next !== '/') {
     redirect(next)
   } else if (role === 'owner') {
-    redirect('/dashboard/owner')
+    redirect('/onboarding?step=payment')
   } else if (role === 'influencer') {
     redirect('/dashboard/influencer')
   } else {

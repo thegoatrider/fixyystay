@@ -15,6 +15,8 @@ import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 import FreeTierToggle from './FreeTierToggle'
 import OrganizationsManagement from './OrganizationsManagement'
+import SubscriptionCheckButton from './SubscriptionCheckButton'
+import PushBroadcastModal from './PushBroadcastModal'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -594,11 +596,17 @@ export default async function AdminDashboard() {
 
       {/* SECTION 4: Partner Management (FREE TIER CONTROL) */}
       <section>
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-          <div className="p-2 bg-blue-50 rounded-xl"><Users className="text-blue-600 w-6 h-6" /></div>
-          Partner Account Management
-          <span className="text-sm font-normal text-gray-400 ml-2">{allOwnersDetailed?.length || 0} partners</span>
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h2 className="text-2xl font-bold flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-xl"><Users className="text-blue-600 w-6 h-6" /></div>
+            Partner Account Management
+            <span className="text-sm font-normal text-gray-400 ml-2">{allOwnersDetailed?.length || 0} partners</span>
+          </h2>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SubscriptionCheckButton />
+            <PushBroadcastModal />
+          </div>
+        </div>
         
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
@@ -614,6 +622,8 @@ export default async function AdminDashboard() {
                 {allOwnersDetailed?.map((owner: any) => {
                   const sub = owner.owner_subscriptions?.[0]
                   const isActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+                  const daysLeft = sub?.end_date ? Math.ceil((new Date(sub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0
+                  const isExpiringSoon = isActive && daysLeft <= 7
                   
                   return (
                     <tr key={owner.id} className="hover:bg-gray-50/50 transition-colors">
@@ -623,11 +633,16 @@ export default async function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4">
                         {isActive ? (
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1">
                              <span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md uppercase tracking-wider w-fit">
                                <Zap className="w-3 h-3 fill-current" /> {sub.plan_name}
                              </span>
-                             <span className="text-[9px] text-gray-400 mt-1">Exp: {new Date(sub.end_date).toLocaleDateString()}</span>
+                             <span className="text-[9px] text-gray-400">Exp: {new Date(sub.end_date).toLocaleDateString()}</span>
+                             {isExpiringSoon && (
+                               <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded uppercase tracking-wider w-fit">
+                                 ⚠️ Expiring in {daysLeft}d
+                               </span>
+                             )}
                           </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-wider">

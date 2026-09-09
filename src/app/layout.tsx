@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CapacitorBackButton } from '@/components/CapacitorBackButton'
 import { CapacitorDeepLink } from '@/components/CapacitorDeepLink'
+import PushNotificationManager from '@/components/PushNotificationManager'
 import { BottomNav } from '@/components/BottomNav'
 import { PullToRefresh } from '@/components/PullToRefresh'
 import Providers from "@/components/Providers";
@@ -96,6 +97,7 @@ export default function RootLayout({
           <PullToRefresh />
           <CapacitorBackButton />
           <CapacitorDeepLink />
+          <PushNotificationManager />
           {children}
           <BottomNav />
         </Providers>

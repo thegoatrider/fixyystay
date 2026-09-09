@@ -26,27 +26,39 @@ async function getAbsoluteOrigin() {
 
 export async function checkEmailAvailability(email: string) {
   const supabaseAdmin = createAdminClient()
-  const { data } = await supabaseAdmin
+  const normalizedEmail = email.toLowerCase().trim()
+
+  const { data: owner } = await supabaseAdmin
     .from('owners')
     .select('id, user_id')
-    .eq('email', email.toLowerCase())
+    .eq('email', normalizedEmail)
     .maybeSingle()
 
-  if (data) {
-    if (!data.user_id) {
-      // Check if they actually paid (active subscription) before allowing pendingRegistration
-      const { data: subscription } = await supabaseAdmin
-        .from('owner_subscriptions')
-        .select('status')
-        .eq('owner_id', data.id)
-        .maybeSingle()
-      
-      if (subscription && subscription.status === 'active') {
-        return { success: true, pendingRegistration: true }
-      }
+  if (owner) {
+    // Check if they actually have an active subscription
+    const { data: subscription } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('status, end_date')
+      .eq('owner_id', owner.id)
+      .maybeSingle()
+    
+    const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
+    
+    if (isPaid) {
+      return { error: 'An owner account with this email already has an active subscription. Please log in to your dashboard.' }
     }
-    return { error: 'Email already registered. If this is you, please enter your correct password to continue onboarding.' }
+
+    // Account exists but has not paid yet - allow proceeding to payment!
+    return { success: true, unpaidExisting: true, ownerId: owner.id }
   }
+
+  // Also check if user exists in auth.users directly
+  const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+  const authUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+  if (authUser) {
+    return { success: true, unpaidExisting: true }
+  }
+
   return { success: true }
 }
 
@@ -149,40 +161,19 @@ export async function submitOnboarding(formData: FormData) {
     }
   }
 
-  // 3. Send the Welcome Email via Resend
-  const apiKey = process.env.RESEND_API_KEY
-  if (apiKey && apiKey !== 're_xxxxxxxxx') {
-    const resend = new Resend(apiKey)
-    try {
-      await resend.emails.send({
-        from: 'FixStay Onboarding <onboarding@resend.dev>', // Update with real domain if available
-        to: normalizedEmail,
-        subject: 'Welcome to FixyStays! Your Owner Account is Ready',
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-            <h1 style="color: #4F46E5;">Welcome to FixyStays, ${name}!</h1>
-            <p>Your property owner account has been successfully created.</p>
-            <p>Here is what you need to know:</p>
-            <ul>
-              <li><strong>Dashboard Access:</strong> You can log in at any time to view your properties, bookings, and revenue.</li>
-              <li><strong>Support:</strong> If you need any help setting up, please contact us.</li>
-            </ul>
-            <p>Thank you for partnering with us!</p>
-            <br />
-            <p>Best regards,<br/>The FixyStays Team</p>
-          </div>
-        `
-      })
-    } catch (e) {
-      console.error('Failed to send welcome email:', e)
-    }
-  }
-
-  // Also sign the user in so their session is active
+  // Sign the user in so their session is active for subsequent steps
   await supabase.auth.signInWithPassword({
     email: normalizedEmail,
     password,
   })
 
-  return { success: true }
+  return { 
+    success: true, 
+    ownerId, 
+    userId, 
+    email: normalizedEmail 
+  }
 }
+
+export const registerOwnerAccount = submitOnboarding
+
