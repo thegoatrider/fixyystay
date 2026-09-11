@@ -25,6 +25,8 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const description = `Book ${property.name}, a premium ${property.type.toLowerCase()} in ${property.city_area || property.city}. Starting from ₹${property.base_price}. Amenities: ${(property.amenities || []).slice(0, 3).join(', ')}. Book now on FixyStays!`
   const url = `https://www.fixystays.com/property/${params.slug}`
   
+  const mainImage = property.image_url || (property.image_urls && property.image_urls.length > 0 ? property.image_urls[0] : null) || 'https://www.fixystays.com/logo.png'
+
   return {
     title,
     description,
@@ -34,13 +36,20 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
       description,
       url,
       type: 'website',
-      images: property.image_url ? [{ url: property.image_url }] : [],
+      images: [
+        {
+          url: mainImage,
+          width: 1200,
+          height: 630,
+          alt: property.name,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: property.image_url ? [property.image_url] : [],
+      images: [mainImage],
     },
     alternates: {
       canonical: url,

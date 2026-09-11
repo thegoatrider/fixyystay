@@ -1,4 +1,6 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -7,6 +9,66 @@ import { format, eachDayOfInterval, subDays, addDays } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+export async function generateMetadata(
+  props: {
+    params: Promise<{ id: string }>
+  }
+): Promise<Metadata> {
+  const params = await props.params
+  const propertyId = params.id
+  const supabaseAdmin = createAdminClient()
+
+  const { data: property } = await supabaseAdmin
+    .from('properties')
+    .select('id, name, type, description, city, city_area, image_url, image_urls, amenities')
+    .eq('id', propertyId)
+    .maybeSingle()
+
+  if (!property) {
+    return {
+      title: 'Property Not Found | Fixy Stays',
+    }
+  }
+
+  const mainImage = property.image_url || (property.image_urls && property.image_urls.length > 0 ? property.image_urls[0] : null) || 'https://www.fixystays.com/logo.png'
+  const locationText = property.city_area || property.city || 'India'
+  const propertyTypeFormatted = property.type === 'villa' ? 'Luxury Villa' : 'Premium Stay'
+  const title = `${property.name} - ${propertyTypeFormatted} in ${locationText} | Fixy Stays`
+  const description = property.description 
+    ? (property.description.length > 160 ? `${property.description.slice(0, 157)}...` : property.description)
+    : `Checkout ${property.name} in ${locationText}. Amenities: ${(property.amenities || []).slice(0, 4).join(', ')}. Book now on Fixy Stays!`
+  const url = `https://www.fixystays.com/guest/property/${property.id}`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: 'Fixy Stays',
+      type: 'website',
+      images: [
+        {
+          url: mainImage,
+          width: 1200,
+          height: 630,
+          alt: property.name,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [mainImage],
+    },
+    alternates: {
+      canonical: url,
+    },
+  }
+}
 
 export default async function PropertyDetailPage(
   props: {
