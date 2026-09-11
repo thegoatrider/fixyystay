@@ -535,16 +535,46 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
-    if (!owner) return { success: false, error: 'Owner profile not found' }
+    const email = (user.email || '').toLowerCase().trim()
+    const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
+    const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
+    const isAdmin = 
+      email === 'superadmin@fixstay.com' ||
+      email === 'admin@fixstay.com' ||
+      email.endsWith('@fixstay.com') ||
+      userRole === 'admin' ||
+      userRole === 'superadmin' ||
+      appRole === 'admin' ||
+      appRole === 'superadmin'
 
-    const { data: property } = await supabaseAdmin
-      .from('properties')
-      .select('id')
-      .eq('id', propertyId)
-      .eq('owner_id', owner.id)
-      .single()
-    if (!property) return { success: false, error: 'Property not found or access denied' }
+    if (!isAdmin) {
+      let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+      if (!owner && email) {
+        const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
+        if (matchedOwner) {
+          owner = matchedOwner
+          await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        }
+      }
+      if (!owner) return { success: false, error: 'Owner profile not found' }
+
+      const { data: property } = await supabaseAdmin
+        .from('properties')
+        .select('id, owner_id')
+        .eq('id', propertyId)
+        .maybeSingle()
+      if (!property) return { success: false, error: 'Property not found' }
+      if (property.owner_id && property.owner_id !== owner.id) {
+        return { success: false, error: 'Access denied' }
+      }
+    } else {
+      const { data: property } = await supabaseAdmin
+        .from('properties')
+        .select('id')
+        .eq('id', propertyId)
+        .maybeSingle()
+      if (!property) return { success: false, error: 'Property not found' }
+    }
 
     const { error } = await supabaseAdmin
       .from('property_rooms')
@@ -556,6 +586,7 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
     }
 
     revalidatePath('/dashboard/owner')
+    revalidatePath('/dashboard/admin/properties/[id]', 'page')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }
@@ -569,26 +600,48 @@ export async function deletePropertyRoom(roomId: string) {
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
-    if (!owner) return { success: false, error: 'Owner profile not found' }
+    const email = (user.email || '').toLowerCase().trim()
+    const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
+    const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
+    const isAdmin = 
+      email === 'superadmin@fixstay.com' ||
+      email === 'admin@fixstay.com' ||
+      email.endsWith('@fixstay.com') ||
+      userRole === 'admin' ||
+      userRole === 'superadmin' ||
+      appRole === 'admin' ||
+      appRole === 'superadmin'
 
-    // Fetch the room to verify it belongs to this owner's property
-    const { data: room } = await supabaseAdmin
-      .from('property_rooms')
-      .select('id, property_id')
-      .eq('id', roomId)
-      .single()
+    if (!isAdmin) {
+      let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+      if (!owner && email) {
+        const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
+        if (matchedOwner) {
+          owner = matchedOwner
+          await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        }
+      }
+      if (!owner) return { success: false, error: 'Owner profile not found' }
 
-    if (!room) return { success: false, error: 'Room not found' }
+      // Fetch the room to verify it belongs to this owner's property
+      const { data: room } = await supabaseAdmin
+        .from('property_rooms')
+        .select('id, property_id')
+        .eq('id', roomId)
+        .maybeSingle()
 
-    const { data: property } = await supabaseAdmin
-      .from('properties')
-      .select('id')
-      .eq('id', room.property_id)
-      .eq('owner_id', owner.id)
-      .single()
+      if (!room) return { success: false, error: 'Room not found' }
 
-    if (!property) return { success: false, error: 'Access denied' }
+      const { data: property } = await supabaseAdmin
+        .from('properties')
+        .select('id, owner_id')
+        .eq('id', room.property_id)
+        .maybeSingle()
+
+      if (!property || (property.owner_id && property.owner_id !== owner.id)) {
+        return { success: false, error: 'Access denied' }
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from('property_rooms')
@@ -601,6 +654,7 @@ export async function deletePropertyRoom(roomId: string) {
     }
 
     revalidatePath('/dashboard/owner')
+    revalidatePath('/dashboard/admin/properties/[id]', 'page')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

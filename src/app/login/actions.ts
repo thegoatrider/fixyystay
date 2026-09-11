@@ -69,17 +69,32 @@ export async function login(formData: FormData) {
     }
 
     let role = user.user_metadata?.role
-    if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer' && role !== 'owner' && role !== 'agent')) {
-      role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
+    const isAdminUser = 
+      normalizedEmail === 'superadmin@fixstay.com' ||
+      normalizedEmail === 'admin@fixstay.com' ||
+      normalizedEmail.endsWith('@fixstay.com') ||
+      role === 'admin' ||
+      role === 'superadmin'
+
+    if (!isAdminUser && role !== 'police' && role !== 'autowala' && role !== 'agent') {
+      if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer')) {
+        role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
+        await supabase.auth.updateUser({
+          data: { role }
+        })
+      }
+    } else if (isAdminUser && role !== 'admin' && role !== 'superadmin') {
+      role = 'admin'
       await supabase.auth.updateUser({
-        data: { role }
+        data: { role: 'admin' }
       })
     }
     
     // If they are logging in without a 'next' param, redirect them to their dashboard
     if (next === '/') {
+      if (isAdminUser || role === 'admin' || role === 'superadmin') return redirect('/dashboard/admin')
       if (role === 'owner') {
-        const isSuperAdmin = user?.email === 'superadmin@fixstay.com' || user?.user_metadata?.role === 'admin'
+        const isSuperAdmin = isAdminUser
         if (!isSuperAdmin && owner) {
           const { data: sub } = await supabase
             .from('owner_subscriptions')
@@ -95,7 +110,6 @@ export async function login(formData: FormData) {
         return redirect('/dashboard/owner')
       }
       if (role === 'influencer') return redirect('/dashboard/influencer')
-      if (role === 'admin') return redirect('/dashboard/admin')
       if (role === 'autowala' || role === 'agent') return redirect('/dashboard/agent')
       if (role === 'police') return redirect('/dashboard/police')
     }

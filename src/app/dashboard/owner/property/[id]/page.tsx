@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -20,28 +21,91 @@ export default async function PropertyDetailPage(
   const propertyId = params.id
   const supabase = await createClient()
 
-  // Verify owner
+  // 1. Verify user session
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: owner } = await supabase.from('owners').select('id').eq('user_id', user?.id).single()
+  if (!user) redirect('/login')
 
-  if (!owner) redirect('/login')
+  const email = user.email?.toLowerCase().trim() || ''
+  const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
+  const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
+  const isAdmin = 
+    email === 'superadmin@fixstay.com' ||
+    email === 'admin@fixstay.com' ||
+    email.endsWith('@fixstay.com') ||
+    userRole === 'admin' ||
+    userRole === 'superadmin' ||
+    appRole === 'admin' ||
+    appRole === 'superadmin'
 
-  const { data: property, error } = await supabase
-    .from('properties')
-    .select('id, uid, name, type, description, amenities, highlights, address, city, area_name, pincode, contact_number, helpdesk_number, image_url, images, base_price, location, is_active, approved, room_categories')
-    .eq('id', propertyId)
-    .eq('owner_id', owner.id)
-    .single()
+  const supabaseAdmin = createAdminClient()
 
-  if (error || !property) redirect('/dashboard/owner')
+  let property: any = null
 
-  const { data: rooms } = await supabase.from('rooms').select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url').eq('property_id', propertyId)
+  if (isAdmin) {
+    // Admin can view and manage any property
+    const { data, error } = await supabaseAdmin
+      .from('properties')
+      .select('*')
+      .eq('id', propertyId)
+      .maybeSingle()
+
+    if (error) console.error('Admin Property Detail Query Error:', error)
+    property = data
+  } else {
+    // Look up owner record for user
+    let { data: owner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!owner && email) {
+      const { data: matchedOwner } = await supabaseAdmin
+        .from('owners')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle()
+      if (matchedOwner) {
+        owner = matchedOwner
+        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      }
+    }
+
+    if (!owner) redirect('/login')
+
+    const { data, error } = await supabaseAdmin
+      .from('properties')
+      .select('*')
+      .eq('id', propertyId)
+      .maybeSingle()
+
+    if (error) console.error('Owner Property Detail Query Error:', error)
+
+    if (data) {
+      // Self-heal: if property has no owner_id, claim it for this owner
+      if (!data.owner_id) {
+        await supabaseAdmin
+          .from('properties')
+          .update({ owner_id: owner.id })
+          .eq('id', propertyId)
+        data.owner_id = owner.id
+      }
+
+      if (data.owner_id === owner.id) {
+        property = data
+      }
+    }
+  }
+
+  if (!property) redirect('/dashboard/owner')
+
+  const { data: rooms } = await supabaseAdmin.from('rooms').select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url').eq('property_id', propertyId)
   const roomIds = rooms?.map(r => r.id) || []
   
   // Fetch calendar needed data
-  const { data: bookings } = await supabase.from('bookings').select('id, room_id, checkin_date, checkout_date, status, guest_name, total_amount').in('room_id', roomIds)
-  const { data: rates } = await supabase.from('room_rates').select('id, room_id, date, price').in('room_id', roomIds)
-  const { data: availability } = await supabase.from('room_availability').select('id, room_id, date, is_available').in('room_id', roomIds)
+  const { data: bookings } = await supabaseAdmin.from('bookings').select('id, room_id, checkin_date, checkout_date, status, guest_name, total_amount').in('room_id', roomIds)
+  const { data: rates } = await supabaseAdmin.from('room_rates').select('id, room_id, date, price').in('room_id', roomIds)
+  const { data: availability } = await supabaseAdmin.from('room_availability').select('id, room_id, date, is_available').in('room_id', roomIds)
 
   return (
     <div className="flex flex-col gap-8">

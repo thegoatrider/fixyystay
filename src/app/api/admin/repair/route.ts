@@ -103,6 +103,30 @@ export async function GET() {
       }
     }
 
+    // 3. Re-link Orphan Properties
+    const { data: allProperties } = await supabaseAdmin
+      .from('properties')
+      .select('id, name, owner_id')
+
+    const { data: allOwners } = await supabaseAdmin
+      .from('owners')
+      .select('id, name, email')
+
+    if (allProperties && allOwners && allOwners.length > 0) {
+      const ownerIdSet = new Set(allOwners.map(o => o.id))
+      for (const prop of allProperties) {
+        if (!prop.owner_id || !ownerIdSet.has(prop.owner_id)) {
+          // If only 1 owner exists, or prioritize primary owner
+          let targetOwner = allOwners[0]
+          const nonAdminOwner = allOwners.find(o => !o.email.toLowerCase().includes('fixstay.com'))
+          if (nonAdminOwner) targetOwner = nonAdminOwner
+
+          await supabaseAdmin.from('properties').update({ owner_id: targetOwner.id }).eq('id', prop.id)
+          report.properties_relinked++
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, report })
 
   } catch (err: any) {

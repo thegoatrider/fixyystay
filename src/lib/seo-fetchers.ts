@@ -75,7 +75,7 @@ export async function getPropertyBySlug(slugOrId: string) {
   const supabase = createStaticClient()
   // Try finding by slug first, fallback to ID if it looks like a UUID
   let query = supabase.from('properties').select(`
-    id, name, type, description, amenities, highlights, address, city, city_area, state, pincode, contact_number, helpdesk_number, image_url, images, base_price, location, slug,
+    *,
     rooms (id, name, category, base_price, max_guests, price_bucket, image_url),
     owners (name, email)
   `)

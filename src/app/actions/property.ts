@@ -4,6 +4,23 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
+function isUserAdmin(user: any): boolean {
+  if (!user) return false
+  const email = (user.email || '').toLowerCase().trim()
+  const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
+  const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
+  
+  return (
+    email === 'superadmin@fixstay.com' ||
+    email === 'admin@fixstay.com' ||
+    email.endsWith('@fixstay.com') ||
+    userRole === 'admin' ||
+    userRole === 'superadmin' ||
+    appRole === 'admin' ||
+    appRole === 'superadmin'
+  )
+}
+
 export async function updateProperty(propertyId: string, formData: FormData) {
   try {
   const supabase = await createClient()
@@ -13,15 +30,33 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expired. Please log in again.' }
 
-  const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'superadmin@fixstay.com'
+  const isAdmin = isUserAdmin(user)
   
   // Verify ownership if not admin
   if (!isAdmin) {
-    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+    if (!owner && user.email) {
+      const { data: matchedOwner } = await supabaseAdmin
+        .from('owners')
+        .select('id')
+        .eq('email', user.email.toLowerCase().trim())
+        .maybeSingle()
+      if (matchedOwner) {
+        owner = matchedOwner
+        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      }
+    }
     if (!owner) return { error: 'Owner profile not found.' }
     
-    const { data: prop } = await supabaseAdmin.from('properties').select('id').eq('id', propertyId).eq('owner_id', owner.id).single()
-    if (!prop) return { error: 'You do not have permission to edit this property.' }
+    const { data: prop } = await supabaseAdmin.from('properties').select('id, owner_id').eq('id', propertyId).maybeSingle()
+    if (!prop) return { error: 'Property not found.' }
+    
+    // If property has no owner, self-heal and associate with this owner
+    if (!prop.owner_id) {
+      await supabaseAdmin.from('properties').update({ owner_id: owner.id }).eq('id', propertyId)
+    } else if (prop.owner_id !== owner.id) {
+      return { error: 'You do not have permission to edit this property.' }
+    }
   }
 
   // 2. Extract fields
@@ -155,6 +190,11 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   
   if (newCoverImageUrl) {
     updatePayload.image_url = newCoverImageUrl
+  }
+
+  const targetOwnerId = formData.get('owner_id') as string | null
+  if (isAdmin && targetOwnerId) {
+    updatePayload.owner_id = targetOwnerId
   }
 
 

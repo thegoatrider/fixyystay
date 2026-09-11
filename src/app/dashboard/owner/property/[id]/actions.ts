@@ -222,8 +222,8 @@ export async function saveMultipleChanges(
 
 export async function updateRoomCategories(propertyId: string, categories: any[]) {
   try {
-    const supabase = await createClient()
-    const { error } = await supabase
+    const supabaseAdmin = createAdminClient()
+    const { error } = await supabaseAdmin
       .from('properties')
       .update({ room_categories: categories })
       .eq('id', propertyId)
