@@ -222,6 +222,7 @@ Guidelines for cropped digital layouts and photographed physical cards:
 - Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
 - Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
 - If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
+- For passports, the second/back upload is often an Indian or foreign visa sticker, immigration stamp page, passport back page, or passport cover. These are valid government travel documents (set is_government_id: true). If no residential address is present, return an empty string "" for address.
 
 Return STRICTLY this JSON (no markdown, just raw JSON):
 {
@@ -839,10 +840,6 @@ export async function uploadBackImage(formData: FormData) {
       }
     }
 
-    if (result.is_government_id === false) {
-      return saveManualReview(result.rejection_reason || 'Back side is not recognized as a government ID.')
-    }
-
     const supabaseAdmin = createAdminClient()
     const { data: existingRecord, error: fetchError } = await supabaseAdmin
       .from('guest_identity')
@@ -855,10 +852,16 @@ export async function uploadBackImage(formData: FormData) {
       return { success: false, error: 'Could not find the corresponding front ID record. Please upload the front ID first.' }
     }
 
-    const backIdType = mapIdType(result.id_type || result.idType)
     const frontIdType = existingRecord.document_type
+    const isPassport = frontIdType === 'PASSPORT'
 
-    if (backIdType !== 'UNKNOWN' && frontIdType !== 'UNKNOWN' && backIdType !== frontIdType) {
+    if (result.is_government_id === false && !isPassport) {
+      return saveManualReview(result.rejection_reason || 'Back side is not recognized as a government ID.')
+    }
+
+    const backIdType = mapIdType(result.id_type || result.idType)
+
+    if (backIdType !== 'UNKNOWN' && frontIdType !== 'UNKNOWN' && backIdType !== frontIdType && !isPassport) {
       return saveManualReview(`Back side document type (${backIdType}) does not match front side (${frontIdType}).`)
     }
 
@@ -878,7 +881,7 @@ export async function uploadBackImage(formData: FormData) {
         
         const last4Back = digitsBack.slice(-4)
         const last4Front = digitsFront.slice(-4)
-        if (last4Back.length === 4 && last4Front.length === 4 && last4Back !== last4Front) {
+        if (last4Back.length === 4 && last4Front.length === 4 && last4Back !== last4Front && !isPassport) {
           return saveManualReview('Document number on back side does not match front side.')
         }
       }
@@ -887,12 +890,14 @@ export async function uploadBackImage(formData: FormData) {
     const confidence = typeof result.confidence === 'number'
       ? result.confidence
       : mapConfidenceToNumeric(result.confidence?.overall || (typeof result.confidence === 'string' ? result.confidence : 'medium'))
-    if (confidence < 0.40) {
+    if (confidence < 0.40 && !isPassport) {
       return saveManualReview('Back side image quality is too poor or text is blurry.')
     }
 
     const address = cleanFieldValue(result.address)
-    if (frontIdType !== 'PAN') {
+    // Passports (especially international passports which do not print residential addresses, and Indian passports)
+    // as well as PAN cards are exempt from requiring an address on the back side.
+    if (frontIdType !== 'PAN' && frontIdType !== 'PASSPORT') {
       if (!address || address.trim() === '') {
         return saveManualReview('Could not extract address from back side.')
       }

@@ -39,7 +39,7 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     }
 
     for (const identity of identities) {
-      const isAllowedStatus = identity.verification_status === 'VERIFIED';
+      const isAllowedStatus = identity.verification_status === 'VERIFIED' || identity.verification_status === 'MANUAL_REVIEW';
       if (!isAllowedStatus) {
         return { error: `Verification is incomplete or failed for ${identity.full_name || 'one of the guests'}. Please re-upload a clearer image.` }
       }
