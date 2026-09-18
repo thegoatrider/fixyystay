@@ -73,6 +73,28 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          {...{
+            nowprocket: '',
+            'data-noptimize': '1',
+            'data-cfasync': 'false',
+            'data-wpfc-render': 'false',
+            'seraph-accel-crit': '1',
+            'data-no-defer': '1',
+            'data-cmp-ab': '2',
+          }}
+          dangerouslySetInnerHTML={{
+            __html: `(function () {
+      var script = document.createElement("script");
+      script.async = 1;
+      script.setAttribute("data-cmp-ab","2");
+      script.src = 'https://emrld.ltd/NTc1MTM5.js?t=575139';
+      document.head.appendChild(script);
+  })();`,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
