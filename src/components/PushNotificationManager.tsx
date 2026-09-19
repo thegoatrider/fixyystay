@@ -12,6 +12,15 @@ export default function PushNotificationManager() {
     initialized.current = true
 
     async function initPush() {
+      // EMERGENCY OTA HOTFIX:
+      // The current native Android binary on Google Play was built without google-services.json.
+      // Calling PushNotifications.register() invokes FirebaseMessaging on Android, which throws an
+      // uncaught IllegalStateException ("Default FirebaseApp is not initialized") and hard-crashes
+      // the app immediately when notification permissions are granted.
+      // Bypassing native registration over-the-air restores full app functionality instantly.
+      console.warn('[PushNotifications] Push registration temporarily disabled over-the-air to prevent native Firebase crash.')
+      return
+
       // Dynamic import to avoid SSR errors
       try {
         const { Capacitor } = await import('@capacitor/core')
