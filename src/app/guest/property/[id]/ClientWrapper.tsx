@@ -422,6 +422,7 @@ export default function PropertyDetailClient({
                       alt={property.name} 
                       fill
                       priority
+                      unoptimized
                       sizes="(max-width: 1024px) 100vw, 66vw"
                       className="object-cover transition-all duration-700 hover:scale-105" 
                     />
@@ -472,7 +473,7 @@ export default function PropertyDetailClient({
                           : "border-transparent opacity-70 hover:opacity-100 hover:scale-105"
                       )}
                     >
-                      <Image src={url} alt={`Thumbnail ${i + 1}`} fill sizes="96px" className="object-cover bg-gray-50" />
+                      <Image src={url} alt={`Thumbnail ${i + 1}`} fill unoptimized sizes="96px" className="object-cover bg-gray-50" />
                       <div className={cn(
                         "absolute inset-0 transition-colors",
                         (activeImage === url || (!activeImage && i === 0)) ? "bg-transparent" : "bg-black/10 group-hover:bg-transparent"
@@ -783,7 +784,7 @@ export default function PropertyDetailClient({
           <div id="lightbox-scroll-container" className="flex-1 flex overflow-x-auto snap-x snap-mandatory hide-scrollbar items-center">
             {allImages.map((src, i) => (
               <div key={i} className="flex-shrink-0 w-full h-full relative flex items-center justify-center snap-center p-4">
-                <Image src={src} fill sizes="100vw" className="object-contain p-4" alt={`View ${i + 1}`} />
+                <Image src={src} fill unoptimized sizes="100vw" className="object-contain p-4" alt={`View ${i + 1}`} />
               </div>
             ))}
           </div>

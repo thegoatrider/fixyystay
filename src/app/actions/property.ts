@@ -137,7 +137,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   }
 
   // 3.8 Check and generate UID if missing (for dummy properties)
-  const { data: currentProp } = await supabaseAdmin.from('properties').select('uid, city').eq('id', propertyId).single()
+  const { data: currentProp } = await supabaseAdmin.from('properties').select('uid, city, image_url').eq('id', propertyId).single()
   let uid = currentProp?.uid
 
   if (!uid && city) {
@@ -190,6 +190,8 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   
   if (newCoverImageUrl) {
     updatePayload.image_url = newCoverImageUrl
+  } else if (!currentProp?.image_url && image_urls.length > 0) {
+    updatePayload.image_url = image_urls[0]
   }
 
   const targetOwnerId = formData.get('owner_id') as string | null
@@ -254,11 +256,20 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 
   // 5. Revalidate paths to reflect changes
   revalidatePath('/dashboard/owner/property/[id]', 'page')
+  revalidatePath('/dashboard/owner/property/[id]/edit', 'page')
+  revalidatePath(`/dashboard/owner/property/${propertyId}`)
+  revalidatePath(`/dashboard/owner/property/${propertyId}/edit`)
   revalidatePath('/dashboard/admin/properties/[id]', 'page')
   revalidatePath(`/guest/property/${propertyId}`)
   revalidatePath('/dashboard/owner')
+  revalidatePath('/guest')
+  revalidatePath('/')
   
-  return { success: true }
+  return { 
+    success: true,
+    image_urls,
+    image_url: updatePayload.image_url || currentProp?.image_url || null
+  }
   } catch (err: any) {
     console.error('UNEXPECTED ERROR in updateProperty:', err)
     return { error: `Server Error: ${err.message || String(err)}` }

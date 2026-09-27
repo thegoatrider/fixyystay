@@ -289,36 +289,46 @@ export async function getActiveAccessToken(ownerId: string): Promise<string | nu
     .maybeSingle()
 
   if (tokensError) {
-    throw new Error(`Database error reading owner tokens: ${tokensError.message}`)
+    console.error(`Database error reading owner tokens for ${ownerId}:`, tokensError)
+    return null
   }
 
-  if (!tokens) {
+  if (!tokens || !tokens.access_token) {
     return null
   }
 
   let currentAccessToken = tokens.access_token
   const now = new Date()
-  const expiry = new Date(tokens.expiry_date)
+  const expiry = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(0)
 
   // Refresh token 5 minutes before actual expiry just in case
   if (now.getTime() >= expiry.getTime() - 5 * 60 * 1000) {
+    if (!tokens.refresh_token) {
+      console.warn(`[GOOGLE-DRIVE] Owner ${ownerId} has no refresh token stored. Re-authorization required.`)
+      return null
+    }
+
     console.log(`[GOOGLE-DRIVE] Refreshing access token for owner ${ownerId}`)
-    const refreshResult = await refreshAccessToken(tokens.refresh_token)
-    currentAccessToken = refreshResult.access_token
-    const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
+    try {
+      const refreshResult = await refreshAccessToken(tokens.refresh_token)
+      currentAccessToken = refreshResult.access_token
+      const newExpiryDate = new Date(now.getTime() + (refreshResult.expires_in || 3600) * 1000)
 
-    const { error: updateError } = await supabaseAdmin
-      .from('owner_google_tokens')
-      .update({
-        access_token: currentAccessToken,
-        expiry_date: newExpiryDate.toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('owner_id', ownerId)
+      const { error: updateError } = await supabaseAdmin
+        .from('owner_google_tokens')
+        .update({
+          access_token: currentAccessToken,
+          expiry_date: newExpiryDate.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('owner_id', ownerId)
 
-    if (updateError) {
-      console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
-      throw new Error(`DB_UPDATE_FAILED: ${JSON.stringify(updateError)}`)
+      if (updateError) {
+        console.error('[GOOGLE-DRIVE] Failed to update refreshed token in DB:', updateError)
+      }
+    } catch (refreshErr: any) {
+      console.error(`[GOOGLE-DRIVE] Token refresh failed for owner ${ownerId}:`, refreshErr.message)
+      return null
     }
   }
 
@@ -333,7 +343,7 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
     // 1. Fetch checkin record
     const { data: checkin, error: checkinError } = await supabaseAdmin
       .from('guest_checkins')
-      .select('id, uid, owner_id, guest_name, guest_phone, checkin_date, checkout_date, num_people, room_number, vehicle_number, property_id')
+      .select('*')
       .eq('id', checkinId)
       .single()
 
@@ -345,13 +355,13 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
     // 2. Fetch active credentials using helper
     const currentAccessToken = await getActiveAccessToken(checkin.owner_id)
     if (!currentAccessToken) {
-      return { success: true, message: 'Google Drive not connected or token expired for this owner' }
+      return { success: false, error: 'Google Drive not connected or token expired for this owner' }
     }
 
     // 4. Fetch associated guest identities
     const { data: identities, error: identityError } = await supabaseAdmin
       .from('guest_identity')
-      .select('id, checkin_id, full_name, document_type, document_number, dob, address, document_image_url, back_image_url')
+      .select('*')
       .eq('checkin_id', checkinId)
 
     if (identityError || !identities) {
@@ -394,10 +404,13 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
       throw new Error('Could not find or create root folder on Google Drive')
     }
 
-    // 7. Create subfolder for this checkin
-    const sanitizeName = (name: string) => name.replace(/[^a-zA-Z0-9\s-_]/g, '')
+    // 7. Create subfolder for this checkin (reuse existing to avoid duplicate folders on backfill)
+    const sanitizeName = (name: string) => (name || 'Guest').replace(/[^a-zA-Z0-9\s-_]/g, '')
     const folderName = `CheckIn - ${sanitizeName(checkin.guest_name)} - ${checkin.uid || checkin.id.substring(0, 8)}`
-    const subfolderId = await createGoogleFolder(currentAccessToken, folderName, rootFolderId)
+    let subfolderId = await findGoogleFolder(currentAccessToken, folderName, rootFolderId)
+    if (!subfolderId) {
+      subfolderId = await createGoogleFolder(currentAccessToken, folderName, rootFolderId)
+    }
 
     // 8. Generate and upload check-in summary PDF
     const pdfBytes = await generateCheckinPDF(checkin, identities, propertyName)
@@ -437,6 +450,44 @@ export async function backupCheckinToGoogleDrive(checkinId: string) {
   } catch (err: any) {
     console.error('[GOOGLE-DRIVE-SYNC] Error backing up check-in to Google Drive:', err)
     return { success: false, error: err.message }
+  }
+}
+
+// 5. Backfill/Sync helper for all pending check-ins for an owner
+export async function syncOwnerPendingCheckins(ownerId: string, sinceDate: string = '2026-08-30') {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const { data: checkins, error: checkinsError } = await supabaseAdmin
+      .from('guest_checkins')
+      .select('id, guest_name, created_at')
+      .eq('owner_id', ownerId)
+      .gte('created_at', sinceDate)
+      .order('created_at', { ascending: false })
+
+    if (checkinsError || !checkins) {
+      return { success: false, error: checkinsError?.message || 'Failed to fetch check-ins' }
+    }
+
+    const results = {
+      total: checkins.length,
+      synced: 0,
+      failed: 0,
+      errors: [] as string[]
+    }
+
+    for (const c of checkins) {
+      const res = await backupCheckinToGoogleDrive(c.id)
+      if (res.success) {
+        results.synced++
+      } else {
+        results.failed++
+        results.errors.push(`${c.guest_name || 'Guest'}: ${res.error || 'Unknown error'}`)
+      }
+    }
+
+    return { success: true, results }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to sync pending check-ins' }
   }
 }
 

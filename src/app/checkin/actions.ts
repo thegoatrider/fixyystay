@@ -335,6 +335,15 @@ export async function saveRegisterGuests(
         .eq('id', checkin.id)
     }
 
+    // Trigger Google Drive Cloud Backup for each saved register check-in
+    for (const checkinId of savedCheckinIds) {
+      try {
+        await backupCheckinToGoogleDrive(checkinId)
+      } catch (err) {
+        console.error(`[SAVE-REGISTER-GOOGLE-BACKUP] Failed to backup check-in ${checkinId}:`, err)
+      }
+    }
+
     return {
       success: true,
       count: savedCheckinIds.length

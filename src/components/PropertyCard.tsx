@@ -11,21 +11,25 @@ type Property = {
   name: string
   type: string
   image_url: string | null
+  image_urls?: string[] | null
   approved: boolean
   uid: string
   room_count: number
 }
 
 export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
+  const displayImage = prop.image_url || (prop.image_urls && prop.image_urls.length > 0 ? prop.image_urls[0] : null)
+
   return (
     <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300 flex flex-col group w-full h-full select-none">
       {/* Top Image Container */}
       <div className="bg-blue-50 relative aspect-[16/10] w-full overflow-hidden border-b border-gray-100 flex-shrink-0">
-        {prop.image_url ? (
+        {displayImage ? (
           <Image 
-            src={prop.image_url} 
+            src={displayImage} 
             alt={prop.name} 
             fill 
+            unoptimized
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={false}

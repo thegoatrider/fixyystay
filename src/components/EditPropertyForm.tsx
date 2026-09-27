@@ -18,8 +18,24 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   
+  const parseImageUrls = (val: any): string[] => {
+    if (!val) return []
+    if (Array.isArray(val)) return val.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val)
+        if (Array.isArray(parsed)) return parsed.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+      } catch {
+        if (val.startsWith('{') && val.endsWith('}')) {
+          return val.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+        }
+      }
+    }
+    return []
+  }
+
   // Track existing photos that user decides to KEEP
-  const [existingPhotos, setExistingPhotos] = useState<string[]>(property.image_urls || [])
+  const [existingPhotos, setExistingPhotos] = useState<string[]>(() => parseImageUrls(property.image_urls))
 
   const [rooms, setRooms] = useState<any[]>([])
   const [newRoomNumber, setNewRoomNumber] = useState('')
@@ -209,18 +225,31 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         setSuccess(true)
         setNewFiles([])
         setNewPreviews([])
-        // Refetch the updated image_urls from DB so existingPhotos stays in sync
-        // Without this, newly uploaded images are lost on next save because
-        // existingPhotos state never knew about the newly uploaded URLs
-        const supabase = createClient()
-        const { data: updatedProp } = await supabase
-          .from('properties')
-          .select('image_urls')
-          .eq('id', property.id)
-          .single()
-        if (updatedProp?.image_urls) {
-          setExistingPhotos(updatedProp.image_urls)
+        setCoverImageFile(null)
+
+        if (result.image_urls) {
+          setExistingPhotos(parseImageUrls(result.image_urls))
+        } else {
+          // Refetch the updated image_urls from DB as fallback
+          const supabase = createClient()
+          const { data: updatedProp } = await supabase
+            .from('properties')
+            .select('image_urls, image_url')
+            .eq('id', property.id)
+            .single()
+          if (updatedProp?.image_urls) {
+            setExistingPhotos(parseImageUrls(updatedProp.image_urls))
+          }
+          if (updatedProp?.image_url) {
+            setCoverImagePreview(updatedProp.image_url)
+          }
         }
+
+        if (result.image_url) {
+          setCoverImagePreview(result.image_url)
+        }
+
+        router.refresh()
         setTimeout(() => setSuccess(false), 3000)
       }
     } catch (err: any) {
@@ -554,9 +583,9 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-          {existingPhotos.map((url, i) => (
+          {existingPhotos.filter(Boolean).map((url, i) => (
             <div key={`exist-${i}`} className="relative aspect-square rounded-2xl overflow-hidden group border border-gray-200">
-              <NextImage src={url} alt="Property existing" fill sizes="120px" className="object-cover" />
+              <NextImage src={url} alt="Property existing" fill unoptimized sizes="120px" className="object-cover" />
               <button 
                 type="button" 
                 onClick={() => removeExistingPhoto(i)}

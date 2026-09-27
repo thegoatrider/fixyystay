@@ -744,3 +744,33 @@ export async function checkoutGuest(checkinId: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function syncOwnerCheckinsAction(sinceDate: string = '2026-08-30') {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: owner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!owner) {
+      return { success: false, error: 'Owner record not found' }
+    }
+
+    const { syncOwnerPendingCheckins } = await import('@/lib/google-drive')
+    const result = await syncOwnerPendingCheckins(owner.id, sinceDate)
+
+    revalidatePath('/dashboard/owner')
+    revalidatePath('/dashboard/owner/profile')
+    return result
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to sync check-ins' }
+  }
+}
