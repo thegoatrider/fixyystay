@@ -108,6 +108,34 @@ function OnboardingContent() {
         order_id: res.orderId,
         prefill: { email: userEmail },
         theme: { color: "#4F46E5" },
+        webview_intent: true,
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI (Google Pay, PhonePe, Paytm, QR)",
+                instruments: [
+                  {
+                    method: "upi"
+                  }
+                ]
+              },
+              other: {
+                name: "Cards, Netbanking & Wallets",
+                instruments: [
+                  { method: "card" },
+                  { method: "netbanking" },
+                  { method: "wallet" },
+                  { method: "emi" }
+                ]
+              }
+            },
+            sequence: ["block.upi", "block.other"],
+            preferences: {
+              show_default_blocks: true
+            }
+          }
+        },
         handler: async function (response: any) {
           setLoading('Processing...')
           // Verify and activate subscription

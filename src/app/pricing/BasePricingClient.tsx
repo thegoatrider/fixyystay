@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, Zap, Star, ShieldCheck, Crown, LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createOwnerOrder, verifyAndUpgrade } from './business/actions'
+import { createClient } from '@/utils/supabase/client'
 import Script from 'next/script'
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -43,6 +44,21 @@ export default function BasePricingClient({
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.email) {
+          setEmail(user.email)
+        }
+      } catch (err) {
+        // Safe fallback if unauthenticated
+      }
+    }
+    fetchUser()
+  }, [])
+
   const handlePayment = async (planName: string, amount: number) => {
     console.log(`Payment triggered for ${planName} (₹${amount}) with email ${email}`)
     if (!email) {
@@ -72,6 +88,33 @@ export default function BasePricingClient({
           color: themeColor,
         },
         webview_intent: true,
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI (Google Pay, PhonePe, Paytm, QR)",
+                instruments: [
+                  {
+                    method: "upi"
+                  }
+                ]
+              },
+              other: {
+                name: "Cards, Netbanking & Wallets",
+                instruments: [
+                  { method: "card" },
+                  { method: "netbanking" },
+                  { method: "wallet" },
+                  { method: "emi" }
+                ]
+              }
+            },
+            sequence: ["block.upi", "block.other"],
+            preferences: {
+              show_default_blocks: true
+            }
+          }
+        },
         handler: async function (response: any) {
 
           setLoading('Processing...')

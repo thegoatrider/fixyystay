@@ -287,6 +287,33 @@ export default function PropertyDetailClient({
           color: "#2563eb",
         },
         webview_intent: true,
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI (Google Pay, PhonePe, Paytm, QR)",
+                instruments: [
+                  {
+                    method: "upi"
+                  }
+                ]
+              },
+              other: {
+                name: "Cards, Netbanking & Wallets",
+                instruments: [
+                  { method: "card" },
+                  { method: "netbanking" },
+                  { method: "wallet" },
+                  { method: "emi" }
+                ]
+              }
+            },
+            sequence: ["block.upi", "block.other"],
+            preferences: {
+              show_default_blocks: true
+            }
+          }
+        },
         handler: async function (response: any) {
 
           // 3. Confirm Booking on Server
