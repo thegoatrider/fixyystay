@@ -22,6 +22,43 @@ function isUserAdmin(user: any): boolean {
   )
 }
 
+export async function uploadPropertyImage(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Session expired. Please log in again.' }
+
+    const file = formData.get('file') as File | null
+    const prefix = (formData.get('prefix') as string) || 'prop'
+    if (!file || file.size === 0) {
+      return { error: 'No valid image file provided.' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    const rawExt = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
+    const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
+    const fileName = `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('property_images')
+      .upload(fileName, file, {
+        contentType: file.type || 'image/jpeg',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('Single image upload failed:', uploadError)
+      return { error: `Image upload failed: ${uploadError.message}` }
+    }
+
+    const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
+    return { success: true, url: urlData.publicUrl }
+  } catch (err: any) {
+    console.error('UNEXPECTED ERROR in uploadPropertyImage:', err)
+    return { error: err.message || 'Failed to upload image.' }
+  }
+}
+
 export async function updateProperty(propertyId: string, formData: FormData) {
   try {
   const supabase = await createClient()
@@ -86,16 +123,28 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     } catch(e) {}
   }
 
-  // 3. Handle new image uploads
+  // 2.5 Append pre-uploaded gallery URLs if uploaded client-side via uploadPropertyImage
+  const uploadedGalleryUrlsStr = formData.get('uploadedGalleryUrls') as string | null
+  if (uploadedGalleryUrlsStr) {
+    try {
+      const parsedUrls = JSON.parse(uploadedGalleryUrlsStr)
+      if (Array.isArray(parsedUrls)) {
+        image_urls.push(...parsedUrls.filter((u): u is string => typeof u === 'string' && u.length > 0))
+      }
+    } catch (e) {}
+  }
+
+  // 3. Handle new image uploads (fallback if File objects were passed directly)
   const imageFiles = formData.getAll('newImages') as File[]
-  const validNewFilesCount = imageFiles.filter(file => file && file.size > 0).length
+  const validNewFilesCount = imageFiles.filter(file => file && typeof file === 'object' && file.size > 0).length
   if (image_urls.length + validNewFilesCount > 15) {
     return { error: 'only 15 pictures of property are permitted.' }
   }
   
   const uploadPromises = imageFiles.map(async (imageFile) => {
-    if (imageFile && imageFile.size > 0) {
-      const fileExt = imageFile.name.split('.').pop()
+    if (imageFile && typeof imageFile === 'object' && imageFile.size > 0) {
+      const rawExt = imageFile.name && imageFile.name.includes('.') ? imageFile.name.split('.').pop() : 'jpg'
+      const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
       const fileName = `prop-update-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
       
       const { error: uploadError } = await supabaseAdmin.storage
@@ -118,11 +167,13 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   image_urls.push(...validUrls)
 
   // 3.5 Handle new Cover Image upload
+  const uploadedCoverUrl = formData.get('uploadedCoverUrl') as string | null
   const coverImageFile = formData.get('coverImage') as File | null;
-  let newCoverImageUrl: string | null = null;
+  let newCoverImageUrl: string | null = uploadedCoverUrl && uploadedCoverUrl.trim().length > 0 ? uploadedCoverUrl.trim() : null;
 
-  if (coverImageFile && coverImageFile.size > 0) {
-    const fileExt = coverImageFile.name.split('.').pop()
+  if (!newCoverImageUrl && coverImageFile && typeof coverImageFile === 'object' && coverImageFile.size > 0) {
+    const rawExt = coverImageFile.name && coverImageFile.name.includes('.') ? coverImageFile.name.split('.').pop() : 'jpg'
+    const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
     const fileName = `prop-cover-update-${propertyId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
     
     const { error: uploadError } = await supabaseAdmin.storage

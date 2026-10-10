@@ -5,16 +5,24 @@ import NextImage from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { updateProperty } from '@/app/actions/property'
+import { updateProperty, uploadPropertyImage } from '@/app/actions/property'
 import { X, Upload, Save, CheckCircle, Image as ImageIcon, Plus, Loader2, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { addPropertyRoom, deletePropertyRoom } from '@/app/dashboard/owner/actions'
+import { addPropertyRoom, deletePropertyRoom, getPropertyRooms } from '@/app/dashboard/owner/actions'
 
 import { useRouter } from 'next/navigation'
 import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
 import { SearchableCitySelect } from '@/components/SearchableCitySelect'
 
-export default function EditPropertyForm({ property, initialRooms = [] }: { property: any, initialRooms?: any[] }) {
+export default function EditPropertyForm({
+  property,
+  initialRooms = [],
+  initialPropertyRooms = [],
+}: {
+  property: any
+  initialRooms?: any[]
+  initialPropertyRooms?: any[]
+}) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +47,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
   // Track existing photos that user decides to KEEP
   const [existingPhotos, setExistingPhotos] = useState<string[]>(() => parseImageUrls(property.image_urls))
 
-  const [rooms, setRooms] = useState<any[]>([])
+  const [rooms, setRooms] = useState<any[]>(initialPropertyRooms)
   const [newRoomNumber, setNewRoomNumber] = useState('')
   const [isAddingRoom, setIsAddingRoom] = useState(false)
   const [propertyType, setPropertyType] = useState(property.type || 'multi-room property')
@@ -93,10 +101,19 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
   }
 
   const fetchRooms = async () => {
+    try {
+      const res = await getPropertyRooms(property.id)
+      if (res.success && Array.isArray(res.rooms)) {
+        setRooms(res.rooms)
+        return
+      }
+    } catch (err) {
+      console.error('Failed to fetch rooms via server action:', err)
+    }
     const supabase = createClient()
     const { data } = await supabase
       .from('property_rooms')
-      .select('id, property_id, room_number, room_type, status, floor_number')
+      .select('id, property_id, room_number, created_at')
       .eq('property_id', property.id)
       .order('room_number', { ascending: true })
     if (data) setRooms(data)
@@ -112,7 +129,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     if (!cleanRoomNum) return
 
     // Check duplicate
-    const exists = rooms.some(r => r.room_number.toLowerCase() === cleanRoomNum.toLowerCase())
+    const exists = rooms.some(r => String(r.room_number).trim().toLowerCase() === cleanRoomNum.toLowerCase())
     if (exists) {
       alert(`Room number ${cleanRoomNum} already exists.`)
       return
@@ -121,9 +138,13 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     setIsAddingRoom(true)
     const res = await addPropertyRoom(property.id, cleanRoomNum)
     setIsAddingRoom(false)
+    if (Array.isArray((res as any).rooms)) {
+      setRooms((res as any).rooms)
+    } else {
+      fetchRooms()
+    }
     if (res.success) {
       setNewRoomNumber('')
-      fetchRooms() // Refresh the list
     } else {
       alert(res.error || 'Failed to add room')
     }
@@ -134,6 +155,8 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
     const res = await deletePropertyRoom(roomId)
     if (!res.success) {
       alert(res.error || 'Failed to delete room')
+    } else if (Array.isArray((res as any).rooms)) {
+      setRooms((res as any).rooms)
     } else {
       fetchRooms() // Refresh the list
     }
@@ -191,6 +214,7 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    const formEl = e.currentTarget
     setIsLoading(true)
     setError(null)
     setSuccess(false)
@@ -201,8 +225,13 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       return
     }
     
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(formEl)
     
+    // Remove raw file inputs so uncompressed files never bloat the Server Action payload
+    formData.delete('coverImage')
+    formData.delete('galleryImages')
+    formData.delete('newImages')
+
     // Add arrays to formData
     formData.append('existingPhotos', JSON.stringify(existingPhotos))
     
@@ -240,12 +269,13 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
             
             canvas.toBlob((blob) => {
               if (!blob) return resolve(file);
-              const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+              const safeBaseName = (file.name || 'photo').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'photo';
+              const newFile = new File([blob], `${safeBaseName}.jpg`, {
                 type: 'image/jpeg',
                 lastModified: Date.now(),
               });
               resolve(newFile);
-            }, 'image/jpeg', 0.8);
+            }, 'image/jpeg', 0.75);
           };
           img.onerror = () => resolve(file);
           img.src = event.target?.result as string;
@@ -255,19 +285,52 @@ export default function EditPropertyForm({ property, initialRooms = [] }: { prop
       });
     };
 
-    const compressedFiles = await Promise.all(newFiles.map(compressImage));
-    
-    formData.delete('newImages')
-    compressedFiles.forEach(file => {
-      formData.append('newImages', file)
-    })
-    
-    if (coverImageFile) {
-      const compressedCover = await compressImage(coverImageFile)
-      formData.append('coverImage', compressedCover)
-    }
-
     try {
+      // If user typed a room number in the Room Registry input without clicking "+ Add Room", save it too
+      const pendingRoom = newRoomNumber.trim()
+      if (pendingRoom) {
+        const roomRes = await addPropertyRoom(property.id, pendingRoom)
+        if (Array.isArray((roomRes as any).rooms)) {
+          setRooms((roomRes as any).rooms)
+        }
+        if (roomRes.success) {
+          setNewRoomNumber('')
+        }
+      }
+
+      const uploadSingleFile = async (file: File, prefix: string): Promise<string> => {
+        const singleFd = new FormData()
+        singleFd.append('file', file)
+        singleFd.append('prefix', prefix)
+        const upRes = await uploadPropertyImage(singleFd)
+        if (upRes.error || !upRes.url) {
+          throw new Error(upRes.error || 'Failed to upload image')
+        }
+        return upRes.url
+      }
+
+      // Upload cover image if changed
+      if (coverImageFile) {
+        const compressedCover = await compressImage(coverImageFile)
+        const coverUrl = await uploadSingleFile(compressedCover, `prop-cover-update-${property.id}`)
+        formData.append('uploadedCoverUrl', coverUrl)
+      }
+
+      // Upload gallery images in small batches of 3 to avoid payload/timeout limits
+      if (newFiles.length > 0) {
+        const compressedFiles = await Promise.all(newFiles.map(compressImage))
+        const uploadedGalleryUrls: string[] = []
+        const BATCH_SIZE = 3
+        for (let i = 0; i < compressedFiles.length; i += BATCH_SIZE) {
+          const batch = compressedFiles.slice(i, i + BATCH_SIZE)
+          const batchUrls = await Promise.all(
+            batch.map(f => uploadSingleFile(f, `prop-update-${property.id}`))
+          )
+          uploadedGalleryUrls.push(...batchUrls)
+        }
+        formData.append('uploadedGalleryUrls', JSON.stringify(uploadedGalleryUrls))
+      }
+
       const result = await updateProperty(property.id, formData)
       if (result.error) {
         setError(result.error)

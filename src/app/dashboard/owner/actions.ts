@@ -135,6 +135,7 @@ async function geocodeAddress(address: string) {
 }
 
 export async function createProperty(formData: FormData) {
+  try {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
@@ -142,19 +143,26 @@ export async function createProperty(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expired. Please log in again.' }
 
-  if (user.user_metadata?.role !== 'owner') {
-    return { error: 'Access denied. Your account is not registered as an Owner.' }
-  }
-
-  // 2. Get owner record (using admin to bypass any RLS)
-  const { data: owner, error: ownerError } = await supabaseAdmin
+  // 2. Get owner record (using admin to bypass any RLS, with email fallback)
+  let { data: owner } = await supabaseAdmin
     .from('owners')
     .select('id')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (ownerError || !owner) {
-    console.error('Owner lookup failed:', ownerError)
+  if (!owner && user.email) {
+    const { data: matchedOwner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .eq('email', user.email.toLowerCase().trim())
+      .maybeSingle()
+    if (matchedOwner) {
+      owner = matchedOwner
+      await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+    }
+  }
+
+  if (!owner) {
     return { error: `Owner profile not found. Contact support. (uid: ${user.id})` }
   }
 
@@ -200,12 +208,14 @@ export async function createProperty(formData: FormData) {
   const searchQuery = `${pincode}, India`
   const geoData = await geocodeAddress(searchQuery)
 
-  // 3.8 Handle Cover Image upload
+  // 3.8 Handle Cover Image upload (supports pre-uploaded URL or File fallback)
+  const uploadedCoverUrl = formData.get('uploadedCoverUrl') as string | null
   const coverImageFile = formData.get('coverImage') as File | null;
-  let coverImageUrl: string | null = null;
+  let coverImageUrl: string | null = uploadedCoverUrl && uploadedCoverUrl.trim().length > 0 ? uploadedCoverUrl.trim() : null;
 
-  if (coverImageFile && coverImageFile.size > 0) {
-    const fileExt = coverImageFile.name.split('.').pop()
+  if (!coverImageUrl && coverImageFile && typeof coverImageFile === 'object' && coverImageFile.size > 0) {
+    const rawExt = coverImageFile.name && coverImageFile.name.includes('.') ? coverImageFile.name.split('.').pop() : 'jpg'
+    const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
     const fileName = `prop-cover-${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
     const { error: uploadError } = await supabaseAdmin.storage
       .from('property_images')
@@ -220,17 +230,28 @@ export async function createProperty(formData: FormData) {
     }
   }
 
-  // 4. Handle multiple image uploads
+  // 4. Handle multiple image uploads (supports pre-uploaded URLs or File fallback)
+  const image_urls: string[] = []
+  const uploadedGalleryUrlsStr = formData.get('uploadedGalleryUrls') as string | null
+  if (uploadedGalleryUrlsStr) {
+    try {
+      const parsedUrls = JSON.parse(uploadedGalleryUrlsStr)
+      if (Array.isArray(parsedUrls)) {
+        image_urls.push(...parsedUrls.filter((u): u is string => typeof u === 'string' && u.length > 0))
+      }
+    } catch (e) {}
+  }
+
   const imageFiles = formData.getAll('image') as File[]
-  const validNewFilesCount = imageFiles.filter(file => file && file.size > 0).length
-  if (validNewFilesCount > 15) {
+  const validNewFilesCount = imageFiles.filter(file => file && typeof file === 'object' && file.size > 0).length
+  if (image_urls.length + validNewFilesCount > 15) {
     return { error: 'only 15 pictures of property are permitted.' }
   }
-  const image_urls: string[] = []
   
   const uploadPromises = imageFiles.map(async (imageFile) => {
-    if (imageFile && imageFile.size > 0) {
-      const fileExt = imageFile.name.split('.').pop()
+    if (imageFile && typeof imageFile === 'object' && imageFile.size > 0) {
+      const rawExt = imageFile.name && imageFile.name.includes('.') ? imageFile.name.split('.').pop() : 'jpg'
+      const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
       const fileName = `prop-${owner.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
       
       const { error: uploadError } = await supabaseAdmin.storage
@@ -341,6 +362,10 @@ export async function createProperty(formData: FormData) {
 
   revalidatePath('/dashboard/owner')
   return { success: true, id: property.id }
+  } catch (err: any) {
+    console.error('UNEXPECTED ERROR in createProperty:', err)
+    return { error: `Server Error: ${err.message || String(err)}` }
+  }
 }
 
 export async function updatePassword(formData: FormData) {
@@ -518,6 +543,30 @@ export async function approveIdentity(identityId: string, manualName?: string, m
   }
 }
 
+export async function getPropertyRooms(propertyId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized', rooms: [] }
+
+    const supabaseAdmin = createAdminClient()
+    const { data: rooms, error } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id, room_number, created_at')
+      .eq('property_id', propertyId)
+      .order('room_number', { ascending: true })
+
+    if (error) {
+      console.error('Failed to fetch property rooms:', error)
+      return { success: false, error: error.message, rooms: [] }
+    }
+
+    return { success: true, rooms: rooms || [] }
+  } catch (err: any) {
+    return { success: false, error: err.message, rooms: [] }
+  }
+}
+
 export async function addPropertyRoom(propertyId: string, roomNumber: string) {
   try {
     const supabase = await createClient()
@@ -566,18 +615,77 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
       if (!property) return { success: false, error: 'Property not found' }
     }
 
+    // Parse single or comma-separated room numbers
+    const requestedRooms = Array.from(
+      new Set(
+        roomNumber
+          .split(',')
+          .map(r => r.trim())
+          .filter(Boolean)
+      )
+    )
+
+    if (requestedRooms.length === 0) {
+      return { success: false, error: 'Please enter a valid room number.' }
+    }
+
+    const { data: existingRooms } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id, room_number, created_at')
+      .eq('property_id', propertyId)
+      .order('room_number', { ascending: true })
+
+    const existingSet = new Set(
+      (existingRooms || []).map(r => String(r.room_number).trim().toLowerCase())
+    )
+
+    const roomsToInsert = requestedRooms.filter(
+      r => !existingSet.has(r.toLowerCase())
+    )
+
+    if (roomsToInsert.length === 0) {
+      return {
+        success: false,
+        error: requestedRooms.length === 1
+          ? `Room ${requestedRooms[0]} is already registered for this property.`
+          : 'All entered room numbers are already registered for this property.',
+        rooms: existingRooms || []
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('property_rooms')
-      .insert({ property_id: propertyId, room_number: roomNumber })
+      .insert(roomsToInsert.map(num => ({ property_id: propertyId, room_number: num })))
 
     if (error) {
       console.error('Failed to add property room:', error)
-      return { success: false, error: error.message }
+      const { data: refreshedRooms } = await supabaseAdmin
+        .from('property_rooms')
+        .select('id, property_id, room_number, created_at')
+        .eq('property_id', propertyId)
+        .order('room_number', { ascending: true })
+
+      if (error.code === '23505' || error.message?.includes('property_rooms_property_id_room_number_key')) {
+        return {
+          success: false,
+          error: `Room number is already registered for this property.`,
+          rooms: refreshedRooms || existingRooms || []
+        }
+      }
+      return { success: false, error: error.message, rooms: refreshedRooms || existingRooms || [] }
     }
 
+    const { data: updatedRooms } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id, room_number, created_at')
+      .eq('property_id', propertyId)
+      .order('room_number', { ascending: true })
+
     revalidatePath('/dashboard/owner')
+    revalidatePath('/dashboard/owner/property/[id]/edit', 'page')
+    revalidatePath(`/dashboard/owner/property/${propertyId}/edit`)
     revalidatePath('/dashboard/admin/properties/[id]', 'page')
-    return { success: true }
+    return { success: true, rooms: updatedRooms || [] }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
@@ -602,6 +710,14 @@ export async function deletePropertyRoom(roomId: string) {
       appRole === 'admin' ||
       appRole === 'superadmin'
 
+    const { data: room } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id')
+      .eq('id', roomId)
+      .maybeSingle()
+
+    if (!room) return { success: false, error: 'Room not found' }
+
     if (!isAdmin) {
       let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
       if (!owner && email) {
@@ -612,15 +728,6 @@ export async function deletePropertyRoom(roomId: string) {
         }
       }
       if (!owner) return { success: false, error: 'Owner profile not found' }
-
-      // Fetch the room to verify it belongs to this owner's property
-      const { data: room } = await supabaseAdmin
-        .from('property_rooms')
-        .select('id, property_id')
-        .eq('id', roomId)
-        .maybeSingle()
-
-      if (!room) return { success: false, error: 'Room not found' }
 
       const { data: property } = await supabaseAdmin
         .from('properties')
@@ -643,9 +750,17 @@ export async function deletePropertyRoom(roomId: string) {
       return { success: false, error: error.message }
     }
 
+    const { data: updatedRooms } = await supabaseAdmin
+      .from('property_rooms')
+      .select('id, property_id, room_number, created_at')
+      .eq('property_id', room.property_id)
+      .order('room_number', { ascending: true })
+
     revalidatePath('/dashboard/owner')
+    revalidatePath('/dashboard/owner/property/[id]/edit', 'page')
+    revalidatePath(`/dashboard/owner/property/${room.property_id}/edit`)
     revalidatePath('/dashboard/admin/properties/[id]', 'page')
-    return { success: true }
+    return { success: true, rooms: updatedRooms || [] }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

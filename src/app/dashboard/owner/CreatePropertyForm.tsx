@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProperty } from './actions'
+import { uploadPropertyImage } from '@/app/actions/property'
 import { useRouter } from 'next/navigation'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { PlusCircle, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
@@ -73,6 +74,7 @@ export default function CreatePropertyForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    const formEl = e.currentTarget
     setIsLoading(true)
     
     if (selectedFiles.length > 15) {
@@ -81,7 +83,7 @@ export default function CreatePropertyForm() {
       return
     }
     
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(formEl)
     
     if (!coverImage && selectedFiles.length === 0) {
       alert('Please upload a cover image or at least one property image.')
@@ -89,8 +91,10 @@ export default function CreatePropertyForm() {
       return
     }
 
-    // Clear the original 'image' file inputs and manually append our state-managed files
+    // Clear raw file inputs so uncompressed files never bloat the Server Action payload
     formData.delete('image')
+    formData.delete('coverImage')
+    formData.delete('coverImageInput')
     
     // Compress images before sending to prevent 413 Payload Too Large
     const compressImage = (file: File): Promise<File> => {
@@ -126,12 +130,13 @@ export default function CreatePropertyForm() {
             
             canvas.toBlob((blob) => {
               if (!blob) return resolve(file);
-              const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+              const safeBaseName = (file.name || 'photo').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'photo';
+              const newFile = new File([blob], `${safeBaseName}.jpg`, {
                 type: 'image/jpeg',
                 lastModified: Date.now(),
               });
               resolve(newFile);
-            }, 'image/jpeg', 0.8);
+            }, 'image/jpeg', 0.75);
           };
           img.onerror = () => resolve(file);
           img.src = event.target?.result as string;
@@ -141,18 +146,38 @@ export default function CreatePropertyForm() {
       });
     };
 
-    const compressedFiles = await Promise.all(selectedFiles.map(compressImage));
-    
-    compressedFiles.forEach(file => {
-      formData.append('image', file)
-    })
-    
-    if (coverImage) {
-      const compressedCover = await compressImage(coverImage)
-      formData.append('coverImage', compressedCover)
-    }
-
     try {
+      const uploadSingleFile = async (file: File, prefix: string): Promise<string> => {
+        const singleFd = new FormData()
+        singleFd.append('file', file)
+        singleFd.append('prefix', prefix)
+        const upRes = await uploadPropertyImage(singleFd)
+        if (upRes.error || !upRes.url) {
+          throw new Error(upRes.error || 'Failed to upload image')
+        }
+        return upRes.url
+      }
+
+      if (coverImage) {
+        const compressedCover = await compressImage(coverImage)
+        const coverUrl = await uploadSingleFile(compressedCover, 'prop-cover')
+        formData.append('uploadedCoverUrl', coverUrl)
+      }
+
+      if (selectedFiles.length > 0) {
+        const compressedFiles = await Promise.all(selectedFiles.map(compressImage))
+        const uploadedGalleryUrls: string[] = []
+        const BATCH_SIZE = 3
+        for (let i = 0; i < compressedFiles.length; i += BATCH_SIZE) {
+          const batch = compressedFiles.slice(i, i + BATCH_SIZE)
+          const batchUrls = await Promise.all(
+            batch.map(f => uploadSingleFile(f, 'prop'))
+          )
+          uploadedGalleryUrls.push(...batchUrls)
+        }
+        formData.append('uploadedGalleryUrls', JSON.stringify(uploadedGalleryUrls))
+      }
+
       const result = await createProperty(formData)
       if (result?.error) {
         alert(result.error)
@@ -160,9 +185,9 @@ export default function CreatePropertyForm() {
       } else if (result?.success) {
         router.push(`/dashboard/owner/property/${result.id}`)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      alert('An unexpected error occurred. Please try again.')
+      alert(err?.message || 'An unexpected error occurred. Please try again.')
       setIsLoading(false)
     }
   }

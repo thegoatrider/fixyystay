@@ -99,13 +99,13 @@ export default async function PropertyDetailPage(
 
   if (!property) redirect('/dashboard/owner')
 
-  const { data: rooms } = await supabaseAdmin.from('rooms').select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url').eq('property_id', propertyId)
+  const { data: rooms } = await supabaseAdmin.from('rooms').select('*').eq('property_id', propertyId)
   const roomIds = rooms?.map(r => r.id) || []
   
   // Fetch calendar needed data
-  const { data: bookings } = await supabaseAdmin.from('bookings').select('id, room_id, checkin_date, checkout_date, status, guest_name, total_amount').in('room_id', roomIds)
+  const { data: bookings } = await supabaseAdmin.from('bookings').select('*').in('room_id', roomIds)
   const { data: rates } = await supabaseAdmin.from('room_rates').select('id, room_id, date, price').in('room_id', roomIds)
-  const { data: availability } = await supabaseAdmin.from('room_availability').select('id, room_id, date, is_available').in('room_id', roomIds)
+  const { data: availability } = await supabaseAdmin.from('room_availability').select('*').in('room_id', roomIds)
 
   return (
     <div className="flex flex-col gap-8">

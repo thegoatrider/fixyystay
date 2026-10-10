@@ -92,8 +92,14 @@ export default async function EditPropertyPage(
 
   const { data: rooms } = await supabaseAdmin
     .from('rooms')
-    .select('id, property_id, name, category, base_price, max_guests, price_bucket, image_url')
+    .select('*')
     .eq('property_id', propertyId)
+
+  const { data: propertyRooms } = await supabaseAdmin
+    .from('property_rooms')
+    .select('id, property_id, room_number, created_at')
+    .eq('property_id', propertyId)
+    .order('room_number', { ascending: true })
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
@@ -110,7 +116,11 @@ export default async function EditPropertyPage(
       </div>
 
       <div className="w-full">
-        <EditPropertyForm property={property} initialRooms={rooms || []} />
+        <EditPropertyForm
+          property={property}
+          initialRooms={rooms || []}
+          initialPropertyRooms={propertyRooms || []}
+        />
       </div>
     </div>
   )

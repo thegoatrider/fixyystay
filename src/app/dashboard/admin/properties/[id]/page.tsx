@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -9,6 +10,7 @@ import PropertyApprovalActions from '@/app/dashboard/admin/PropertyApprovalActio
 export default async function ManagePropertyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = await params
   const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
 
   const { data: property, error } = await supabase
     .from('properties')
@@ -20,6 +22,17 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
     console.error('Property Load Error:', error, 'Property Data:', property)
     redirect('/dashboard/admin')
   }
+
+  const { data: rooms } = await supabaseAdmin
+    .from('rooms')
+    .select('*')
+    .eq('property_id', propertyId)
+
+  const { data: propertyRooms } = await supabaseAdmin
+    .from('property_rooms')
+    .select('id, property_id, room_number, created_at')
+    .eq('property_id', propertyId)
+    .order('room_number', { ascending: true })
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-8">
@@ -59,7 +72,11 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
               </div>
             </div>
 
-            <EditPropertyForm property={property} />
+            <EditPropertyForm
+              property={property}
+              initialRooms={rooms || []}
+              initialPropertyRooms={propertyRooms || []}
+            />
           </div>
         </div>
 
