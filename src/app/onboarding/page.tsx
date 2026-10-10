@@ -6,10 +6,11 @@ import { createOwnerOrder, verifyAndUpgrade } from '../pricing/business/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle } from 'lucide-react'
+import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle, MapPin, Loader2 } from 'lucide-react'
 import Script from 'next/script'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { INDIAN_STATES_AND_CITIES, ALL_POPULAR_CITIES } from '@/lib/india-locations'
 
 const SHARED_FEATURES = [
   "List Unlimited Properties",
@@ -36,6 +37,86 @@ function OnboardingContent() {
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
   const [ownerId, setOwnerId] = useState<string | null>(null)
+
+  // Property Location states
+  const [pincode, setPincode] = useState('')
+  const [selectedCity, setSelectedCity] = useState('Alibag')
+  const [customCity, setCustomCity] = useState('')
+  const [selectedArea, setSelectedArea] = useState('')
+  const [customArea, setCustomArea] = useState('')
+  const [selectedState, setSelectedState] = useState('Maharashtra')
+  const [availableAreas, setAvailableAreas] = useState<string[]>([])
+  const [isDetectingPin, setIsDetectingPin] = useState(false)
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
+  const [pinError, setPinError] = useState<string | null>(null)
+
+  const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 6)
+    setPincode(val)
+    setPinError(null)
+
+    if (val.length === 6) {
+      setIsDetectingPin(true)
+      try {
+        const res = await fetch(`/api/pincode/${val}`)
+        const data = await res.json()
+        if (data.success) {
+          setDetectedLocation(`${data.city}, ${data.state}`)
+          if (data.state) setSelectedState(data.state)
+
+          // Match city to our comprehensive city list if possible
+          const rawCity = (data.city || '').toLowerCase()
+          let matchedCity = data.city || ''
+
+          for (const [st, cities] of Object.entries(INDIAN_STATES_AND_CITIES)) {
+            const found = cities.find(c => 
+              c.toLowerCase() === rawCity ||
+              rawCity.includes(c.toLowerCase()) ||
+              c.toLowerCase().includes(rawCity)
+            )
+            if (found) {
+              matchedCity = found
+              setSelectedState(st)
+              break
+            }
+          }
+
+          setSelectedCity(matchedCity)
+
+          if (Array.isArray(data.areas) && data.areas.length > 0) {
+            setAvailableAreas(data.areas)
+            setSelectedArea(data.areas[0])
+          } else {
+            setAvailableAreas([])
+            setSelectedArea(data.city || '')
+          }
+        } else {
+          setPinError(data.error || 'Pincode not recognized')
+          setDetectedLocation(null)
+        }
+      } catch (err) {
+        console.error('Failed to lookup pincode:', err)
+        setPinError('Could not verify pincode')
+      } finally {
+        setIsDetectingPin(false)
+      }
+    } else {
+      setDetectedLocation(null)
+      if (val.length === 0) {
+        setAvailableAreas([])
+      }
+    }
+  }
+
+  const handleCityChange = (newCity: string) => {
+    setSelectedCity(newCity)
+    for (const [st, cities] of Object.entries(INDIAN_STATES_AND_CITIES)) {
+      if (cities.includes(newCity)) {
+        setSelectedState(st)
+        break
+      }
+    }
+  }
 
   // If redirected with step=payment, fetch current session email
   useEffect(() => {
@@ -261,6 +342,149 @@ function OnboardingContent() {
                         className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
                       />
                     </div>
+                  </div>
+
+                  {/* Property Location with Pincode Auto-detection */}
+                  <div className="pt-3 border-t border-gray-100 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-gray-900 font-bold text-sm flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                        Property Location
+                      </Label>
+                      <span className="text-[11px] text-blue-600 font-bold bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
+                        All India
+                      </span>
+                    </div>
+
+                    {/* Area Pincode with Auto-detection status */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="pincode" className="text-gray-700 font-semibold text-xs">
+                          Area Pincode <span className="text-blue-600 font-bold">(Auto-detects City & Area)</span>
+                        </Label>
+                        {isDetectingPin && (
+                          <span className="text-[11px] text-blue-600 font-bold flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
+                          </span>
+                        )}
+                        {detectedLocation && (
+                          <span className="text-[11px] text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-green-200">
+                            <CheckCircle2 className="w-3 h-3 text-green-600" /> {detectedLocation}
+                          </span>
+                        )}
+                        {pinError && (
+                          <span className="text-[11px] text-amber-600 font-medium">
+                            {pinError}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          id="pincode"
+                          name="pincode"
+                          type="text"
+                          maxLength={6}
+                          value={pincode}
+                          onChange={handlePincodeChange}
+                          placeholder="e.g. 402201, 403516, 560001, 110001"
+                          className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* City Dropdown & Area Selection */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* City Across India */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="city" className="text-gray-700 font-semibold text-xs">
+                          City / Destination
+                        </Label>
+                        <select
+                          id="city"
+                          name="city"
+                          value={selectedCity}
+                          onChange={(e) => handleCityChange(e.target.value)}
+                          className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                        >
+                          <option value="">Select City across India...</option>
+                          {selectedCity && selectedCity !== 'Other' && !ALL_POPULAR_CITIES.includes(selectedCity) && (
+                            <option value={selectedCity}>{selectedCity}</option>
+                          )}
+                          {Object.entries(INDIAN_STATES_AND_CITIES).map(([state, cities]) => (
+                            <optgroup key={state} label={`── ${state} ──`}>
+                              {cities.map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                          <option value="Other">Other / Custom City...</option>
+                        </select>
+                      </div>
+
+                      {/* Area / Sub-locality */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cityArea" className="text-gray-700 font-semibold text-xs">
+                          Area / Sub-locality
+                        </Label>
+                        {availableAreas.length > 0 ? (
+                          <select
+                            id="cityArea"
+                            name="cityArea"
+                            value={selectedArea}
+                            onChange={(e) => setSelectedArea(e.target.value)}
+                            className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                          >
+                            {availableAreas.map((a) => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                            <option value="custom">Other / Custom Locality...</option>
+                          </select>
+                        ) : (
+                          <Input
+                            id="cityArea"
+                            name="cityArea"
+                            value={selectedArea}
+                            onChange={(e) => setSelectedArea(e.target.value)}
+                            placeholder="e.g. Kihim, Calangute, Indiranagar"
+                            className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Custom City if 'Other' is chosen */}
+                    {selectedCity === 'Other' && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="customCity" className="text-gray-700 font-semibold text-xs">Custom City Name</Label>
+                        <Input
+                          id="customCity"
+                          name="customCity"
+                          value={customCity}
+                          onChange={(e) => setCustomCity(e.target.value)}
+                          placeholder="Enter your city / district name"
+                          className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
+                        />
+                      </div>
+                    )}
+
+                    {/* Custom Area if 'custom' is chosen */}
+                    {selectedArea === 'custom' && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="customArea" className="text-gray-700 font-semibold text-xs">Custom Area Name</Label>
+                        <Input
+                          id="customArea"
+                          name="customArea"
+                          value={customArea}
+                          onChange={(e) => setCustomArea(e.target.value)}
+                          placeholder="Enter neighborhood / area name"
+                          className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
+                        />
+                      </div>
+                    )}
+
+                    {/* Hidden State Input */}
+                    <input type="hidden" name="state" value={selectedState} />
                   </div>
 
                   {error && (

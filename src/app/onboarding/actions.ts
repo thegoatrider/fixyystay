@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
+import { getCityCode } from '@/lib/india-locations'
 
 async function getAbsoluteOrigin() {
   const reqHeaders = await headers()
@@ -68,7 +69,6 @@ export async function submitOnboarding(formData: FormData) {
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const propertyName = formData.get('propertyName') as string
 
   if (!name || !email || !password) {
     return { error: 'Name, email, and password are required' }
@@ -144,18 +144,59 @@ export async function submitOnboarding(formData: FormData) {
     }
   }
 
-  // Also create a dummy property if propertyName is provided
-  if (propertyName && ownerId) {
+  const propertyName = formData.get('propertyName') as string
+  const pincode = ((formData.get('pincode') as string) || '').trim()
+  const city = ((formData.get('city') as string) || '').trim()
+  const customCity = ((formData.get('customCity') as string) || '').trim()
+  const selectedArea = ((formData.get('cityArea') as string) || (formData.get('area') as string) || '').trim()
+  const customArea = ((formData.get('customArea') as string) || '').trim()
+  const finalCity = city === 'Other' && customCity ? customCity : (city || (pincode ? 'Detected Location' : 'Pending'))
+  const finalArea = selectedArea === 'custom' ? customArea : (selectedArea || customArea || null)
+  const state = ((formData.get('state') as string) || '').trim()
+
+  // Also create property if propertyName or location is provided
+  if (ownerId && (propertyName || city || pincode)) {
+    const finalPropName = propertyName || `${name}'s Property`
+
     // Check if property exists first (for recovering users)
-    const { data: existingProp } = await supabaseAdmin.from('properties').select('id').eq('owner_id', ownerId).eq('name', propertyName).maybeSingle()
+    const { data: existingProp } = await supabaseAdmin
+      .from('properties')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .eq('name', finalPropName)
+      .maybeSingle()
+
     if (!existingProp) {
+      // Generate clean collision-safe UID with city code
+      const prefix = getCityCode(finalCity)
+      const { data: properties } = await supabaseAdmin
+        .from('properties')
+        .select('uid')
+        .like('uid', `${prefix}%`)
+        .order('uid', { ascending: false })
+        .limit(1)
+
+      let nextNum = 1
+      if (properties && properties.length > 0 && properties[0].uid) {
+        const match = properties[0].uid.match(/\d+$/)
+        if (match) {
+          nextNum = parseInt(match[0], 10) + 1
+        }
+      }
+      const uid = `${prefix}${nextNum.toString().padStart(3, '0')}`
+
       // Use supabaseAdmin to ensure bypass of RLS on property creation
       await supabaseAdmin.from('properties').insert([
         {
           owner_id: ownerId,
-          name: propertyName,
-          city: 'Pending',
+          name: finalPropName,
+          city: finalCity,
+          city_area: finalArea,
+          area_name: finalArea,
+          pincode: pincode || null,
+          state: state || null,
           type: 'multi-room property',
+          uid,
         }
       ])
     }

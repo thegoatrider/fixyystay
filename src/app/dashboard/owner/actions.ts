@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { GoogleGenAI } from '@google/genai'
+import { getCityCode } from '@/lib/india-locations'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -70,18 +71,7 @@ function mapConfidenceToNumeric(overall: string | null | undefined): number {
 }
 
 async function generatePropertyUid(supabaseAdmin: any, city: string) {
-  const prefixes: Record<string, string> = {
-    'Alibag': 'ALB',
-    'Raigad': 'ALB',
-    'Lonavala': 'LON',
-    'Khandala': 'KHA',
-    'Matheran': 'MAT',
-    'Mahableshwar': 'MAH',
-    'Mumbai': 'MUM',
-    'Goa': 'GOA'
-  }
-  
-  const prefix = prefixes[city] || 'PRP'
+  const prefix = getCityCode(city)
   
   // Find properties with this prefix and get the highest number
   const { data: properties } = await supabaseAdmin

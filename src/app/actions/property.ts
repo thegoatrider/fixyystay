@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { getCityCode } from '@/lib/india-locations'
 
 function isUserAdmin(user: any): boolean {
   if (!user) return false
@@ -141,17 +142,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   let uid = currentProp?.uid
 
   if (!uid && city) {
-    const prefixes: Record<string, string> = {
-      'Alibag': 'ALB',
-      'Raigad': 'ALB',
-      'Lonavala': 'LON',
-      'Khandala': 'KHA',
-      'Matheran': 'MAT',
-      'Mahableshwar': 'MAH',
-      'Mumbai': 'MUM',
-      'Goa': 'GOA'
-    }
-    const prefix = prefixes[city] || 'PRP'
+    const prefix = getCityCode(city)
     const { data: properties } = await supabaseAdmin
       .from('properties')
       .select('uid')

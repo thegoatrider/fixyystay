@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { createProperty } from './actions'
 import { useRouter } from 'next/navigation'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
-import { PlusCircle } from 'lucide-react'
+import { PlusCircle, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
+import { INDIAN_STATES_AND_CITIES, ALL_POPULAR_CITIES } from '@/lib/india-locations'
 
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
@@ -17,7 +18,57 @@ export default function CreatePropertyForm() {
   const [previews, setPreviews] = useState<string[]>([])
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [city, setCity] = useState('Alibag')
+  const [pincode, setPincode] = useState('')
+  const [isDetectingPin, setIsDetectingPin] = useState(false)
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
+  const [availableAreas, setAvailableAreas] = useState<string[]>([])
+  const [selectedArea, setSelectedArea] = useState('')
   const router = useRouter()
+
+  const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 6)
+    setPincode(val)
+
+    if (val.length === 6) {
+      setIsDetectingPin(true)
+      try {
+        const res = await fetch(`/api/pincode/${val}`)
+        const data = await res.json()
+        if (data.success) {
+          setDetectedLocation(`${data.city}, ${data.state}`)
+
+          const rawCity = (data.city || '').toLowerCase()
+          let matchedCity = data.city || ''
+
+          for (const [_, cities] of Object.entries(INDIAN_STATES_AND_CITIES)) {
+            const found = cities.find(c =>
+              c.toLowerCase() === rawCity ||
+              rawCity.includes(c.toLowerCase()) ||
+              c.toLowerCase().includes(rawCity)
+            )
+            if (found) {
+              matchedCity = found
+              break
+            }
+          }
+
+          setCity(matchedCity)
+
+          if (Array.isArray(data.areas) && data.areas.length > 0) {
+            setAvailableAreas(data.areas)
+            setSelectedArea(data.areas[0])
+          }
+        }
+      } catch (err) {
+        console.error('Failed to lookup pincode:', err)
+      } finally {
+        setIsDetectingPin(false)
+      }
+    } else {
+      setDetectedLocation(null)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -318,103 +369,19 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="city">City</Label>
-        <select
-          id="city"
-          name="city"
-          required
-          defaultValue="Raigad"
-          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
-        >
-          <option value="Raigad">Raigad</option>
-          <option value="Lonavala" disabled>Lonavala (Coming Soon)</option>
-          <option value="Khandala" disabled>Khandala (Coming Soon)</option>
-          <option value="Matheran" disabled>Matheran (Coming Soon)</option>
-          <option value="Mahableshwar" disabled>Mahableshwar (Coming Soon)</option>
-          <option value="Mumbai" disabled>Mumbai (Coming Soon)</option>
-          <option value="Goa" disabled>Goa (Coming Soon)</option>
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="cityArea">Area / Sub-locality</Label>
-        <select
-          id="cityArea"
-          name="cityArea"
-          required
-          defaultValue=""
-          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
-        >
-          <option value="" disabled>Select area...</option>
-          <optgroup label="── Raigad ──">
-            <option value="Rewas">Rewas</option>
-            <option value="Bodni">Bodni</option>
-            <option value="Karmale / Hashivare">Karmale / Hashivare</option>
-            <option value="Saral">Saral</option>
-            <option value="Chondhi">Chondhi</option>
-            <option value="Awas">Awas</option>
-            <option value="Sasawane">Sasawane</option>
-            <option value="Mandwa">Mandwa</option>
-            <option value="Kihim">Kihim</option>
-            <option value="Zirad">Zirad</option>
-            <option value="Thal">Thal</option>
-            <option value="Alibag">Alibag</option>
-            <option value="Varsoli">Varsoli</option>
-            <option value="Akshi">Akshi</option>
-            <option value="Nagaon">Nagaon</option>
-            <option value="Chaul">Chaul</option>
-            <option value="Revdanda">Revdanda</option>
-            <option value="Salav">Salav</option>
-            <option value="Korlai">Korlai</option>
-            <option value="Kashid">Kashid</option>
-            <option value="Nandgaon">Nandgaon</option>
-            <option value="Murud">Murud</option>
-            <option value="Rajpuri">Rajpuri</option>
-          </optgroup>
-          <optgroup label="── Shrivardhan Raigad ──">
-            <option value="Agardanda">Agardanda</option>
-            <option value="Dighi">Dighi</option>
-            <option value="Diveagar">Diveagar</option>
-            <option value="Borli Panchatan">Borli Panchatan</option>
-            <option value="Bagmandala">Bagmandala</option>
-            <option value="Shrivardhan">Shrivardhan</option>
-            <option value="Harihareshwar">Harihareshwar</option>
-            <option value="Velas">Velas</option>
-            <option value="Bharadkhol">Bharadkhol</option>
-            <option value="Shekhadi">Shekhadi</option>
-            <option value="Sarve">Sarve</option>
-          </optgroup>
-          <optgroup label="── Extended Raigad Locations ──">
-            <option value="Nagothane">Nagothane</option>
-            <option value="Pali">Pali</option>
-            <option value="Roha">Roha</option>
-            <option value="Kolad">Kolad</option>
-            <option value="Mangaon">Mangaon</option>
-            <option value="Goregaon">Goregaon</option>
-            <option value="Tala">Tala</option>
-            <option value="Mhasla">Mhasla</option>
-            <option value="Dighi Sagari">Dighi Sagari</option>
-            <option value="Mahad City">Mahad City</option>
-            <option value="Mahad Taluka">Mahad Taluka</option>
-            <option value="Mahad MIDC">Mahad MIDC</option>
-            <option value="Poladpur">Poladpur</option>
-            <option value="Karjat">Karjat</option>
-            <option value="Neral">Neral</option>
-            <option value="Matheran">Matheran</option>
-            <option value="Khopoli">Khopoli</option>
-            <option value="Khalapur">Khalapur</option>
-            <option value="Rasayani">Rasayani</option>
-            <option value="Pen">Pen</option>
-            <option value="Vadkhal">Vadkhal</option>
-            <option value="Poynad">Poynad</option>
-            <option value="Dadar Sagari">Dadar Sagari</option>
-            <option value="Mandwa Sagari">Mandwa Sagari</option>
-          </optgroup>
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="pincode">Area Pincode</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="pincode">Area Pincode</Label>
+          {isDetectingPin && (
+            <span className="text-[11px] text-blue-600 font-bold flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Detecting location...
+            </span>
+          )}
+          {detectedLocation && (
+            <span className="text-[11px] text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-green-200">
+              <CheckCircle2 className="w-3 h-3 text-green-600" /> {detectedLocation}
+            </span>
+          )}
+        </div>
         <Input
           id="pincode"
           name="pincode"
@@ -423,12 +390,68 @@ export default function CreatePropertyForm() {
           maxLength={6}
           pattern="\d{6}"
           required
-          placeholder="e.g. 402201"
+          value={pincode}
+          onChange={handlePincodeChange}
+          placeholder="e.g. 402201, 403516, 560001, 110001"
           className="tracking-widest font-mono"
         />
         <p className="text-[10px] text-gray-400">
-          Guests will see an approximate map of this pincode area. Precise location is never shown until after booking.
+          Entering a 6-digit pincode auto-detects City & Area across India.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="city">City / Destination</Label>
+        <select
+          id="city"
+          name="city"
+          required
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+        >
+          {city && city !== 'Other' && !ALL_POPULAR_CITIES.includes(city) && (
+            <option value={city}>{city}</option>
+          )}
+          {Object.entries(INDIAN_STATES_AND_CITIES).map(([state, cities]) => (
+            <optgroup key={state} label={`── ${state} ──`}>
+              {cities.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </optgroup>
+          ))}
+          <option value="Other">Other Location</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cityArea">Area / Sub-locality</Label>
+        {availableAreas.length > 0 ? (
+          <select
+            id="cityArea"
+            name="cityArea"
+            required
+            value={selectedArea}
+            onChange={(e) => setSelectedArea(e.target.value)}
+            className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+          >
+            <option value="" disabled>Select area...</option>
+            {availableAreas.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+            <option value="Other">Other Area</option>
+          </select>
+        ) : (
+          <Input
+            id="cityArea"
+            name="cityArea"
+            required
+            value={selectedArea}
+            onChange={(e) => setSelectedArea(e.target.value)}
+            placeholder="e.g. Kihim, Calangute, Indiranagar"
+            className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
+          />
+        )}
       </div>
 
       <div className="space-y-2">
