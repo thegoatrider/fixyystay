@@ -9,7 +9,8 @@ import { createProperty } from './actions'
 import { useRouter } from 'next/navigation'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { PlusCircle, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
-import { INDIAN_STATES_AND_CITIES, ALL_POPULAR_CITIES } from '@/lib/india-locations'
+import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
+import { SearchableCitySelect } from '@/components/SearchableCitySelect'
 
 export default function CreatePropertyForm() {
   const [propertyType, setPropertyType] = useState('villa')
@@ -402,26 +403,14 @@ export default function CreatePropertyForm() {
 
       <div className="space-y-2">
         <Label htmlFor="city">City / Destination</Label>
-        <select
+        <SearchableCitySelect
           id="city"
           name="city"
           required
           value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-gray-200 bg-transparent px-3 py-1 text-sm shadow-sm"
-        >
-          {city && city !== 'Other' && !ALL_POPULAR_CITIES.includes(city) && (
-            <option value={city}>{city}</option>
-          )}
-          {Object.entries(INDIAN_STATES_AND_CITIES).map(([state, cities]) => (
-            <optgroup key={state} label={`── ${state} ──`}>
-              {cities.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </optgroup>
-          ))}
-          <option value="Other">Other Location</option>
-        </select>
+          onChange={(c) => setCity(c)}
+          className="h-9 rounded-md"
+        />
       </div>
 
       <div className="space-y-2">

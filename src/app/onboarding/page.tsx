@@ -10,7 +10,8 @@ import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck,
 import Script from 'next/script'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { INDIAN_STATES_AND_CITIES, ALL_POPULAR_CITIES } from '@/lib/india-locations'
+import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
+import { SearchableCitySelect } from '@/components/SearchableCitySelect'
 
 const SHARED_FEATURES = [
   "List Unlimited Properties",
@@ -400,26 +401,16 @@ function OnboardingContent() {
                         <Label htmlFor="city" className="text-gray-700 font-semibold text-xs">
                           City / Destination
                         </Label>
-                        <select
+                        <SearchableCitySelect
                           id="city"
                           name="city"
                           value={selectedCity}
-                          onChange={(e) => handleCityChange(e.target.value)}
-                          className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                        >
-                          <option value="">Select City across India...</option>
-                          {selectedCity && selectedCity !== 'Other' && !ALL_POPULAR_CITIES.includes(selectedCity) && (
-                            <option value={selectedCity}>{selectedCity}</option>
-                          )}
-                          {Object.entries(INDIAN_STATES_AND_CITIES).map(([state, cities]) => (
-                            <optgroup key={state} label={`── ${state} ──`}>
-                              {cities.map((c) => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                          <option value="Other">Other / Custom City...</option>
-                        </select>
+                          onChange={(c, st) => {
+                            handleCityChange(c)
+                            if (st) setSelectedState(st)
+                          }}
+                          placeholder="Search or select city across India..."
+                        />
                       </div>
 
                       {/* Area / Sub-locality */}
