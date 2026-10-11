@@ -22,13 +22,13 @@ const PRICE_PER_ROOM_PER_MONTH = 20
 // CRYPTO & SESSION HELPERS
 // ============================================================================
 
-export async function hashPassword(password: string): Promise<string> {
+async function hashPassword(password: string): Promise<string> {
   const salt = crypto.randomBytes(16).toString('hex')
   const derived = crypto.scryptSync(password, salt, 64).toString('hex')
   return `${salt}:${derived}`
 }
 
-export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   if (!storedHash || !storedHash.includes(':')) return false
   const [salt, key] = storedHash.split(':')
   const derived = crypto.scryptSync(password, salt, 64).toString('hex')
@@ -53,11 +53,11 @@ function verifySignedPayload<T = any>(token: string | undefined): T | null {
   }
 }
 
-export function generateRandomQrToken(): string {
+function generateRandomQrToken(): string {
   return crypto.randomBytes(9).toString('hex')
 }
 
-export function generate4DigitPin(): string {
+function generate4DigitPin(): string {
   return Math.floor(1000 + Math.random() * 9000).toString()
 }
 
