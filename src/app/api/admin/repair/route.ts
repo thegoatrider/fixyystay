@@ -127,7 +127,15 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ success: true, report })
+    // 4. Auto-activate Guest Hub for Madhurleela Holiday Home
+    const { ensureMadhurleelaActivated } = await import('@/lib/guest-hub/db-adapter')
+    const madhurleelaGuestHub = await ensureMadhurleelaActivated()
+
+    return NextResponse.json({
+      success: true,
+      report,
+      madhurleela_guest_hub: madhurleelaGuestHub,
+    })
 
   } catch (err: any) {
     console.error('Repair API Error:', err)

@@ -66,8 +66,13 @@ export default function GuestHubSection({
   isSuperAdmin?: boolean
   initialPropertyId?: string
 }) {
+  const defaultProp =
+    properties.find((p: any) =>
+      `${p?.name || ''} ${p?.slug || ''}`.toLowerCase().includes('madhur')
+    ) || properties[0]
+
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(
-    initialPropertyId || properties[0]?.id || ''
+    initialPropertyId || defaultProp?.id || ''
   )
   const [bundle, setBundle] = useState<any>(null)
   const [loading, setLoading] = useState(true)
