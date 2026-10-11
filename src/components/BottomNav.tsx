@@ -25,9 +25,9 @@ export function BottomNav() {
     getRole()
   }, [])
 
-  // Don't show on login/signup pages or if we can't determine role yet (optional)
+  // Don't show on login/signup pages, Guest Hub QR portal (/g/), or Staff console (/staff)
   const hideOn = ['/login', '/signup']
-  if (hideOn.includes(pathname)) return null
+  if (hideOn.includes(pathname) || pathname.startsWith('/g/') || pathname.startsWith('/staff')) return null
 
   const dashboardPath = role ? (role === 'guest' ? '/guest' : `/dashboard/${role}`) : '/login'
 

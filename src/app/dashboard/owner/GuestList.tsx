@@ -914,10 +914,13 @@ function GuestList({
                       <Button
                         disabled={!selectedRoomNumberToAssign}
                         onClick={async () => {
-                          const res = await assignRoomToGuest(selectedGuest.id, selectedRoomNumberToAssign)
+                          const res = await assignRoomToGuest(selectedGuest.id, selectedRoomNumberToAssign) as any
                           if (res.success) {
                             setSelectedGuest({ ...selectedGuest, room_number: selectedRoomNumberToAssign })
                             setSelectedRoomNumberToAssign('')
+                            if (res.pinCode) {
+                              alert(`Room ${selectedRoomNumberToAssign} assigned! Guest Hub 4-Digit Room PIN: ${res.pinCode} (Share this PIN with the guest for their room QR).`)
+                            }
                           } else {
                             alert(res.error)
                           }

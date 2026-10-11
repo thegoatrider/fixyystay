@@ -16,7 +16,8 @@ import {
   Sparkles,
   Inbox,
   Lock,
-  ChevronRight
+  ChevronRight,
+  QrCode
 } from 'lucide-react'
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -51,6 +52,13 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
       icon: Home,
       href: '/dashboard/owner?tab=properties',
       isActive: (pathname === '/dashboard/owner' && activeTab === 'properties') || pathname.startsWith('/dashboard/owner/property')
+    },
+    {
+      id: 'guest-hub',
+      label: 'Guest Hub',
+      icon: QrCode,
+      href: '/dashboard/owner?tab=guest-hub',
+      isActive: pathname === '/dashboard/owner' && activeTab === 'guest-hub'
     },
     {
       id: 'leads',

@@ -49,12 +49,17 @@ export async function updateSession(request: NextRequest) {
     // Basic role-based routing check based on user metadata
     const role = user.user_metadata?.role
 
-    if (request.nextUrl.pathname.startsWith('/dashboard/admin') && role !== 'admin') {
+    const isSuperAdmin =
+      role === 'admin' ||
+      role === 'superadmin' ||
+      user.email?.toLowerCase() === 'superadmin@fixstay.com'
+
+    if (request.nextUrl.pathname.startsWith('/dashboard/admin') && !isSuperAdmin) {
       url.pathname = '/'
       return NextResponse.redirect(url)
     }
     
-    if (request.nextUrl.pathname.startsWith('/dashboard/owner') && role !== 'owner') {
+    if (request.nextUrl.pathname.startsWith('/dashboard/owner') && role !== 'owner' && !isSuperAdmin) {
       url.pathname = '/'
       return NextResponse.redirect(url)
     }

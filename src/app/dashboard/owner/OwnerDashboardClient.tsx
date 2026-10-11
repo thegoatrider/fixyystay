@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone } from 'lucide-react'
+import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone, QrCode } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
@@ -22,6 +22,7 @@ const GuestList = dynamic(() => import('./GuestList'), { loading: () => <Dashboa
 const InfluencerRequestsInbox = dynamic(() => import('./InfluencerRequestsInbox'), { loading: () => <DashboardSkeleton /> })
 const EmployeeSection = dynamic(() => import('./EmployeeSection'), { loading: () => <DashboardSkeleton /> })
 const MarketingSection = dynamic(() => import('./MarketingSection'), { loading: () => <DashboardSkeleton /> })
+const GuestHubSection = dynamic(() => import('./GuestHubSection'), { loading: () => <DashboardSkeleton /> })
 
 export default function OwnerDashboardClient({ 
   userId, 
@@ -119,6 +120,7 @@ export default function OwnerDashboardClient({
       {/* Tabs / Navigation (Only visible on Mobile, hidden on tablet/desktop mode) */}
       <div className="md:hidden flex flex-wrap border-b border-gray-100 w-full mb-2">
         <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<Home className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
+        <TabLink href="/dashboard/owner?tab=guest-hub" active={activeTab === 'guest-hub'} icon={<QrCode className="w-4 h-4 md:w-5 md:h-5" />} label="Guest Hub" />
         <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
         <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
         <TabLink href="/dashboard/owner?tab=employees" active={activeTab === 'employees'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Employees" />
@@ -130,6 +132,16 @@ export default function OwnerDashboardClient({
 
       {/* Dynamic Tab Content */}
       <div className="space-y-6">
+        {activeTab === 'guest-hub' && (
+          <GuestHubSection
+            ownerId={ownerId}
+            ownerEmail={email}
+            properties={properties || []}
+            isSuperAdmin={isSuperAdmin}
+            initialPropertyId={searchParams.get('propertyId') || undefined}
+          />
+        )}
+
         {activeTab === 'properties' && (
           <div className="flex flex-col gap-6 items-start w-full">
             {/* Google Drive Sync Banner */}
@@ -228,8 +240,8 @@ export default function OwnerDashboardClient({
         )}
       </div>
 
-      {/* Subscription Banner for Free Tier */}
-      {isFreeTier && (
+      {/* Subscription Banner for Free Tier (hidden when using standalone Guest Hub tab) */}
+      {isFreeTier && activeTab !== 'guest-hub' && (
         <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 md:w-96 bg-gray-900 text-white p-6 rounded-3xl shadow-2xl border border-gray-800 animate-in slide-in-from-bottom-10 z-50">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">

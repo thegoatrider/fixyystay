@@ -64,7 +64,31 @@ export default async function OwnerDashboard() {
 
       const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
       if (!isSubActive) {
-        redirect('/onboarding?step=payment&reason=unpaid')
+        // Also allow owners who purchased standalone Guest Hub (₹20/room/month)
+        const supabaseAdmin = createAdminClient()
+        const { data: ownerProps } = await supabaseAdmin
+          .from('properties')
+          .select('id')
+          .eq('owner_id', owner.id)
+
+        const propIds = (ownerProps || []).map((p: any) => p.id)
+        let hasActiveGuestHub = false
+
+        if (propIds.length > 0) {
+          const { data: activeHub } = await supabaseAdmin
+            .from('guest_hub_settings')
+            .select('id')
+            .in('property_id', propIds)
+            .eq('subscription_status', 'active')
+            .limit(1)
+            .maybeSingle()
+
+          if (activeHub) hasActiveGuestHub = true
+        }
+
+        if (!hasActiveGuestHub) {
+          redirect('/onboarding?step=payment&reason=unpaid')
+        }
       }
     }
   }

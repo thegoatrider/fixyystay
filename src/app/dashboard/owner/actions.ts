@@ -773,13 +773,13 @@ export async function assignRoomToGuest(checkinId: string, roomNumber: string | 
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).single()
     if (!owner) return { success: false, error: 'Owner profile not found' }
 
     // Fetch the checkin to ensure it belongs to this owner
     const { data: checkin } = await supabaseAdmin
       .from('guest_checkins')
-      .select('id, property_id')
+      .select('id, property_id, guest_name, guest_phone, checkout_date')
       .eq('id', checkinId)
       .eq('owner_id', owner.id)
       .single()
@@ -799,8 +799,57 @@ export async function assignRoomToGuest(checkinId: string, roomNumber: string | 
       return { success: false, error: error.message }
     }
 
+    // Also sync with Guest Hub Stays if roomNumber is assigned
+    let pinCode: string | null = null
+    try {
+      const nowIso = new Date().toISOString()
+      // End any existing stay linked to this checkin
+      await supabaseAdmin
+        .from('hub_stays')
+        .update({ ended_at: nowIso, ended_by: owner.name || 'Owner' })
+        .eq('guest_checkin_id', checkinId)
+        .is('ended_at', null)
+
+      if (roomNumber) {
+        const { data: propRoom } = await supabaseAdmin
+          .from('property_rooms')
+          .select('id')
+          .eq('property_id', checkin.property_id)
+          .eq('room_number', roomNumber)
+          .maybeSingle()
+
+        if (propRoom) {
+          // End any active stay on that room
+          await supabaseAdmin
+            .from('hub_stays')
+            .update({ ended_at: nowIso, ended_by: owner.name || 'Owner' })
+            .eq('room_id', propRoom.id)
+            .is('ended_at', null)
+
+          pinCode = Math.floor(1000 + Math.random() * 9000).toString()
+          const defaultAccessEnd = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+          await supabaseAdmin.from('hub_stays').insert({
+            property_id: checkin.property_id,
+            room_id: propRoom.id,
+            guest_checkin_id: checkin.id,
+            guest_name: checkin.guest_name || 'Guest',
+            guest_phone: checkin.guest_phone || null,
+            pin_code: pinCode,
+            checkin_at: nowIso,
+            access_ends_at: defaultAccessEnd,
+            food_ordering_allowed: true,
+            created_by: owner.name || 'Owner',
+          })
+        }
+      }
+    } catch (hubErr) {
+      console.warn('[GuestHub] Optional stay sync skipped:', hubErr)
+    }
+
     revalidatePath('/dashboard/owner')
-    return { success: true }
+    revalidatePath('/staff')
+    return { success: true, pinCode }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
@@ -813,7 +862,7 @@ export async function checkoutGuest(checkinId: string) {
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).single()
+    const { data: owner } = await supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).single()
     if (!owner) return { success: false, error: 'Owner profile not found' }
 
     // Fetch the checkin to ensure it belongs to this owner
@@ -843,7 +892,19 @@ export async function checkoutGuest(checkinId: string) {
       return { success: false, error: error.message }
     }
 
+    // End any active Guest Hub stay tied to this checkin
+    try {
+      await supabaseAdmin
+        .from('hub_stays')
+        .update({ ended_at: new Date().toISOString(), ended_by: owner.name || 'Owner' })
+        .eq('guest_checkin_id', checkinId)
+        .is('ended_at', null)
+    } catch (hubErr) {
+      console.warn('[GuestHub] Optional stay checkout sync skipped:', hubErr)
+    }
+
     revalidatePath('/dashboard/owner')
+    revalidatePath('/staff')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

@@ -17,6 +17,7 @@ import FreeTierToggle from './FreeTierToggle'
 import OrganizationsManagement from './OrganizationsManagement'
 import SubscriptionCheckButton from './SubscriptionCheckButton'
 import PushBroadcastModal from './PushBroadcastModal'
+import PlatformGuestHubManager from './PlatformGuestHubManager'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -206,6 +207,11 @@ export default async function AdminDashboard() {
             <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
           </div>
         </div>
+      </section>
+
+      {/* SECTION: GUEST HUB PLATFORM BACK END */}
+      <section>
+        <PlatformGuestHubManager />
       </section>
 
       {/* HORIZONTAL GRID: Growth & Communications */}
