@@ -22,6 +22,8 @@ import {
   Eye,
   AlertTriangle,
   Sparkles,
+  CalendarDays,
+  User,
 } from 'lucide-react'
 import {
   loginHubStaffAction,
@@ -32,6 +34,9 @@ import {
   endStayAction,
   updateHubRequestStatusAction,
 } from '@/app/actions/guest-hub'
+import GuestHubHistoryExplorer, {
+  getCustomerKey,
+} from '@/components/guest-hub/GuestHubHistoryExplorer'
 
 // Web Audio synthesizer for reliable desk-phone chime (zero external MP3 asset failure)
 function playDeskAlertChime() {
@@ -85,9 +90,10 @@ export default function StaffPortalClient({
   const [loggingIn, setLoggingIn] = useState(false)
 
   // Staff navigation state
-  const [activeTab, setActiveTab] = useState<'inbox' | 'rooms'>('inbox')
+  const [activeTab, setActiveTab] = useState<'inbox' | 'rooms' | 'history'>('inbox')
   const [deptFilter, setDeptFilter] = useState<string>('all')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [focusCustomerQuery, setFocusCustomerQuery] = useState<string | null>(null)
 
   // Check-in Modal state
   const [checkinRoom, setCheckinRoom] = useState<any | null>(null)
@@ -660,6 +666,21 @@ export default function StaffPortalClient({
               Rooms &amp; Check-in ({Object.keys(activeStayByRoomId).length}/{rooms.length} Occupied)
             </button>
           )}
+
+          <button
+            onClick={() => {
+              setFocusCustomerQuery(null)
+              setActiveTab('history')
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition ${
+              activeTab === 'history'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:bg-slate-800'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            History &amp; Customer Summary ({stays.length} Stays)
+          </button>
         </div>
 
         {activeTab === 'inbox' && (
@@ -786,7 +807,7 @@ export default function StaffPortalClient({
                 </div>
               ) : (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 gap-3 flex-wrap">
                     <div>
                       <h3 className="text-lg font-black">
                         Room {selectedRoomThread.roomNumber} ·{' '}
@@ -796,6 +817,20 @@ export default function StaffPortalClient({
                         {selectedRoomThread.allRequests.length} request(s) in thread
                       </p>
                     </div>
+                    <button
+                      onClick={() => {
+                        const stayObj =
+                          activeStayByRoomId[selectedRoomThread.roomId] ||
+                          stays.find((s: any) => s.room_id === selectedRoomThread.roomId) || {
+                            guest_name: selectedRoomThread.guestName,
+                          }
+                        setFocusCustomerQuery(getCustomerKey(stayObj))
+                        setActiveTab('history')
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-black flex items-center gap-1.5 transition"
+                    >
+                      <User className="w-3.5 h-3.5" /> Customer Full Summary
+                    </button>
                   </div>
 
                   <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
@@ -1036,41 +1071,52 @@ export default function StaffPortalClient({
                           </button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="space-y-1.5">
                           <button
-                            onClick={async () => {
-                              await extendStayAction({
-                                propertyId: selectedPropertyId,
-                                stayId: activeStay.id,
-                                additionalHours: 24,
-                              })
-                              refreshBundle(selectedPropertyId)
+                            onClick={() => {
+                              setFocusCustomerQuery(getCustomerKey(activeStay))
+                              setActiveTab('history')
                             }}
-                            className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px]"
+                            className="w-full py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-black text-[11px] flex items-center justify-center gap-1.5"
                           >
-                            +24h Extend
+                            <User className="w-3.5 h-3.5" /> Customer Summary &amp; Stay Orders
                           </button>
-                          <button
-                            onClick={() => setQrModalRoom(room)}
-                            className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1"
-                          >
-                            <QrCode className="w-3 h-3" /> QR
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (
-                                confirm(
-                                  `End stay for ${activeStay.guest_name} in Room ${room.room_number}?`
-                                )
-                              ) {
-                                await endStayAction(selectedPropertyId, activeStay.id)
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              onClick={async () => {
+                                await extendStayAction({
+                                  propertyId: selectedPropertyId,
+                                  stayId: activeStay.id,
+                                  additionalHours: 24,
+                                })
                                 refreshBundle(selectedPropertyId)
-                              }
-                            }}
-                            className="py-2 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 font-bold text-[11px]"
-                          >
-                            End Stay
-                          </button>
+                              }}
+                              className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px]"
+                            >
+                              +24h Extend
+                            </button>
+                            <button
+                              onClick={() => setQrModalRoom(room)}
+                              className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1"
+                            >
+                              <QrCode className="w-3 h-3" /> QR
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (
+                                  confirm(
+                                    `End stay for ${activeStay.guest_name} in Room ${room.room_number}?`
+                                  )
+                                ) {
+                                  await endStayAction(selectedPropertyId, activeStay.id)
+                                  refreshBundle(selectedPropertyId)
+                                }
+                              }}
+                              className="py-2 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 font-bold text-[11px]"
+                            >
+                              End Stay
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1079,6 +1125,19 @@ export default function StaffPortalClient({
               })}
             </div>
           </div>
+        )}
+
+        {/* TAB 3: HISTORY & CUSTOMER SUMMARY */}
+        {activeTab === 'history' && (
+          <GuestHubHistoryExplorer
+            rooms={rooms}
+            stays={stays}
+            requests={requests}
+            hotelName={hotelName}
+            primaryColor={primaryColor}
+            theme="dark"
+            initialCustomerKey={focusCustomerQuery}
+          />
         )}
       </div>
 

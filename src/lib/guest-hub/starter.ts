@@ -41,6 +41,7 @@ export interface HouseInfoConfig {
   breakfastEnd: string
   restaurantOpen: string
   restaurantClose: string
+  restaurantAlwaysOpen?: boolean
   extraTimings: ExtraTiming[]
 }
 
@@ -242,6 +243,7 @@ export function starter(opts: {
       breakfastEnd: '10:30 AM',
       restaurantOpen: '07:30',
       restaurantClose: '22:30',
+      restaurantAlwaysOpen: true,
       extraTimings: [
         { id: 'et1', label: 'Swimming Pool', value: '07:00 AM – 07:00 PM' },
         { id: 'et2', label: 'Quiet Hours', value: '10:30 PM – 07:00 AM' },
@@ -548,9 +550,13 @@ export function isRestaurantOpen(
   openStr?: string,
   closeStr?: string,
   timezone: string = 'Asia/Kolkata',
-  now: Date = new Date()
+  now: Date = new Date(),
+  alwaysOpen?: boolean
 ): boolean {
+  if (alwaysOpen !== false) return true
   if (!openStr || !closeStr) return true
+  if (openStr === '00:00' && (closeStr === '23:59' || closeStr === '24:00')) return true
+
   const openMins = parseTimeStrToMinutes(openStr)
   const closeMins = parseTimeStrToMinutes(closeStr)
   if (openMins === null || closeMins === null) return true

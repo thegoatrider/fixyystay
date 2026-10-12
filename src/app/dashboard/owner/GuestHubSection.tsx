@@ -28,6 +28,8 @@ import {
   Save,
   ShieldCheck,
   Building2,
+  CalendarDays,
+  Clock,
 } from 'lucide-react'
 import {
   getPropertyGuestHubBundle,
@@ -41,9 +43,11 @@ import {
   deleteHubStaffUserAction,
 } from '@/app/actions/guest-hub'
 import type { ServiceId } from '@/lib/guest-hub/starter'
+import GuestHubHistoryExplorer from '@/components/guest-hub/GuestHubHistoryExplorer'
 
 type ConfigTab =
   | 'rooms_qr'
+  | 'history'
   | 'branding'
   | 'departments'
   | 'house_info'
@@ -617,15 +621,16 @@ export default function GuestHubSection({
             )}
           </div>
 
-          {/* 9 Sub-navigation Pills */}
+          {/* 10 Sub-navigation Pills */}
           <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border shadow-sm">
             {[
               { id: 'rooms_qr', label: 'Rooms & QR Cards', icon: QrCode },
+              { id: 'history', label: 'History & Calendar', icon: CalendarDays },
               { id: 'branding', label: 'Branding', icon: Palette },
               { id: 'departments', label: 'Departments & Shifts', icon: PhoneCall },
               { id: 'house_info', label: 'House & Wi-Fi', icon: Wifi },
               { id: 'services', label: 'Services & Routing', icon: ToggleLeft },
-              { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
+              { id: 'menu', label: 'Menu & Timings', icon: UtensilsCrossed },
               { id: 'request_items', label: 'Request Items', icon: ClipboardList },
               { id: 'local_guide', label: 'Local Guide', icon: MapPin },
               { id: 'staff', label: 'Staff Logins', icon: Users },
@@ -648,6 +653,18 @@ export default function GuestHubSection({
               )
             })}
           </div>
+
+          {/* TAB: HISTORY & CALENDAR + CUSTOMER SUMMARY */}
+          {activeSubTab === 'history' && (
+            <GuestHubHistoryExplorer
+              rooms={bundle?.rooms || []}
+              stays={bundle?.stays || []}
+              requests={bundle?.requests || []}
+              hotelName={branding?.hotelName || bundle?.property?.name || 'Hotel'}
+              primaryColor={branding?.primaryColor || '#2563eb'}
+              theme="light"
+            />
+          )}
 
           {/* TAB: ROOMS & QR CARDS */}
           {activeSubTab === 'rooms_qr' && (
@@ -1146,27 +1163,73 @@ export default function GuestHubSection({
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label>Restaurant Opening Time (24h HH:mm)</Label>
-                  <Input
-                    type="time"
-                    value={houseInfo.restaurantOpen || '07:30'}
-                    onChange={(e) =>
-                      setHouseInfo({ ...houseInfo, restaurantOpen: e.target.value })
-                    }
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Restaurant Closing Time (24h HH:mm)</Label>
-                  <Input
-                    type="time"
-                    value={houseInfo.restaurantClose || '22:30'}
-                    onChange={(e) =>
-                      setHouseInfo({ ...houseInfo, restaurantClose: e.target.value })
-                    }
-                    className="mt-1"
-                  />
+                <div className="sm:col-span-2 p-4 rounded-2xl border border-blue-100 bg-blue-50/50 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-black text-gray-900 flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        Restaurant Ordering Availability
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Choose whether guests can order food 24×7 or only between specific opening &amp; closing hours.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHouseInfo({ ...houseInfo, restaurantAlwaysOpen: true })
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                          houseInfo.restaurantAlwaysOpen !== false
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        Open 24×7 (Always Open)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHouseInfo({ ...houseInfo, restaurantAlwaysOpen: false })
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                          houseInfo.restaurantAlwaysOpen === false
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        Scheduled Hours
+                      </button>
+                    </div>
+                  </div>
+
+                  {houseInfo.restaurantAlwaysOpen === false && (
+                    <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-blue-100">
+                      <div>
+                        <Label>Restaurant Opening Time (24h HH:mm)</Label>
+                        <Input
+                          type="time"
+                          value={houseInfo.restaurantOpen || '07:30'}
+                          onChange={(e) =>
+                            setHouseInfo({ ...houseInfo, restaurantOpen: e.target.value })
+                          }
+                          className="mt-1 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <Label>Restaurant Closing Time (24h HH:mm)</Label>
+                        <Input
+                          type="time"
+                          value={houseInfo.restaurantClose || '22:30'}
+                          onChange={(e) =>
+                            setHouseInfo({ ...houseInfo, restaurantClose: e.target.value })
+                          }
+                          className="mt-1 bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1294,6 +1357,104 @@ export default function GuestHubSection({
           {/* TAB: MENU */}
           {activeSubTab === 'menu' && (
             <div className="bg-white rounded-3xl border p-6 shadow-sm space-y-6">
+              {/* Restaurant Operating Hours & 24x7 Setting Box */}
+              <div className="p-5 rounded-2xl border border-blue-200 bg-blue-50/60 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <h4 className="font-black text-sm text-gray-900">
+                        Restaurant Timings &amp; Order Availability
+                      </h4>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          houseInfo.restaurantAlwaysOpen !== false
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {houseInfo.restaurantAlwaysOpen !== false
+                          ? 'Open 24×7 (Never Closes)'
+                          : `Scheduled (${houseInfo.restaurantOpen || '07:30'} – ${houseInfo.restaurantClose || '22:30'})`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      Control when guests can place food orders from their room QR so the restaurant never unexpectedly shows closed.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHouseInfo({ ...houseInfo, restaurantAlwaysOpen: true })
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                          houseInfo.restaurantAlwaysOpen !== false
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        Open 24×7 (Always Open)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHouseInfo({ ...houseInfo, restaurantAlwaysOpen: false })
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                          houseInfo.restaurantAlwaysOpen === false
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        Set Opening &amp; Closing Hours
+                      </button>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => handleSaveSection('house_info', houseInfo)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl gap-1.5 h-9"
+                    >
+                      <Save className="w-3.5 h-3.5" /> Save Timings
+                    </Button>
+                  </div>
+                </div>
+
+                {houseInfo.restaurantAlwaysOpen === false && (
+                  <div className="grid sm:grid-cols-2 gap-4 pt-3 border-t border-blue-200/70">
+                    <div>
+                      <Label className="text-xs font-bold text-gray-700">
+                        Opening Time (24-Hour Format, e.g. 07:30)
+                      </Label>
+                      <Input
+                        type="time"
+                        value={houseInfo.restaurantOpen || '07:30'}
+                        onChange={(e) =>
+                          setHouseInfo({ ...houseInfo, restaurantOpen: e.target.value })
+                        }
+                        className="mt-1 bg-white font-bold text-xs h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-gray-700">
+                        Closing Time (24-Hour Format — supports past midnight, e.g. 23:30 or 02:00)
+                      </Label>
+                      <Input
+                        type="time"
+                        value={houseInfo.restaurantClose || '22:30'}
+                        onChange={(e) =>
+                          setHouseInfo({ ...houseInfo, restaurantClose: e.target.value })
+                        }
+                        className="mt-1 bg-white font-bold text-xs h-9"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-gray-900">Restaurant Menu</h3>

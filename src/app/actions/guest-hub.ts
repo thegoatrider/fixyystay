@@ -988,19 +988,19 @@ export async function getPropertyGuestHubBundle(propertyId: string) {
       .select('*')
       .eq('property_id', propertyId)
       .order('checkin_at', { ascending: false })
-      .limit(200),
+      .limit(1000),
     supabaseAdmin
       .from('hub_requests')
       .select('*')
       .eq('property_id', propertyId)
       .order('created_at', { ascending: false })
-      .limit(300),
+      .limit(2000),
     supabaseAdmin
       .from('hub_event_logs')
       .select('*')
       .eq('property_id', propertyId)
       .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(250),
     supabaseAdmin
       .from('guest_hub_platform_settings')
       .select('*')
@@ -2179,7 +2179,8 @@ export async function submitGuestHubRequestAction(params: {
       hubSettings.house_info?.restaurantOpen,
       hubSettings.house_info?.restaurantClose,
       hubSettings.timezone || 'Asia/Kolkata',
-      now
+      now,
+      hubSettings.house_info?.restaurantAlwaysOpen
     )
     if (!open) {
       return {

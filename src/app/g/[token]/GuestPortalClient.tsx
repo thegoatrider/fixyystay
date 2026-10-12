@@ -153,6 +153,7 @@ export default function GuestPortalClient({
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'food' | 'services'>('all')
 
   // Sync theme preference
   useEffect(() => {
@@ -304,7 +305,8 @@ export default function GuestPortalClient({
       const open = isRestaurantOpen(
         hotel.houseInfo?.restaurantOpen,
         hotel.houseInfo?.restaurantClose,
-        hotel.timezone
+        hotel.timezone,
+        hotel.houseInfo?.restaurantAlwaysOpen
       )
       if (!open) {
         return {
@@ -706,8 +708,13 @@ export default function GuestPortalClient({
   const restaurantOpen = isRestaurantOpen(
     hotel.houseInfo?.restaurantOpen,
     hotel.houseInfo?.restaurantClose,
-    hotel.timezone
+    hotel.timezone,
+    hotel.houseInfo?.restaurantAlwaysOpen
   )
+
+  const staySpendTotal = requests
+    .filter((r: any) => r.status !== 'declined')
+    .reduce((sum: number, r: any) => sum + Number(r.total || 0), 0)
 
   const activeRequestsCount = requests.filter(
     (r: any) => r.status !== 'completed' && r.status !== 'declined'
@@ -767,15 +774,25 @@ export default function GuestPortalClient({
             <button
               onClick={() => setScreen('requests')}
               className={`relative px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 border ${
-                darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'
+                screen === 'requests'
+                  ? 'text-white border-transparent'
+                  : darkMode
+                  ? 'border-slate-700 bg-slate-800'
+                  : 'border-slate-200 bg-slate-50'
               }`}
+              style={screen === 'requests' ? { backgroundColor: primaryColor } : {}}
             >
-              <Bell className="w-3.5 h-3.5" style={{ color: primaryColor }} />
-              <span>Requests</span>
+              <Bell
+                className="w-3.5 h-3.5"
+                style={{ color: screen === 'requests' ? '#ffffff' : primaryColor }}
+              />
+              <span>My History</span>
               {requests.length > 0 && (
                 <span
                   className="px-1.5 py-0.2 rounded-full text-[10px] font-black text-white"
-                  style={{ backgroundColor: primaryColor }}
+                  style={{
+                    backgroundColor: screen === 'requests' ? 'rgba(0,0,0,0.25)' : primaryColor,
+                  }}
                 >
                   {requests.length}
                 </span>
@@ -825,36 +842,47 @@ export default function GuestPortalClient({
                 </div>
               </div>
 
-              {/* Active Requests Status Bar */}
-              {requests.length > 0 && (
-                <button
-                  onClick={() => setScreen('requests')}
-                  className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition ${bgCard}`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0"
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      <Clock className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
+              {/* Stay Orders & Request History Banner (Always visible so guest can view history anytime) */}
+              <button
+                onClick={() => setScreen('requests')}
+                className={`w-full p-4 rounded-2xl border flex items-center justify-between text-left transition active:scale-[0.99] shadow-sm ${bgCard}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-sm"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
                       <p className="text-xs font-black">
-                        My Requests ({requests.length})
+                        My Orders &amp; Request History ({requests.length})
                       </p>
-                      <p className={`text-[11px] truncate ${textSub}`}>
+                      {staySpendTotal > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                          ₹{staySpendTotal}
+                        </span>
+                      )}
+                    </div>
+                    {requests.length > 0 ? (
+                      <p className={`text-[11px] truncate mt-0.5 ${textSub}`}>
                         Latest: {requests[0].service.replace('_', ' ')} —{' '}
                         <span className="font-bold uppercase">
                           {requests[0].status === 'received' ? 'Sent' : requests[0].status}
                         </span>
                       </p>
-                    </div>
+                    ) : (
+                      <p className={`text-[11px] truncate mt-0.5 ${textSub}`}>
+                        View everything you order or request during your stay
+                      </p>
+                    )}
                   </div>
-                  <span className="text-xs font-bold" style={{ color: primaryColor }}>
-                    View &rarr;
-                  </span>
-                </button>
-              )}
+                </div>
+                <span className="text-xs font-black flex-shrink-0" style={{ color: primaryColor }}>
+                  History &rarr;
+                </span>
+              </button>
 
               {/* Six Main Navigation Buttons */}
               <div className="grid grid-cols-2 gap-3">
@@ -1045,7 +1073,9 @@ export default function GuestPortalClient({
                   <div className={`p-3 rounded-2xl ${bgMuted}`}>
                     <p className={textSub}>Restaurant</p>
                     <p className="font-black text-sm mt-0.5">
-                      {hotel.houseInfo?.restaurantOpen} – {hotel.houseInfo?.restaurantClose}
+                      {hotel.houseInfo?.restaurantAlwaysOpen !== false
+                        ? 'Open 24×7'
+                        : `${hotel.houseInfo?.restaurantOpen} – ${hotel.houseInfo?.restaurantClose}`}
                     </p>
                   </div>
                 </div>
@@ -1068,10 +1098,21 @@ export default function GuestPortalClient({
           {/* SCREEN: GUEST SERVICES LIST */}
           {screen === 'services' && (
             <div className="space-y-3">
-              <h2 className="text-lg font-black">Guest Services</h2>
-              <p className={`text-xs ${textSub}`}>
-                Select a service below. Your request goes straight to our team.
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-black">Guest Services</h2>
+                  <p className={`text-xs ${textSub}`}>
+                    Select a service below. Your request goes straight to our team.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setScreen('requests')}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black border"
+                  style={{ borderColor: `${primaryColor}40`, color: primaryColor }}
+                >
+                  My History ({requests.length})
+                </button>
+              </div>
 
               <div className="space-y-2.5">
                 {enabledServices.map((srvId) => {
@@ -1128,7 +1169,9 @@ export default function GuestPortalClient({
                 <div>
                   <h2 className="text-lg font-black">Menu &amp; In-Room Dining</h2>
                   <p className={`text-xs ${textSub}`}>
-                    Hours: {hotel.houseInfo?.restaurantOpen} – {hotel.houseInfo?.restaurantClose}
+                    {hotel.houseInfo?.restaurantAlwaysOpen !== false
+                      ? 'Open 24×7 for In-Room Dining'
+                      : `Hours: ${hotel.houseInfo?.restaurantOpen} – ${hotel.houseInfo?.restaurantClose}`}
                   </p>
                 </div>
                 <span
@@ -1633,27 +1676,116 @@ export default function GuestPortalClient({
             </div>
           )}
 
-          {/* SCREEN: MY REQUESTS (LIVE STATUS) */}
+          {/* SCREEN: MY REQUESTS & STAY ORDER HISTORY (LIVE STATUS) */}
           {screen === 'requests' && (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black">My Requests</h2>
+                <div>
+                  <h2 className="text-lg font-black">My Stay Orders &amp; History</h2>
+                  <p className={`text-xs ${textSub}`}>
+                    Room {roomNumber} · {stay.guestName}
+                  </p>
+                </div>
                 <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-500">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                   Live Updates
                 </span>
               </div>
 
-              {requests.length === 0 ? (
-                <div className={`p-8 rounded-3xl border text-center ${bgCard}`}>
-                  <Clock className={`w-8 h-8 mx-auto mb-2 ${textSub}`} />
-                  <p className="font-bold text-sm">No requests sent yet</p>
-                  <p className={`text-xs mt-1 ${textSub}`}>
-                    Any service request or food order you send during your stay will appear here live.
-                  </p>
+              {/* Stay Summary Card */}
+              <div className={`p-4 rounded-3xl border space-y-3 ${bgCard}`}>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className={`p-2.5 rounded-2xl ${bgMuted}`}>
+                    <p className={`text-[10px] font-bold uppercase ${textSub}`}>Total Sent</p>
+                    <p className="text-lg font-black mt-0.5">{requests.length}</p>
+                  </div>
+                  <div className={`p-2.5 rounded-2xl ${bgMuted}`}>
+                    <p className={`text-[10px] font-bold uppercase ${textSub}`}>In Progress</p>
+                    <p className="text-lg font-black mt-0.5 text-amber-500">
+                      {activeRequestsCount}
+                    </p>
+                  </div>
+                  <div className={`p-2.5 rounded-2xl ${bgMuted}`}>
+                    <p className={`text-[10px] font-bold uppercase ${textSub}`}>Stay Bill</p>
+                    <p className="text-lg font-black mt-0.5 text-emerald-500">
+                      ₹{staySpendTotal}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                requests.map((req: any) => {
+
+                {/* Filter Pills */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  {[
+                    { id: 'all', label: `All (${requests.length})` },
+                    {
+                      id: 'food',
+                      label: `Food (${
+                        requests.filter(
+                          (r: any) =>
+                            r.service === 'restaurant' || r.service === 'minibar'
+                        ).length
+                      })`,
+                    },
+                    {
+                      id: 'services',
+                      label: `Services (${
+                        requests.filter(
+                          (r: any) =>
+                            r.service !== 'restaurant' && r.service !== 'minibar'
+                        ).length
+                      })`,
+                    },
+                  ].map((tab) => {
+                    const active = historyFilter === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setHistoryFilter(tab.id as any)}
+                        style={active ? { backgroundColor: primaryColor } : {}}
+                        className={`py-2 rounded-xl text-xs font-black transition ${
+                          active ? 'text-white shadow-sm' : bgMuted
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {(() => {
+                const filteredReqs = requests.filter((r: any) => {
+                  if (historyFilter === 'food') {
+                    return r.service === 'restaurant' || r.service === 'minibar'
+                  }
+                  if (historyFilter === 'services') {
+                    return r.service !== 'restaurant' && r.service !== 'minibar'
+                  }
+                  return true
+                })
+
+                if (filteredReqs.length === 0) {
+                  return (
+                    <div className={`p-8 rounded-3xl border text-center space-y-3 ${bgCard}`}>
+                      <Clock className={`w-8 h-8 mx-auto ${textSub}`} />
+                      <div>
+                        <p className="font-bold text-sm">No orders or requests yet</p>
+                        <p className={`text-xs mt-1 ${textSub}`}>
+                          Everything you order from the restaurant or request from housekeeping during your stay will be saved here.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setScreen('services')}
+                        style={{ backgroundColor: primaryColor }}
+                        className="px-4 py-2.5 rounded-xl text-white text-xs font-black inline-flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Browse Services &amp; Menu
+                      </button>
+                    </div>
+                  )
+                }
+
+                return filteredReqs.map((req: any) => {
                   const statusMap: Record<
                     string,
                     { label: string; color: string; step: number }
@@ -1712,7 +1844,9 @@ export default function GuestPortalClient({
                             {req.service.replace('_', ' ')}
                           </span>
                           <p className={`text-[11px] ${textSub}`}>
-                            {new Date(req.created_at).toLocaleTimeString([], {
+                            {new Date(req.created_at).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
@@ -1777,6 +1911,29 @@ export default function GuestPortalClient({
                         <p className={`text-xs italic ${textSub}`}>Note: “{req.note}”</p>
                       )}
 
+                      {(req.accepted_at || req.completed_at) && (
+                        <div className={`flex flex-wrap gap-3 text-[10px] pt-1 ${textSub}`}>
+                          {req.accepted_at && (
+                            <span>
+                              Accepted at{' '}
+                              {new Date(req.accepted_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          )}
+                          {req.completed_at && (
+                            <span className="text-emerald-500 font-bold">
+                              Completed at{' '}
+                              {new Date(req.completed_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {req.status === 'declined' && req.decline_reason && (
                         <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
                           Reason: {req.decline_reason}
@@ -1785,7 +1942,7 @@ export default function GuestPortalClient({
                     </div>
                   )
                 })
-              )}
+              })()}
             </div>
           )}
 
