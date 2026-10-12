@@ -75,16 +75,13 @@ async function ensureStorageBucket(supabaseAdmin: ReturnType<typeof createAdminC
 }
 
 export async function readHubStore(): Promise<HubFallbackStore> {
-  if (memoryStoreCache && Date.now() - memoryStoreCache.ts < 1500) {
-    return memoryStoreCache.data
-  }
   const supabaseAdmin = createAdminClient()
   await ensureStorageBucket(supabaseAdmin)
 
   try {
     const { data, error } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
-      .download(`${STORE_FILE}?t=${Date.now()}`)
+      .download(STORE_FILE)
 
     if (!error && data) {
       const text = await data.text()
@@ -104,7 +101,11 @@ export async function readHubStore(): Promise<HubFallbackStore> {
       return merged
     }
   } catch {
-    // Fallback to default store if file doesn't exist yet
+    // Fallback to memory cache or default store if download fails
+  }
+
+  if (memoryStoreCache) {
+    return memoryStoreCache.data
   }
 
   const fresh = structuredClone(DEFAULT_STORE)

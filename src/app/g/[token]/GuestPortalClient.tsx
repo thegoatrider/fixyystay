@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -153,7 +153,168 @@ export default function GuestPortalClient({
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [guestStatusAlert, setGuestStatusAlert] = useState<{
+    tone: 'accepted' | 'declined' | 'completed'
+    title: string
+    subtitle: string
+  } | null>(null)
   const [historyFilter, setHistoryFilter] = useState<'all' | 'food' | 'services'>('all')
+  const guestAudioCtxRef = useRef<AudioContext | null>(null)
+  const prevRequestStatusRef = useRef<Map<string, string>>(new Map())
+  const initializedStatusesRef = useRef(false)
+
+  // Soft, quiet 2-note chime for guest phone when order gets accepted
+  const playQuietGuestAcceptChime = () => {
+    try {
+      const AudioCtx =
+        typeof window !== 'undefined'
+          ? window.AudioContext || (window as any).webkitAudioContext
+          : null
+      if (!AudioCtx) return
+      if (!guestAudioCtxRef.current) {
+        guestAudioCtxRef.current = new AudioCtx()
+      }
+      const ctx = guestAudioCtxRef.current
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+
+      const playSoftNote = (freq: number, delaySec: number, durationSec: number) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + delaySec)
+
+        // Quiet, gentle volume (0.08 peak) with soft attack and smooth decay
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + delaySec)
+        gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + delaySec + 0.03)
+        gain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          ctx.currentTime + delaySec + durationSec
+        )
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(ctx.currentTime + delaySec)
+        osc.stop(ctx.currentTime + delaySec + durationSec + 0.02)
+      }
+
+      // Warm, calm two-note chime: C5 (523.25 Hz) -> E5 (659.25 Hz)
+      playSoftNote(523.25, 0, 0.28)
+      playSoftNote(659.25, 0.16, 0.42)
+    } catch {
+      // Ignore if browser blocks audio before interaction
+    }
+  }
+
+  // Unlock guest audio context quietly on first tap
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const unlock = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        if (!AudioCtx) return
+        if (!guestAudioCtxRef.current) {
+          guestAudioCtxRef.current = new AudioCtx()
+        }
+        if (guestAudioCtxRef.current.state === 'suspended') {
+          guestAudioCtxRef.current.resume()
+        }
+      } catch {
+        // Ignore
+      }
+    }
+    window.addEventListener('pointerdown', unlock, { passive: true })
+    window.addEventListener('keydown', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  // Detect live order/request status transitions (Accepted / Declined / Completed)
+  useEffect(() => {
+    const list: any[] = portalData?.requests || []
+    if (!initializedStatusesRef.current) {
+      const seed = new Map<string, string>()
+      for (const r of list) {
+        if (r?.id) seed.set(r.id, r.status)
+      }
+      prevRequestStatusRef.current = seed
+      initializedStatusesRef.current = true
+      return
+    }
+
+    for (const req of list) {
+      if (!req?.id) continue
+      const prevStatus = prevRequestStatusRef.current.get(req.id)
+      const nextStatus = req.status
+      prevRequestStatusRef.current.set(req.id, nextStatus)
+
+      if (!prevStatus || prevStatus === nextStatus) continue
+
+      const svcMeta = SERVICE_META[req.service as ServiceId]
+      const svcLabel =
+        portalData?.hotel?.services?.[req.service]?.label ||
+        svcMeta?.defaultLabel ||
+        'Order'
+
+      if (
+        nextStatus === 'accepted' &&
+        (prevStatus === 'received' || prevStatus === 'seen')
+      ) {
+        // Play quiet gentle chime and show calm notification
+        playQuietGuestAcceptChime()
+        const summaryText =
+          req.items && req.items.length > 0
+            ? req.items.map((i: any) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ')
+            : svcLabel
+
+        setGuestStatusAlert({
+          tone: 'accepted',
+          title: `Your ${svcLabel} order is accepted!`,
+          subtitle: `${summaryText}${req.acceptedBy ? ` · Accepted by ${req.acceptedBy}` : ''}`,
+        })
+
+        if (
+          typeof window !== 'undefined' &&
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
+          try {
+            new Notification(`Order Accepted · Room ${portalData?.roomNumber || ''}`, {
+              body: `Your ${svcLabel} request has been accepted by hotel staff.`,
+              silent: true,
+            })
+          } catch {
+            // Ignore notification errors on mobile
+          }
+        }
+      } else if (nextStatus === 'declined' && prevStatus !== 'declined') {
+        setGuestStatusAlert({
+          tone: 'declined',
+          title: `${svcLabel} request could not be fulfilled`,
+          subtitle: req.declinedReason
+            ? `Reason: "${req.declinedReason}"`
+            : 'Please contact reception if you need assistance.',
+        })
+      } else if (nextStatus === 'completed' && prevStatus !== 'completed') {
+        playQuietGuestAcceptChime()
+        setGuestStatusAlert({
+          tone: 'completed',
+          title: `${svcLabel} marked as Completed`,
+          subtitle: 'Completed by hotel staff. Let us know if you need anything else!',
+        })
+      }
+    }
+  }, [portalData?.requests, portalData?.hotel, portalData?.roomNumber])
+
+  // Auto-dismiss guest status alert banner after 8 seconds
+  useEffect(() => {
+    if (!guestStatusAlert) return
+    const timer = setTimeout(() => setGuestStatusAlert(null), 8000)
+    return () => clearTimeout(timer)
+  }, [guestStatusAlert])
 
   // Sync theme preference
   useEffect(() => {
@@ -211,8 +372,8 @@ export default function GuestPortalClient({
       )
       .subscribe()
 
-    // Lightweight 8s fallback poll to guarantee mobile reliability even on flaky carrier WebSockets
-    const interval = setInterval(refreshPortal, 8000)
+    // Lightweight 4s fallback poll to guarantee mobile reliability even on flaky carrier WebSockets
+    const interval = setInterval(refreshPortal, 4000)
 
     return () => {
       clearInterval(interval)
@@ -816,6 +977,47 @@ export default function GuestPortalClient({
           <div className="mx-4 mt-3 p-3 rounded-2xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-2 shadow-lg">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             <span>{toastMsg}</span>
+          </div>
+        )}
+
+        {/* Live Order Acceptance / Status Notification Banner */}
+        {guestStatusAlert && (
+          <div
+            onClick={() => {
+              setScreen('requests')
+              setGuestStatusAlert(null)
+            }}
+            className={`mx-4 mt-3 p-3.5 rounded-2xl border shadow-lg cursor-pointer transition flex items-start justify-between gap-3 ${
+              guestStatusAlert.tone === 'accepted'
+                ? 'bg-emerald-600 text-white border-emerald-500'
+                : guestStatusAlert.tone === 'declined'
+                ? 'bg-red-600 text-white border-red-500'
+                : 'bg-blue-600 text-white border-blue-500'
+            }`}
+          >
+            <div className="flex items-start gap-2.5 min-w-0">
+              {guestStatusAlert.tone === 'declined' ? (
+                <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-black leading-snug">{guestStatusAlert.title}</p>
+                <p className="text-[11px] font-medium text-white/90 mt-0.5 line-clamp-2">
+                  {guestStatusAlert.subtitle}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setGuestStatusAlert(null)
+              }}
+              className="px-2 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-[10px] font-black uppercase tracking-wider flex-shrink-0"
+            >
+              OK
+            </button>
           </div>
         )}
 

@@ -1041,7 +1041,7 @@ export async function getPropertyGuestHubBundle(propertyId: string) {
       : (store.staffUsers[propertyId] || []).map(({ password_hash: _, ...rest }: any) => rest)
 
   const stays = pgStays && pgStays.length > 0 ? pgStays : store.stays[propertyId] || []
-  const requests = pgRequests && pgRequests.length > 0 ? pgRequests : store.requests[propertyId] || []
+  const requests = mergeHubRequests(pgRequests, store.requests[propertyId])
   const eventLogs = pgEventLogs && pgEventLogs.length > 0 ? pgEventLogs : store.eventLogs[propertyId] || []
 
   return {
@@ -1710,6 +1710,51 @@ export async function endStayAction(propertyId: string, stayId: string) {
 // STAFF REQUEST STATUS ACTIONS
 // ============================================================================
 
+const STATUS_RANK: Record<string, number> = {
+  received: 1,
+  seen: 2,
+  accepted: 3,
+  preparing: 4,
+  on_the_way: 5,
+  delivered: 6,
+  completed: 7,
+  declined: 8,
+  cancelled: 8,
+}
+
+function mergeHubRequests(
+  pgList: any[] | null | undefined,
+  storeList: any[] | null | undefined
+): any[] {
+  const byId = new Map<string, any>()
+  for (const r of storeList || []) {
+    if (r?.id) byId.set(r.id, r)
+  }
+  for (const r of pgList || []) {
+    if (!r?.id) continue
+    const existing = byId.get(r.id)
+    if (!existing) {
+      byId.set(r.id, r)
+    } else {
+      const rankExisting = STATUS_RANK[existing.status] || 0
+      const rankPg = STATUS_RANK[r.status] || 0
+      if (rankPg > rankExisting) {
+        byId.set(r.id, r)
+      } else if (rankPg === rankExisting) {
+        const tsExisting = new Date(existing.updated_at || existing.created_at || 0).getTime()
+        const tsPg = new Date(r.updated_at || r.created_at || 0).getTime()
+        if (tsPg >= tsExisting) {
+          byId.set(r.id, r)
+        }
+      }
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  )
+}
+
 export async function updateHubRequestStatusAction(params: {
   propertyId: string
   requestId: string
@@ -1719,9 +1764,10 @@ export async function updateHubRequestStatusAction(params: {
   const actor = await getAuthorizedHubActor(params.propertyId)
   if (!actor.authorized) return { error: 'Unauthorized.' }
 
-  if (params.status === 'declined' && !params.declineReason?.trim()) {
-    return { error: 'Please enter a reason when declining a request.' }
-  }
+  const effectiveDeclineReason =
+    params.status === 'declined'
+      ? params.declineReason?.trim() || 'Unavailable at this moment'
+      : undefined
 
   const supabaseAdmin = createAdminClient()
   const store = await readHubStore()
@@ -1730,15 +1776,42 @@ export async function updateHubRequestStatusAction(params: {
     .from('hub_requests')
     .select('*')
     .eq('id', params.requestId)
-    .eq('property_id', params.propertyId)
     .maybeSingle()
 
-  const propRequests = store.requests[params.propertyId] || []
-  const storeExisting = propRequests.find((r) => r.id === params.requestId)
-  const existing = pgExisting || storeExisting
+  let storeExisting: any = null
+  let resolvedPropertyId = params.propertyId || pgExisting?.property_id || ''
+
+  if (resolvedPropertyId && Array.isArray(store.requests[resolvedPropertyId])) {
+    storeExisting = store.requests[resolvedPropertyId].find(
+      (r) => r.id === params.requestId
+    )
+  }
+
+  if (!storeExisting) {
+    for (const [propKey, reqArr] of Object.entries(store.requests || {})) {
+      const match = (reqArr || []).find((r) => r.id === params.requestId)
+      if (match) {
+        storeExisting = match
+        resolvedPropertyId = propKey
+        break
+      }
+    }
+  }
+
+  const existing =
+    pgExisting && storeExisting
+      ? (STATUS_RANK[storeExisting.status] || 0) > (STATUS_RANK[pgExisting.status] || 0)
+        ? storeExisting
+        : pgExisting
+      : pgExisting || storeExisting
 
   if (!existing) return { error: 'Request not found.' }
 
+  if (!resolvedPropertyId) {
+    resolvedPropertyId = existing.property_id
+  }
+
+  // Never allow a background 'seen' call to downgrade a request that already progressed
   if (params.status === 'seen' && existing.status !== 'received') {
     return { success: true, request: existing }
   }
@@ -1783,13 +1856,29 @@ export async function updateHubRequestStatusAction(params: {
     updateFields.completed_at = nowIso
     updateFields.completed_by = actor.actorName
   } else if (params.status === 'declined') {
+    if (!existing.seen_at) {
+      updateFields.seen_at = nowIso
+      updateFields.seen_by = actor.actorName
+    }
     updateFields.declined_at = nowIso
     updateFields.declined_by = actor.actorName
-    updateFields.decline_reason = params.declineReason?.trim() || ''
+    updateFields.decline_reason = effectiveDeclineReason
   }
 
-  if (storeExisting) {
-    Object.assign(storeExisting, updateFields)
+  const mergedRecord = {
+    ...existing,
+    ...updateFields,
+  }
+
+  if (resolvedPropertyId) {
+    const list = store.requests[resolvedPropertyId] || []
+    const idx = list.findIndex((r) => r.id === params.requestId)
+    if (idx >= 0) {
+      list[idx] = mergedRecord
+    } else {
+      list.unshift(mergedRecord)
+    }
+    store.requests[resolvedPropertyId] = list
     await writeHubStore(store)
   }
 
@@ -1798,18 +1887,21 @@ export async function updateHubRequestStatusAction(params: {
     .update(updateFields)
     .eq('id', params.requestId)
     .select('*')
-    .single()
+    .maybeSingle()
 
-  const updated = pgUpdated || { ...existing, ...updateFields }
+  const updated = pgUpdated ? { ...mergedRecord, ...pgUpdated, ...updateFields } : mergedRecord
 
   await logHubEvent({
-    propertyId: params.propertyId,
+    propertyId: resolvedPropertyId || params.propertyId,
     eventType: 'request_status',
     description: `Marked request (${existing.service} - Room ${existing.room_number}) as ${params.status}`,
     actorName: actor.actorName,
     actorRole: actor.actorRole,
     metadata: { requestId: params.requestId, status: params.status },
   })
+
+  revalidatePath('/staff')
+  revalidatePath('/dashboard/owner')
 
   return { success: true, request: updated }
 }
@@ -1961,8 +2053,7 @@ export async function getGuestPortalDataByToken(qrToken: string) {
     (r) => r.stay_id === activeStay.id
   )
 
-  const stayRequests =
-    pgStayRequests && pgStayRequests.length > 0 ? pgStayRequests : storeStayRequests
+  const stayRequests = mergeHubRequests(pgStayRequests, storeStayRequests)
 
   return {
     state: 'active' as const,

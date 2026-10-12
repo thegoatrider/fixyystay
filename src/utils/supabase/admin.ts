@@ -12,5 +12,14 @@ export function createAdminClient() {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for admin operations and must not fall back to anon key.");
   }
 
-  return createClient(supabaseUrl, serviceRoleKey);
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (url, options = {}) =>
+        fetch(url, {
+          ...options,
+          cache: 'no-store',
+        }),
+    },
+  });
 }

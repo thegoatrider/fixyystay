@@ -38,30 +38,88 @@ import GuestHubHistoryExplorer, {
   getCustomerKey,
 } from '@/components/guest-hub/GuestHubHistoryExplorer'
 
-// Web Audio synthesizer for reliable desk-phone chime (zero external MP3 asset failure)
+let sharedStaffAudioCtx: AudioContext | null = null
+
+function getStaffAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+  if (!AudioCtx) return null
+  if (!sharedStaffAudioCtx) {
+    sharedStaffAudioCtx = new AudioCtx()
+  }
+  if (sharedStaffAudioCtx.state === 'suspended') {
+    sharedStaffAudioCtx.resume().catch(() => {})
+  }
+  return sharedStaffAudioCtx
+}
+
+// High-output urgent multi-oscillator desk alarm & siren (maximum clarity & loudness)
 function playDeskAlertChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
-    const notes = [587.33, 880, 1174.66] // D5, A5, D6 bell triad
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14)
-      gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.14)
-      gain.gain.exponentialRampToValueAtTime(0.32, ctx.currentTime + idx * 0.14 + 0.04)
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.14 + 0.65)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(ctx.currentTime + idx * 0.14)
-      osc.stop(ctx.currentTime + idx * 0.14 + 0.7)
+    const ctx = getStaffAudioContext()
+    if (!ctx) return
+
+    const compressor = ctx.createDynamicsCompressor()
+    compressor.threshold.setValueAtTime(-24, ctx.currentTime)
+    compressor.knee.setValueAtTime(10, ctx.currentTime)
+    compressor.ratio.setValueAtTime(12, ctx.currentTime)
+    compressor.attack.setValueAtTime(0.002, ctx.currentTime)
+    compressor.release.setValueAtTime(0.15, ctx.currentTime)
+    compressor.connect(ctx.destination)
+
+    // 6-pulse urgent alternating high-low siren + buzzer burst (B5 <-> E6 + harmonic octave)
+    const sirenPulses = [
+      { freq: 987.77, start: 0.0, dur: 0.16 },
+      { freq: 1318.51, start: 0.18, dur: 0.16 },
+      { freq: 987.77, start: 0.36, dur: 0.16 },
+      { freq: 1318.51, start: 0.54, dur: 0.16 },
+      { freq: 1174.66, start: 0.74, dur: 0.22 },
+      { freq: 1567.98, start: 0.98, dur: 0.38 },
+    ]
+
+    sirenPulses.forEach(({ freq, start, dur }) => {
+      const t0 = ctx.currentTime + start
+      const tEnd = t0 + dur
+
+      // Primary aggressive sawtooth wave for cut-through loudness
+      const oscSaw = ctx.createOscillator()
+      const gainSaw = ctx.createGain()
+      oscSaw.type = 'sawtooth'
+      oscSaw.frequency.setValueAtTime(freq, t0)
+      gainSaw.gain.setValueAtTime(0.01, t0)
+      gainSaw.gain.exponentialRampToValueAtTime(0.85, t0 + 0.015)
+      gainSaw.gain.setValueAtTime(0.85, tEnd - 0.025)
+      gainSaw.gain.exponentialRampToValueAtTime(0.001, tEnd)
+      oscSaw.connect(gainSaw)
+      gainSaw.connect(compressor)
+      oscSaw.start(t0)
+      oscSaw.stop(tEnd + 0.01)
+
+      // Secondary square wave 1 octave lower for body & buzz
+      const oscSq = ctx.createOscillator()
+      const gainSq = ctx.createGain()
+      oscSq.type = 'square'
+      oscSq.frequency.setValueAtTime(freq * 0.5, t0)
+      gainSq.gain.setValueAtTime(0.01, t0)
+      gainSq.gain.exponentialRampToValueAtTime(0.65, t0 + 0.015)
+      gainSq.gain.setValueAtTime(0.65, tEnd - 0.025)
+      gainSq.gain.exponentialRampToValueAtTime(0.001, tEnd)
+      oscSq.connect(gainSq)
+      gainSq.connect(compressor)
+      oscSq.start(t0)
+      oscSq.stop(tEnd + 0.01)
     })
   } catch (e) {
     console.warn('Audio playback blocked until user interaction:', e)
   }
 }
+
+const QUICK_DECLINE_REASONS = [
+  'Item currently out of stock',
+  'Kitchen / Service is closed right now',
+  'Unavailable at this moment',
+  'Please contact Front Desk Reception',
+]
 
 export default function StaffPortalClient({
   initialAuthorized,
@@ -115,23 +173,66 @@ export default function StaffPortalClient({
   // Decline Reason Modal state
   const [decliningRequestId, setDecliningRequestId] = useState<string | null>(null)
   const [declineReason, setDeclineReason] = useState('')
+  const [updatingReqId, setUpdatingReqId] = useState<string | null>(null)
 
-  // Full-screen Alert & Desk Wake-Lock state
+  // Full-screen Strobe Alert & Desk Wake-Lock state
   const [fullScreenAlertReq, setFullScreenAlertReq] = useState<any | null>(null)
+  const [testStrobeActive, setTestStrobeActive] = useState(false)
+  const [strobePhase, setStrobePhase] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [wakeLockActive, setWakeLockActive] = useState(false)
   const seenRequestIdsRef = useRef<Set<string>>(
     new Set((initialBundle?.requests || []).map((r: any) => r.id))
   )
+  const autoSeenMarkedRef = useRef<Set<string>>(new Set())
 
   const origin =
     typeof window !== 'undefined'
       ? process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       : 'https://www.fixystays.com'
 
+  // Unlock Web Audio automatically on first tap/click anywhere on the staff screen
+  useEffect(() => {
+    const unlock = () => {
+      const ctx = getStaffAudioContext()
+      if (ctx && ctx.state === 'running') {
+        setSoundEnabled(true)
+      }
+    }
+    window.addEventListener('pointerdown', unlock, { passive: true })
+    window.addEventListener('keydown', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  // Rapid strobe flasher + continuous alarm loop while a new request alert is active
+  useEffect(() => {
+    if (!fullScreenAlertReq && !testStrobeActive) {
+      setStrobePhase(0)
+      return
+    }
+
+    const strobeInterval = setInterval(() => {
+      setStrobePhase((prev) => (prev + 1) % 4)
+    }, 150)
+
+    const alarmLoop = fullScreenAlertReq
+      ? setInterval(() => {
+          playDeskAlertChime()
+        }, 2100)
+      : null
+
+    return () => {
+      clearInterval(strobeInterval)
+      if (alarmLoop) clearInterval(alarmLoop)
+    }
+  }, [fullScreenAlertReq, testStrobeActive])
+
   const refreshBundle = useCallback(
     async (propId?: string) => {
-      const targetId = propId || selectedPropertyId
+      const targetId = propId || selectedPropertyId || bundle?.property?.id
       if (!targetId) return
       const res = await getPropertyGuestHubBundle(targetId)
       if (!res.error && res.property) {
@@ -139,13 +240,75 @@ export default function StaffPortalClient({
         res.requests?.forEach((r: any) => seenRequestIdsRef.current.add(r.id))
       }
     },
-    [selectedPropertyId]
+    [selectedPropertyId, bundle?.property?.id]
   )
 
-  // Request browser notification permission & Wake Lock helper
+  // Central optimistic status update helper (handles Accept, Completed, Declined)
+  const handleRequestStatusChange = useCallback(
+    async (
+      requestId: string,
+      status: 'seen' | 'accepted' | 'completed' | 'declined',
+      reason?: string
+    ) => {
+      const propId = selectedPropertyId || bundle?.property?.id || ''
+      const nowIso = new Date().toISOString()
+      const actorName = bundle?.actor?.actorName || 'Staff'
+
+      setUpdatingReqId(requestId)
+
+      // Optimistically update local bundle state immediately so UI responds in 0ms
+      setBundle((prev: any) => {
+        if (!prev?.requests) return prev
+        return {
+          ...prev,
+          requests: prev.requests.map((r: any) => {
+            if (r.id !== requestId) return r
+            return {
+              ...r,
+              status,
+              updated_at: nowIso,
+              ...(status === 'accepted'
+                ? { accepted_at: nowIso, accepted_by: actorName }
+                : {}),
+              ...(status === 'completed'
+                ? { completed_at: nowIso, completed_by: actorName }
+                : {}),
+              ...(status === 'declined'
+                ? {
+                    declined_at: nowIso,
+                    declined_by: actorName,
+                    decline_reason: reason?.trim() || 'Unavailable at this moment',
+                  }
+                : {}),
+            }
+          }),
+        }
+      })
+
+      try {
+        const res = await updateHubRequestStatusAction({
+          propertyId: propId,
+          requestId,
+          status,
+          declineReason: reason,
+        })
+        if (res?.error) {
+          alert(res.error)
+        }
+        await refreshBundle(propId)
+      } finally {
+        setUpdatingReqId(null)
+      }
+    },
+    [selectedPropertyId, bundle?.property?.id, bundle?.actor?.actorName, refreshBundle]
+  )
+
+  // Request browser notification permission, Wake Lock & test alarm + strobe
   const enableDeskModeAndTestSound = async () => {
     playDeskAlertChime()
     setSoundEnabled(true)
+    setTestStrobeActive(true)
+    setTimeout(() => setTestStrobeActive(false), 2000)
 
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
@@ -198,7 +361,7 @@ export default function StaffPortalClient({
               Notification.permission === 'granted'
             ) {
               try {
-                new Notification(`Room ${req.room_number} · New Request`, {
+                new Notification(`🚨 Room ${req.room_number} · New Order / Request`, {
                   body: `${req.guest_name}: ${req.service.replace('_', ' ')}`,
                 })
               } catch {}
@@ -239,7 +402,7 @@ export default function StaffPortalClient({
       )
       .subscribe()
 
-    const pollInterval = setInterval(handleIncomingRequests, 6000)
+    const pollInterval = setInterval(handleIncomingRequests, 4500)
 
     return () => {
       clearInterval(pollInterval)
@@ -247,21 +410,28 @@ export default function StaffPortalClient({
     }
   }, [authorized, selectedPropertyId, refreshBundle])
 
-  // Auto-mark requests as 'seen' when staff opens a room thread
+  // Auto-mark requests as 'seen' sequentially when staff opens a room thread
   useEffect(() => {
     if (!selectedRoomId || !bundle?.requests || !selectedPropertyId) return
     const unseen = bundle.requests.filter(
-      (r: any) => r.room_id === selectedRoomId && r.status === 'received'
+      (r: any) =>
+        r.room_id === selectedRoomId &&
+        r.status === 'received' &&
+        !autoSeenMarkedRef.current.has(r.id)
     )
     if (unseen.length === 0) return
 
-    unseen.forEach((req: any) => {
-      updateHubRequestStatusAction({
-        propertyId: selectedPropertyId,
-        requestId: req.id,
-        status: 'seen',
-      }).then(() => refreshBundle(selectedPropertyId))
-    })
+    unseen.forEach((r: any) => autoSeenMarkedRef.current.add(r.id))
+    ;(async () => {
+      for (const req of unseen) {
+        await updateHubRequestStatusAction({
+          propertyId: selectedPropertyId,
+          requestId: req.id,
+          status: 'seen',
+        })
+      }
+      await refreshBundle(selectedPropertyId)
+    })()
   }, [selectedRoomId, bundle?.requests, selectedPropertyId, refreshBundle])
 
   // Handle Staff Login
@@ -508,26 +678,71 @@ export default function StaffPortalClient({
 
   const selectedRoomThread = roomRows.find((r) => r.roomId === selectedRoomId) || null
 
+  const strobeBgClass =
+    strobePhase === 0
+      ? 'bg-red-600/95'
+      : strobePhase === 1
+      ? 'bg-white/95'
+      : strobePhase === 2
+      ? 'bg-blue-600/95'
+      : 'bg-amber-500/95'
+
+  const strobeBorderClass =
+    strobePhase === 0
+      ? 'border-white shadow-[0_0_80px_rgba(239,68,68,1)]'
+      : strobePhase === 1
+      ? 'border-red-600 shadow-[0_0_80px_rgba(255,255,255,1)]'
+      : strobePhase === 2
+      ? 'border-amber-400 shadow-[0_0_80px_rgba(37,99,235,1)]'
+      : 'border-red-500 shadow-[0_0_80px_rgba(245,158,11,1)]'
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* FULL-SCREEN NEW REQUEST ALERT */}
+      {/* TEST STROBE FLASH OVERLAY */}
+      {testStrobeActive && !fullScreenAlertReq && (
+        <div
+          className={`fixed inset-0 z-[95] pointer-events-none transition-colors duration-75 ${strobeBgClass} opacity-60`}
+        />
+      )}
+
+      {/* FULL-SCREEN FLASHING STROBE NEW REQUEST ALERT */}
       {fullScreenAlertReq && (
-        <div className="fixed inset-0 z-[100] bg-blue-950/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-md bg-slate-900 border-2 border-blue-500 rounded-3xl p-8 text-center shadow-2xl space-y-6">
-            <div className="w-20 h-20 rounded-full bg-blue-600/20 border-2 border-blue-500 text-blue-400 flex items-center justify-center mx-auto animate-bounce">
-              <Bell className="w-10 h-10" />
+        <div
+          className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 transition-colors duration-75 ${strobeBgClass}`}
+        >
+          {/* Flashing Corner Strobe Beacons */}
+          <div className="fixed top-0 left-0 right-0 h-4 bg-gradient-to-r from-red-500 via-white to-blue-500 animate-pulse" />
+          <div className="fixed bottom-0 left-0 right-0 h-4 bg-gradient-to-r from-amber-400 via-red-600 to-white animate-pulse" />
+
+          <div
+            className={`w-full max-w-lg bg-slate-950 border-4 rounded-3xl p-6 sm:p-8 text-center space-y-5 transition-all duration-75 ${strobeBorderClass}`}
+          >
+            <div
+              className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto border-4 transition-colors duration-75 ${
+                strobePhase % 2 === 0
+                  ? 'bg-red-600 border-white text-white scale-110'
+                  : 'bg-amber-400 border-red-600 text-slate-950 scale-100'
+              }`}
+            >
+              <Bell className="w-10 h-10 animate-bounce" />
             </div>
 
             <div>
-              <span className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-black uppercase tracking-widest">
-                New Guest Request
+              <span
+                className={`inline-block px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest ${
+                  strobePhase % 2 === 0
+                    ? 'bg-red-600 text-white'
+                    : 'bg-amber-400 text-slate-950'
+                }`}
+              >
+                🚨 URGENT · NEW GUEST ORDER / REQUEST 🚨
               </span>
-              <h2 className="text-3xl font-black mt-3">
+              <h2 className="text-4xl sm:text-5xl font-black mt-3 text-white tracking-tight">
                 Room {fullScreenAlertReq.room_number}
               </h2>
-              <p className="text-sm text-slate-300 font-bold mt-1">
+              <p className="text-base text-slate-200 font-extrabold mt-1">
                 {fullScreenAlertReq.guest_name} ·{' '}
-                <span className="uppercase text-blue-400">
+                <span className="uppercase text-amber-400">
                   {fullScreenAlertReq.service.replace('_', ' ')}
                 </span>
               </p>
@@ -535,24 +750,68 @@ export default function StaffPortalClient({
 
             {Array.isArray(fullScreenAlertReq.items) &&
               fullScreenAlertReq.items.length > 0 && (
-                <div className="bg-slate-800/90 rounded-2xl p-4 text-left text-xs space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 text-left text-sm space-y-1.5 max-h-44 overflow-y-auto">
                   {fullScreenAlertReq.items.map((it: any, idx: number) => (
-                    <div key={idx} className="flex justify-between font-bold">
+                    <div key={idx} className="flex justify-between font-black text-white">
                       <span>
                         {it.qty} × {it.name}
                       </span>
-                      {it.price > 0 && <span>₹{it.price * it.qty}</span>}
+                      {it.price > 0 && (
+                        <span className="text-emerald-400">₹{it.price * it.qty}</span>
+                      )}
                     </div>
                   ))}
+                  {fullScreenAlertReq.total > 0 && (
+                    <div className="flex justify-between font-black pt-2 border-t border-slate-800 text-amber-400">
+                      <span>Order Total</span>
+                      <span>₹{fullScreenAlertReq.total}</span>
+                    </div>
+                  )}
                 </div>
               )}
+
+            {fullScreenAlertReq.note && (
+              <p className="text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 p-3 rounded-xl">
+                Guest Note: “{fullScreenAlertReq.note}”
+              </p>
+            )}
+
+            {/* Direct Action Buttons right inside the Strobe Alert */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={async () => {
+                  const req = fullScreenAlertReq
+                  setFullScreenAlertReq(null)
+                  setActiveTab('inbox')
+                  setSelectedRoomId(req.room_id)
+                  await handleRequestStatusChange(req.id, 'accepted')
+                }}
+                className="py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Accept Order Now
+              </button>
+
+              <button
+                onClick={() => {
+                  const req = fullScreenAlertReq
+                  setFullScreenAlertReq(null)
+                  setActiveTab('inbox')
+                  setSelectedRoomId(req.room_id)
+                  setDecliningRequestId(req.id)
+                  setDeclineReason('')
+                }}
+                className="py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg"
+              >
+                <XCircle className="w-4 h-4" /> Decline Order
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setFullScreenAlertReq(null)}
-                className="py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-sm"
+                className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-xs"
               >
-                Dismiss
+                Stop Alarm &amp; Dismiss
               </button>
               <button
                 onClick={() => {
@@ -561,9 +820,9 @@ export default function StaffPortalClient({
                   setActiveTab('inbox')
                   setSelectedRoomId(roomId)
                 }}
-                className="py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm shadow-lg"
+                className="py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-lg"
               >
-                Open Request
+                Open Room Thread
               </button>
             </div>
           </div>
@@ -587,7 +846,7 @@ export default function StaffPortalClient({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Live Staff Console · Updates automatically
+              Live Staff Console · Loud Siren &amp; Strobe Alerts Active
             </p>
           </div>
         </div>
@@ -615,15 +874,15 @@ export default function StaffPortalClient({
             className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 border transition ${
               soundEnabled
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                : 'bg-amber-500/15 border-amber-500/40 text-amber-300 animate-pulse'
+                : 'bg-red-500/20 border-red-500/50 text-red-300 animate-pulse'
             }`}
           >
             <Volume2 className="w-4 h-4" />
             {soundEnabled
               ? wakeLockActive
-                ? 'Test Sound (Desk Awake)'
-                : 'Test Sound'
-              : 'Tap to Enable Sound & Alerts'}
+                ? 'Test Loud Alarm & Strobe (Awake)'
+                : 'Test Loud Alarm & Strobe'
+              : 'Tap to Enable Loud Alarm & Strobe'}
           </button>
 
           {!actor.isOwnerOrSuperAdmin && (
@@ -923,40 +1182,29 @@ export default function StaffPortalClient({
                           <div className="flex flex-wrap gap-2 pt-1">
                             {req.status !== 'accepted' && (
                               <button
-                                onClick={async () => {
-                                  await updateHubRequestStatusAction({
-                                    propertyId: selectedPropertyId,
-                                    requestId: req.id,
-                                    status: 'accepted',
-                                  })
-                                  refreshBundle(selectedPropertyId)
-                                }}
-                                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5"
+                                disabled={updatingReqId === req.id}
+                                onClick={() => handleRequestStatusChange(req.id, 'accepted')}
+                                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 disabled:opacity-50"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Accept
                               </button>
                             )}
 
                             <button
-                              onClick={async () => {
-                                await updateHubRequestStatusAction({
-                                  propertyId: selectedPropertyId,
-                                  requestId: req.id,
-                                  status: 'completed',
-                                })
-                                refreshBundle(selectedPropertyId)
-                              }}
-                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5"
+                              disabled={updatingReqId === req.id}
+                              onClick={() => handleRequestStatusChange(req.id, 'completed')}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 disabled:opacity-50"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Completed
                             </button>
 
                             <button
+                              disabled={updatingReqId === req.id}
                               onClick={() => {
                                 setDecliningRequestId(req.id)
                                 setDeclineReason('')
                               }}
-                              className="px-3.5 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 font-black text-xs flex items-center gap-1.5"
+                              className="px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black text-xs flex items-center gap-1.5 disabled:opacity-50"
                             >
                               <XCircle className="w-3.5 h-3.5" /> Decline
                             </button>
@@ -1307,38 +1555,75 @@ export default function StaffPortalClient({
 
       {/* DECLINE REQUEST MODAL */}
       {decliningRequestId && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-            <h3 className="text-base font-black">Decline Request with Reason</h3>
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-3xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-400" />
+                Decline Order / Request
+              </h3>
+              <button
+                onClick={() => setDecliningRequestId(null)}
+                className="text-slate-400 hover:text-white text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-400">
+                Tap a quick reason or type a custom note for the guest:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_DECLINE_REASONS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDeclineReason(preset)}
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                      declineReason === preset
+                        ? 'bg-red-600 text-white border-red-500'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <textarea
               rows={3}
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
-              placeholder="Let the guest know why this request cannot be fulfilled..."
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-xs font-bold text-white"
+              placeholder="Optional custom reason (defaults to 'Unavailable at this moment')..."
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3 text-xs font-bold text-white outline-none focus:border-red-500"
             />
+
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setDecliningRequestId(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
               >
                 Cancel
               </button>
               <button
-                disabled={!declineReason.trim()}
+                type="button"
+                disabled={updatingReqId === decliningRequestId}
                 onClick={async () => {
-                  await updateHubRequestStatusAction({
-                    propertyId: selectedPropertyId,
-                    requestId: decliningRequestId,
-                    status: 'declined',
-                    declineReason,
-                  })
+                  const targetReqId = decliningRequestId
+                  const finalReason =
+                    declineReason.trim() || 'Unavailable at this moment'
                   setDecliningRequestId(null)
-                  refreshBundle(selectedPropertyId)
+                  setDeclineReason('')
+                  await handleRequestStatusChange(targetReqId, 'declined', finalReason)
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-lg transition active:scale-95 disabled:opacity-50"
               >
-                Confirm Decline
+                {updatingReqId === decliningRequestId
+                  ? 'Declining...'
+                  : 'Confirm Decline'}
               </button>
             </div>
           </div>
