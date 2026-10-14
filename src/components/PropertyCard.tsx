@@ -81,12 +81,12 @@ export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
 
         {/* Buttons Grid */}
         <div className="flex items-center gap-2 pt-2 border-t border-gray-50 flex-shrink-0">
-          <Link href={`/dashboard/owner/property/${prop.id}/edit`} className="flex-1">
+          <Link href={`/dashboard/owner/property/${prop.id}/edit`} prefetch={false} className="flex-1">
             <Button variant="outline" size="sm" className="w-full h-10 font-bold border-gray-200 hover:bg-gray-50 rounded-xl transition text-xs">
               Edit Details
             </Button>
           </Link>
-          <Link href={`/dashboard/owner/property/${prop.id}`} className="flex-1">
+          <Link href={`/dashboard/owner/property/${prop.id}`} prefetch={false} className="flex-1">
             <Button variant="default" size="sm" className="w-full h-10 font-bold shadow-md hover:shadow-lg rounded-xl transition text-xs">
               Manage Stay
             </Button>

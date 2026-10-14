@@ -81,7 +81,7 @@ export function CreatePartnerForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <Label htmlFor="name" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Full Name</Label>
             <Input id="name" name="name" placeholder="e.g. Mukesh Ambani" required className="rounded-xl h-12" />
@@ -89,6 +89,13 @@ export function CreatePartnerForm() {
           <div className="space-y-2">
             <Label htmlFor="email" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Email Address</Label>
             <Input id="email" name="email" type="email" placeholder="owner@gmail.com" required className="rounded-xl h-12" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="phone" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Phone / WhatsApp</Label>
+              <span className="text-[9px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">Mandatory</span>
+            </div>
+            <Input id="phone" name="phone" type="tel" placeholder="9876543210" required minLength={10} maxLength={15} className="rounded-xl h-12" />
           </div>
         </div>
 

@@ -345,6 +345,7 @@ export async function onboardPartner(formData: FormData) {
 
     const name = formData.get('name') as string
     const email = (formData.get('email') as string || '').toLowerCase()
+    const phone = ((formData.get('phone') as string) || '').trim()
     const planName = formData.get('plan') as string
     const amount = parseFloat(formData.get('amount') as string) || 0
     const paymentRef = formData.get('paymentRef') as string
@@ -352,12 +353,17 @@ export async function onboardPartner(formData: FormData) {
 
     if (!name || !email || !planName) return { error: 'Name, Email and Plan are required.' }
 
+    const cleanPhone = phone.replace(/\D/g, '')
+    if (!phone || cleanPhone.length < 10) {
+      return { error: 'A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
+    }
+
     // 1. Create Auth User
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: 'owner', name: name }
+      user_metadata: { role: 'owner', name: name, phone }
     })
 
     if (authError) {
@@ -370,7 +376,7 @@ export async function onboardPartner(formData: FormData) {
     // 2. Create Owner Record
     const { data: owner, error: ownerError } = await supabaseAdmin
       .from('owners')
-      .insert({ user_id: userId, name, email })
+      .insert({ user_id: userId, name, email, phone })
       .select('id')
       .single()
 

@@ -5,24 +5,23 @@ import { usePathname } from 'next/navigation'
 import { Home, LayoutDashboard, Search, User, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 export function BottomNav() {
   const pathname = usePathname()
   const [role, setRole] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
     const supabase = createClient()
     async function getRole() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        if (user.email === 'superadmin@fixstay.com') {
-          setRole('admin')
-        } else {
-          setRole(user.user_metadata?.role || 'guest')
-        }
+      if (user && isMounted) {
+        setRole(getEffectiveUserRole(user))
       }
     }
     getRole()
+    return () => { isMounted = false }
   }, [])
 
   // Don't show on login/signup pages, Guest Hub QR portal (/g/), or Staff console (/staff)
@@ -35,6 +34,7 @@ export function BottomNav() {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
       <Link 
         href="/" 
+        prefetch={false}
         className={`flex flex-col items-center gap-1 transition-colors ${pathname === '/' ? 'text-blue-600' : 'text-gray-400'}`}
       >
         <Home className="w-6 h-6" />
@@ -43,6 +43,7 @@ export function BottomNav() {
 
       <Link 
         href="/guest" 
+        prefetch={false}
         className={`flex flex-col items-center gap-1 transition-colors ${pathname === '/guest' ? 'text-blue-600' : 'text-gray-400'}`}
       >
         <Search className="w-6 h-6" />
@@ -51,6 +52,7 @@ export function BottomNav() {
 
       <Link 
         href={dashboardPath} 
+        prefetch={false}
         className={`flex flex-col items-center gap-1 transition-colors ${pathname.includes('/dashboard') ? 'text-blue-600' : 'text-gray-400'}`}
       >
         <LayoutDashboard className="w-6 h-6" />
@@ -60,6 +62,16 @@ export function BottomNav() {
       {role === 'owner' || role === 'influencer' ? (
         <Link 
           href={`${dashboardPath}?tab=wallet`} 
+          prefetch={false}
+          onClick={(e) => {
+            if (pathname === '/dashboard/owner') {
+              e.preventDefault()
+              const url = new URL(window.location.href)
+              url.searchParams.set('tab', 'wallet')
+              window.history.pushState(null, '', url.pathname + url.search)
+              window.dispatchEvent(new PopStateEvent('popstate'))
+            }
+          }}
           className={`flex flex-col items-center gap-1 transition-colors ${pathname.includes('wallet') ? 'text-blue-600' : 'text-gray-400'}`}
         >
           <Wallet className="w-6 h-6" />
@@ -68,6 +80,7 @@ export function BottomNav() {
       ) : (
         <Link 
           href={role ? "/guest/profile" : "/login?next=/guest/profile"} 
+          prefetch={false}
           className={`flex flex-col items-center gap-1 transition-colors ${pathname.includes('/profile') ? 'text-blue-600' : 'text-gray-400'}`}
         >
           <User className="w-6 h-6" />

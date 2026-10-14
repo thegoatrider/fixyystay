@@ -19,6 +19,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Eliminate 300ms tap delay & remove mobile tap gray flash */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Hide Google Translate UI Elements */
 .goog-te-banner-frame {
   display: none !important;

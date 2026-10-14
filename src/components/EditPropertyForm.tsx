@@ -226,6 +226,12 @@ export default function EditPropertyForm({
     }
     
     const formData = new FormData(formEl)
+    const phoneVal = ((formData.get('helpdeskNumber') as string) || '').replace(/\D/g, '')
+    if (phoneVal.length < 10) {
+      setError('A valid owner contact/WhatsApp phone number (at least 10 digits) is mandatory.')
+      setIsLoading(false)
+      return
+    }
     
     // Remove raw file inputs so uncompressed files never bloat the Server Action payload
     formData.delete('coverImage')
