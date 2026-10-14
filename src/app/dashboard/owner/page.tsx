@@ -101,6 +101,8 @@ export default async function OwnerDashboard() {
         isSuperAdmin={isSuperAdmin} 
         hasGoogleDrive={hasGoogleDrive}
         googleEmail={googleEmail}
+        initialOwner={owner}
+        initialSubscription={subResult.data}
       />
     </Suspense>
   )

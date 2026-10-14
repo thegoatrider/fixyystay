@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { respondToPromotionRequest } from '../influencer/influencer-requests-actions'
 import { format } from 'date-fns'
+import { toast } from '@/components/ui/toast'
 
 type Request = {
   id: string
@@ -34,7 +35,7 @@ export default function InfluencerRequestsInbox({
   const handleResponse = async () => {
     if (!selectedRequest || !decision) return
     if (decision === 'rejected' && !rejectionReason) {
-      alert('Please provide a reason for rejection.')
+      toast.error('Please provide a reason for rejection.')
       return
     }
 
@@ -43,15 +44,16 @@ export default function InfluencerRequestsInbox({
     if (res.success) {
       setRequests(prev => prev.map(r => 
         r.id === selectedRequest.id 
-          ? { ...r, status: decision, rejection_reason: rejectionReason } 
+            ? { ...r, status: decision, rejection_reason: rejectionReason } 
           : r
       ))
       setIsDecisionModalOpen(false)
       setSelectedRequest(null)
       setDecision(null)
       setRejectionReason('')
+      toast.success(decision === 'accepted' ? 'Proposal accepted!' : 'Proposal rejected')
     } else {
-      alert(res.error)
+      toast.error(res.error || 'Failed to update proposal')
     }
     setIsSubmitting(false)
   }

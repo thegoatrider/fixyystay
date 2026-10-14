@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import React, { useEffect } from 'react'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { toast } from '@/components/ui/toast'
 import { approveIdentity, assignRoomToGuest, checkoutGuest } from './actions'
 
 const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -57,6 +59,13 @@ function GuestList({
   properties?: any[];
   propertyRooms?: any[];
 }) {
+  const queryClient = useQueryClient()
+  const [localCheckins, setLocalCheckins] = useState<GuestCheckin[]>(checkins)
+
+  useEffect(() => {
+    setLocalCheckins(checkins)
+  }, [checkins])
+
   const [searchTerm, setSearchState] = useState('')
   const [selectedGuest, setSelectedGuest] = useState<GuestCheckin | null>(null)
   const [approveModalId, setApproveModalId] = useState<string | null>(null)
@@ -95,14 +104,14 @@ function GuestList({
 
   const activeCheckinsToday = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-CA')
-    return checkins.filter((c: any) => {
+    return localCheckins.filter((c: any) => {
       if (c.property_id !== selectedPropertyId) return false
       if (!c.room_number) return false
       if (c.status === 'checked_out') return false
       if (!c.checkin_date || !c.checkout_date) return false
       return todayStr >= c.checkin_date && todayStr < c.checkout_date
     })
-  }, [checkins, selectedPropertyId])
+  }, [localCheckins, selectedPropertyId])
 
   const roomOccupancyMap = useMemo(() => {
     const map: Record<string, any> = {}
@@ -119,7 +128,7 @@ function GuestList({
     const gCheckin = selectedGuest.checkin_date
     const gCheckout = selectedGuest.checkout_date
     
-    const overlappingCheckins = checkins.filter((c: any) => {
+    const overlappingCheckins = localCheckins.filter((c: any) => {
       if (c.id === selectedGuest.id) return false
       if (c.property_id !== selectedGuest.property_id) return false
       if (!c.room_number) return false
@@ -136,16 +145,17 @@ function GuestList({
     
     const occupiedRoomNumbers = new Set(overlappingCheckins.map((c: any) => c.room_number))
     return propRooms.filter((r: any) => !occupiedRoomNumbers.has(r.room_number))
-  }, [selectedGuest, propertyRooms, checkins])
+  }, [selectedGuest, propertyRooms, localCheckins])
 
   const handleApproveId = async (id: string, nameOverride?: string, docNumOverride?: string) => {
     setProcessingId(`approve-${id}`)
     const res = await approveIdentity(id, nameOverride, docNumOverride)
     if (!res.success) {
-      alert(res.error)
+      toast.error(res.error || 'Failed to approve ID')
     } else {
       setApproveModalId(null)
-      // Re-fetch or UI state will ideally get updated by revalidatePath
+      toast.success('Identity approved successfully')
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
     }
     setProcessingId(null)
   }
@@ -222,7 +232,7 @@ function GuestList({
         await navigator.share({ title, url })
       } else {
         await navigator.clipboard.writeText(url)
-        alert('Link copied to clipboard!')
+        toast.success('Link copied to clipboard!')
       }
     } catch (e) {
       console.error("Sharing failed", e)
@@ -255,21 +265,83 @@ function GuestList({
     }
   }
 
+  const checkoutMutation = useMutation({
+    mutationFn: async (guestId: string) => {
+      const res = await checkoutGuest(guestId)
+      if (!res.success) throw new Error(res.error || 'Failed to check out guest')
+      return res
+    },
+    onMutate: async (guestId: string) => {
+      const prevCheckins = [...localCheckins]
+      const prevSelectedGuest = selectedGuest ? { ...selectedGuest } : null
+      
+      setLocalCheckins(prev => prev.map(c => 
+        c.id === guestId ? { ...c, status: 'checked_out', checkout_date: new Date().toISOString() } : c
+      ))
+      if (selectedGuest && selectedGuest.id === guestId) {
+        setSelectedGuest({ ...selectedGuest, status: 'checked_out', checkout_date: new Date().toISOString() })
+      }
+      return { prevCheckins, prevSelectedGuest }
+    },
+    onError: (err: any, _guestId, context) => {
+      if (context?.prevCheckins) setLocalCheckins(context.prevCheckins)
+      if (context?.prevSelectedGuest) setSelectedGuest(context.prevSelectedGuest)
+      toast.error(err?.message || 'Failed to check out guest')
+    },
+    onSuccess: () => {
+      toast.success('Guest checked out successfully!')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+    }
+  })
+
+  const assignRoomMutation = useMutation({
+    mutationFn: async ({ guestId, roomNumber }: { guestId: string; roomNumber: string | null }) => {
+      const res = await assignRoomToGuest(guestId, roomNumber) as any
+      if (!res.success) throw new Error(res.error || 'Failed to update room assignment')
+      return res
+    },
+    onMutate: async ({ guestId, roomNumber }) => {
+      const prevCheckins = [...localCheckins]
+      const prevSelectedGuest = selectedGuest ? { ...selectedGuest } : null
+      
+      setLocalCheckins(prev => prev.map(c => 
+        c.id === guestId ? { ...c, room_number: roomNumber } : c
+      ))
+      if (selectedGuest && selectedGuest.id === guestId) {
+        setSelectedGuest({ ...selectedGuest, room_number: roomNumber })
+      }
+      return { prevCheckins, prevSelectedGuest }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.prevCheckins) setLocalCheckins(context.prevCheckins)
+      if (context?.prevSelectedGuest) setSelectedGuest(context.prevSelectedGuest)
+      toast.error(err?.message || 'Failed to update room assignment')
+    },
+    onSuccess: (res: any, vars) => {
+      if (vars.roomNumber && res?.pinCode) {
+        toast.success(`Room ${vars.roomNumber} assigned! Guest PIN: ${res.pinCode}`)
+      } else if (vars.roomNumber) {
+        toast.success(`Room ${vars.roomNumber} assigned!`)
+      } else {
+        toast.success('Room unassigned successfully')
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+    }
+  })
 
   const handleCheckout = async (guestId: string) => {
     if (confirm('Check out this guest from their stay?')) {
-      setProcessingId(`out-${guestId}`)
-      const res = await checkoutGuest(guestId)
-      setProcessingId(null)
-      if (!res.success) {
-        alert(res.error)
-      }
+      checkoutMutation.mutate(guestId)
     }
   }
 
   // 1. Process and filter guests dynamically
   const processedGuests = useMemo(() => {
-    let list = [...checkins]
+    let list = [...localCheckins]
     
     // Search query filter
     if (searchTerm) {
@@ -330,7 +402,7 @@ function GuestList({
     })
     
     return list
-  }, [checkins, searchTerm, filterStatus, filterProperty, sortField, sortOrder])
+  }, [localCheckins, searchTerm, filterStatus, filterProperty, sortField, sortOrder])
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
@@ -382,7 +454,7 @@ function GuestList({
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Guest Check-in Records</h2>
-          <p className="text-sm text-gray-400 mt-0.5">{checkins.length} total registered guests</p>
+          <p className="text-sm text-gray-400 mt-0.5">{localCheckins.length} total registered guests</p>
         </div>
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
           <button
@@ -749,7 +821,7 @@ function GuestList({
                       if (isOccupied) {
                         setSelectedGuest(occupant)
                       } else {
-                        alert(`Room ${r.room_number} is currently available.`)
+                        toast.info(`Room ${r.room_number} is currently available.`)
                       }
                     }}
                     className={[
@@ -882,17 +954,12 @@ function GuestList({
                         <p className="text-base font-extrabold text-indigo-900">Room {selectedGuest.room_number}</p>
                       </div>
                       <button
-                        onClick={async () => {
+                        onClick={() => {
                           if (confirm('Are you sure you want to remove this room assignment?')) {
-                            const res = await assignRoomToGuest(selectedGuest.id, null)
-                            if (res.success) {
-                              setSelectedGuest({ ...selectedGuest, room_number: null })
-                            } else {
-                              alert(res.error)
-                            }
+                            assignRoomMutation.mutate({ selectedGuest: selectedGuest.id, guestId: selectedGuest.id, roomNumber: null } as any)
                           }
                         }}
-                        className="text-xs font-bold text-red-650 hover:text-red-750 bg-red-50 hover:bg-red-100/60 px-3 py-1.5 rounded-lg border border-red-100 transition"
+                        className="text-xs font-bold text-red-650 hover:text-red-750 bg-red-50 hover:bg-red-100/60 px-3 py-1.5 rounded-lg border border-red-100 transition cursor-pointer"
                       >
                         Unassign Room
                       </button>
@@ -912,22 +979,16 @@ function GuestList({
                         ))}
                       </select>
                       <Button
-                        disabled={!selectedRoomNumberToAssign}
-                        onClick={async () => {
-                          const res = await assignRoomToGuest(selectedGuest.id, selectedRoomNumberToAssign) as any
-                          if (res.success) {
-                            setSelectedGuest({ ...selectedGuest, room_number: selectedRoomNumberToAssign })
+                        disabled={!selectedRoomNumberToAssign || assignRoomMutation.isPending}
+                        onClick={() => {
+                          if (selectedRoomNumberToAssign) {
+                            assignRoomMutation.mutate({ guestId: selectedGuest.id, roomNumber: selectedRoomNumberToAssign })
                             setSelectedRoomNumberToAssign('')
-                            if (res.pinCode) {
-                              alert(`Room ${selectedRoomNumberToAssign} assigned! Guest Hub 4-Digit Room PIN: ${res.pinCode} (Share this PIN with the guest for their room QR).`)
-                            }
-                          } else {
-                            alert(res.error)
                           }
                         }}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 rounded-xl shadow-sm px-4 text-xs"
                       >
-                        Assign
+                        {assignRoomMutation.isPending ? 'Assigning...' : 'Assign'}
                       </Button>
                     </div>
                   )}
@@ -1200,22 +1261,16 @@ function GuestList({
             <div className="p-4 bg-gray-55 border-t flex flex-col gap-2 flex-shrink-0">
               {selectedGuest.status !== 'checked_out' && (
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     if (confirm(`Check out ${selectedGuest.guest_name} from their stay?`)) {
-                      setIsCheckingOut(true)
-                      const res = await checkoutGuest(selectedGuest.id)
-                      setIsCheckingOut(false)
-                      if (res.success) {
-                        setSelectedGuest(null)
-                      } else {
-                        alert(res.error)
-                      }
+                      checkoutMutation.mutate(selectedGuest.id)
+                      setSelectedGuest(null)
                     }
                   }}
-                  disabled={isCheckingOut}
+                  disabled={checkoutMutation.isPending}
                   className="w-full h-11 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {isCheckingOut ? (
+                  {checkoutMutation.isPending ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <CheckCircle className="w-4.5 h-4.5" />

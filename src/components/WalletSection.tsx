@@ -5,6 +5,7 @@ import { Wallet, IndianRupee, ArrowRight, Clock, PlusCircle } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/toast'
 
 type Transaction = {
   id: string
@@ -56,7 +57,7 @@ export default function WalletSection({
     }
 
     if (Number(amount) > availableBalance) {
-      alert("Amount exceeds available balance.")
+      toast.error("Amount exceeds available balance.")
       return
     }
     

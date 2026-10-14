@@ -22,7 +22,11 @@ export type DashboardData = {
   }
 }
 
-export function useDashboardData(ownerId: string | undefined, isSuperAdmin: boolean) {
+export function useDashboardData(
+  ownerId: string | undefined, 
+  isSuperAdmin: boolean,
+  initialData?: Partial<DashboardData> | null
+) {
   const supabase = createClient()
 
   return useQuery({
@@ -40,5 +44,8 @@ export function useDashboardData(ownerId: string | undefined, isSuperAdmin: bool
     },
     enabled: !!ownerId || isSuperAdmin,
     staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes cache retention
+    refetchOnWindowFocus: false, // Prevent wasteful refetches on mobile app focus/resume
+    initialData: initialData ? (initialData as DashboardData) : undefined,
   })
 }

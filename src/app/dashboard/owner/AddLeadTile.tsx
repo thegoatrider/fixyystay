@@ -8,10 +8,13 @@ import { MessageCircle, Phone, UserPlus, User } from 'lucide-react'
 import { createLead } from './leads-actions'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/components/ui/toast'
 
 type Property = { id: string; name: string }
 
 export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: string, properties: Property[] }) {
+  const queryClient = useQueryClient()
   const [isLoading, setIsLoading] = useState(false)
   const [selectedPropertyId, setSelectedPropertyId] = useState('')
 
@@ -44,13 +47,14 @@ export default function AddLeadTile({ ownerId = '', properties }: { ownerId?: st
       const message = `Hello! I am the owner of ${propertyName}. I am following up on your enquiry for the dates ${checkin || 'TBD'} to ${checkout || 'TBD'}. View property: https://www.fixystays.com/guest/property/${selectedPropertyId}`
       window.open(`https://wa.me/${formatWhatsAppNumber(phone, countryCode)}?text=${encodeURIComponent(message)}`, '_blank')
       
+      queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
       setPhone('')
       setGuestName('')
       setCheckin('')
       setCheckout('')
-      alert("Enquiry created successfully and added to your Leads Calendar!")
+      toast.success("Enquiry created successfully and added to your Leads Calendar!")
     } else {
-      alert(result.error || 'Failed to create lead')
+      toast.error(result.error || 'Failed to create lead')
     }
     setIsLoading(false)
   }

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Phone, MessageSquare, User } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 
 type Property = {
   id: string
@@ -28,19 +29,19 @@ export default function QuickCheckin({ properties }: { properties: Property[] })
 
   const handleSendForm = () => {
     if (!phone) {
-      alert('Please enter a phone number.')
+      toast.error('Please enter a phone number.')
       return
     }
 
     if (!selectedPropertyId) {
-      alert('Please select a property.')
+      toast.error('Please select a property.')
       return
     }
 
     // Basic phone validation (at least 7 digits)
     const digits = phone.replace(/\D/g, '')
     if (digits.length < 7) {
-      alert('Please enter a valid phone number.')
+      toast.error('Please enter a valid phone number.')
       return
     }
 

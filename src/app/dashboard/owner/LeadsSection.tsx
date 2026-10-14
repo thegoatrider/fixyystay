@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { createLead, updateLeadStatus, updateLeadMarking, deleteLead } from './leads-actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatWhatsAppNumber, COUNTRY_CODES } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 import React from 'react'
 
 type Property = { id: string; name: string }
@@ -185,31 +186,49 @@ function LeadsSection({
       
       setPhone(''); setGuestName(''); setCheckin(''); setCheckout('')
       setIsFormVisible(false)
+      toast.success('Enquiry added!')
     } else {
-      alert(result.error || 'Failed to create lead')
+      toast.error(result.error || 'Failed to create lead')
     }
     setIsLoading(false)
   }
 
   const markLeadMutation = useMutation({
     mutationFn: ({ leadId, marking }: { leadId: string, marking: string }) => updateLeadMarking(leadId, marking),
-    onSuccess: (_, { leadId, marking }) => {
+    onMutate: async ({ leadId, marking }) => {
+      const previousLeads = [...localLeads]
       setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, marking } : l))
+      return { previousLeads }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLeads) setLocalLeads(context.previousLeads)
+      toast.error('Failed to update lead marking')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
     }
   })
 
   const statusLeadMutation = useMutation({
     mutationFn: ({ leadId, status }: { leadId: string, status: string }) => updateLeadStatus(leadId, status),
-    onSuccess: (_, { leadId, status }) => {
+    onMutate: async ({ leadId, status }) => {
+      const previousLeads = [...localLeads]
       setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l))
+      return { previousLeads }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLeads) setLocalLeads(context.previousLeads)
+      toast.error('Failed to update lead status')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
     }
   })
 
   const deleteLeadMutation = useMutation({
     mutationFn: (leadId: string) => deleteLead(leadId),
-    onSuccess: (_, leadId) => {
+    onMutate: async (leadId: string) => {
+      const previousLeads = [...localLeads]
       const updated = localLeads.filter(l => l.id !== leadId)
       setLocalLeads(updated)
       if (selectedDate) {
@@ -217,6 +236,13 @@ function LeadsSection({
         const remaining = updated.filter(l => l.checkin_date?.slice(0, 10) === key)
         if (remaining.length === 0) setSelectedDate(null)
       }
+      return { previousLeads }
+    },
+    onError: (_err, _leadId, context) => {
+      if (context?.previousLeads) setLocalLeads(context.previousLeads)
+      toast.error('Failed to delete lead')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
     }
   })

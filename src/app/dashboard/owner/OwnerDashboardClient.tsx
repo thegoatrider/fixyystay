@@ -15,6 +15,7 @@ import DigitizeRegisterTile from './DigitizeRegisterTile'
 import { requestPayout } from '@/app/actions/wallet'
 import React, { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/components/ui/toast'
 
 // Lazy load heavy tab sections
 const LeadsSection = dynamic(() => import('./LeadsSection'), { loading: () => <DashboardSkeleton /> })
@@ -30,7 +31,9 @@ export default function OwnerDashboardClient({
   ownerId, 
   isSuperAdmin,
   hasGoogleDrive = false,
-  googleEmail = null
+  googleEmail = null,
+  initialOwner = null,
+  initialSubscription = null
 }: { 
   userId: string; 
   email: string;
@@ -38,6 +41,8 @@ export default function OwnerDashboardClient({
   isSuperAdmin: boolean; 
   hasGoogleDrive?: boolean;
   googleEmail?: string | null;
+  initialOwner?: any;
+  initialSubscription?: any;
 }) {
   console.log('OwnerDashboardClient Rendered:', { userId, email, ownerId, isSuperAdmin })
   
@@ -73,18 +78,19 @@ export default function OwnerDashboardClient({
 
   // Use useMemo for trial calculation to avoid redundant calculations
   const { isFreeTier } = useMemo(() => {
-    if (!data) return { isFreeTier: false }
+    const sub = (data as any)?.subscription || initialSubscription
+    const own = (data as any)?.owner || initialOwner
+    if (!sub && !own) return { isFreeTier: false }
     
-    const { subscription, owner } = data as any
-    const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
+    const isPaid = sub?.status === 'active' && new Date(sub.end_date) > new Date()
     
     // 7-day Trial Logic from Owner Creation Date
-    const ownerCreatedAt = owner?.created_at ? new Date(owner.created_at) : null
+    const ownerCreatedAt = own?.created_at ? new Date(own.created_at) : null
     const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
     const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
     
     return { isFreeTier: isExpired }
-  }, [data])
+  }, [data, initialOwner, initialSubscription])
 
 
 
@@ -92,13 +98,13 @@ export default function OwnerDashboardClient({
     try {
       const result = await requestPayout(ownerId, amount, bankDetails) as any
       if (result.success) {
-        queryClient.invalidateQueries(['dashboard_data', ownerId] as any)
-        alert('Payout request submitted successfully!')
+        queryClient.invalidateQueries({ queryKey: ['dashboard_data', ownerId] })
+        toast.success('Payout request submitted successfully!')
       } else {
-        alert(result.error || 'Failed to request payout')
+        toast.error(result.error || 'Failed to request payout')
       }
     } catch (err) {
-      alert('An error occurred while requesting payout')
+      toast.error('An error occurred while requesting payout')
     }
   }
 

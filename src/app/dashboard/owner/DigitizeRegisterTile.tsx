@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { FileText } from 'lucide-react'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
+import { toast } from '@/components/ui/toast'
 
 type Property = {
   id: string
@@ -23,7 +24,7 @@ export default function DigitizeRegisterTile({ properties }: { properties: Prope
 
   const handleDigitizeRegister = () => {
     if (!selectedPropertyId) {
-      alert('Please select a property.')
+      toast.error('Please select a property.')
       return
     }
 

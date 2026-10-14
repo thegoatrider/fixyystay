@@ -15,6 +15,7 @@ import { addEmployee, fireEmployee, getEmployeesByOwner } from './employees-acti
 import AttendanceKiosk from './AttendanceKiosk'
 import { EmployeeIdUpload, type EmployeeIdData } from './EmployeeIdUpload'
 import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 
 export default function EmployeeSection({
   ownerId,
@@ -62,7 +63,7 @@ export default function EmployeeSection({
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!idData) { alert('Please upload and verify the employee\'s government ID before registering.'); return }
+    if (!idData) { toast.error('Please upload and verify the employee\'s government ID before registering.'); return }
     setIsSubmitting(true)
 
     const formData = new FormData()
@@ -82,11 +83,11 @@ export default function EmployeeSection({
     const result = await addEmployee(formData)
 
     if (result.success) {
-      alert('Employee registered successfully!')
+      toast.success('Employee registered successfully!')
       resetForm()
       fetchEmployees()
     } else {
-      alert(`Error: ${result.error}`)
+      toast.error(`Error: ${result.error}`)
     }
     setIsSubmitting(false)
   }
@@ -94,8 +95,12 @@ export default function EmployeeSection({
   const handleFireEmployee = async (employeeId: string, name: string) => {
     if (confirm(`Are you sure you want to fire ${name}?`)) {
       const result = await fireEmployee(employeeId)
-      if (result.success) fetchEmployees()
-      else alert('Failed to fire employee.')
+      if (result.success) {
+        toast.success(`Removed ${name}`)
+        fetchEmployees()
+      } else {
+        toast.error('Failed to fire employee.')
+      }
     }
   }
 
@@ -445,7 +450,7 @@ export default function EmployeeSection({
                       </Button>
                     )}
                     <Button variant="outline" className="flex-1 lg:flex-none border-gray-200 hover:bg-blue-50 hover:text-blue-600"
-                      onClick={() => alert('Detailed history view coming soon!')}>
+                      onClick={() => toast.info('Detailed history view coming soon!')}>
                       <Clock4 className="w-4 h-4 mr-2" /> History
                     </Button>
                     <Button variant="outline"
