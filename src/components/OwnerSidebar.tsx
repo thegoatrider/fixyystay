@@ -30,20 +30,34 @@ type OwnerSidebarProps = {
 export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get('tab') || 'properties'
-  const router = useRouter()
-  const supabase = createClient()
+  const [activeTab, setActiveTab] = useState<string>(() => searchParams.get('tab') || 'properties')
   const [userName, setUserName] = useState<string>('Owner')
 
   useEffect(() => {
+    setActiveTab(searchParams.get('tab') || 'properties')
+  }, [searchParams])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(params.get('tab') || 'properties')
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    const supabase = createClient()
     async function getUserName() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      if (user && isMounted) {
         setUserName(user.user_metadata?.name || user.email?.split('@')[0] || 'Partner')
       }
     }
     getUserName()
-  }, [supabase])
+    return () => { isMounted = false }
+  }, [])
 
   const menuItems = [
     {
@@ -106,6 +120,15 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
   ]
 
   const isProfileActive = pathname === '/dashboard/owner/profile'
+  const isOwnerDashboard = pathname === '/dashboard/owner'
+
+  const handleTabClick = (tabId: string) => {
+    setActiveTab(tabId)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tabId)
+    window.history.pushState(null, '', url.pathname + url.search)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
 
   return (
     <aside className="hidden md:flex flex-col flex-shrink-0 bg-white border-r border-gray-150 h-screen sticky top-0 z-40 transition-all duration-300 md:w-20 lg:w-64 shadow-sm select-none">
@@ -123,15 +146,35 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-16rem)]">
         {menuItems.map((item) => {
           const Icon = item.icon
+          const itemClasses = `flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all group w-full text-left active:scale-[0.98] ${
+            item.isActive 
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-200/50' 
+              : 'text-gray-500 hover:bg-blue-50/50 hover:text-blue-600'
+          }`
+
+          if (isOwnerDashboard) {
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleTabClick(item.id)}
+                className={itemClasses}
+                title={item.label}
+              >
+                <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${item.isActive ? 'text-white' : 'text-gray-400 group-hover:text-blue-600'}`} />
+                <span className="hidden lg:inline-block truncate">
+                  {item.label}
+                </span>
+              </button>
+            )
+          }
+
           return (
             <Link
               key={item.id}
               href={item.href}
-              className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all group ${
-                item.isActive 
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200/50' 
-                  : 'text-gray-500 hover:bg-blue-50/50 hover:text-blue-600'
-              }`}
+              prefetch={false}
+              className={itemClasses}
               title={item.label}
             >
               <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${item.isActive ? 'text-white' : 'text-gray-400 group-hover:text-blue-600'}`} />
@@ -148,7 +191,8 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
         {/* Settings Shortcut */}
         <Link
           href="/dashboard/owner/profile"
-          className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl font-bold text-sm transition-all group ${
+          prefetch={false}
+          className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl font-bold text-sm transition-all group active:scale-[0.98] ${
             isProfileActive 
               ? 'bg-blue-600 text-white shadow-md' 
               : 'text-gray-500 hover:bg-blue-50/50 hover:text-blue-600'

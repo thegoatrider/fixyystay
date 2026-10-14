@@ -607,8 +607,20 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
     const email = (user.email || '').toLowerCase().trim()
     const isAdmin = isSuperAdminUser(user)
 
+    let existingRooms: any[] | null = null
+
     if (!isAdmin) {
-      let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+      const [ownerRes, propRes, roomsRes] = await Promise.all([
+        supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle(),
+        supabaseAdmin.from('properties').select('id, owner_id').eq('id', propertyId).maybeSingle(),
+        supabaseAdmin
+          .from('property_rooms')
+          .select('id, property_id, room_number, created_at')
+          .eq('property_id', propertyId)
+          .order('room_number', { ascending: true })
+      ])
+
+      let owner = ownerRes.data
       if (!owner && email) {
         const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
         if (matchedOwner) {
@@ -618,22 +630,23 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
       }
       if (!owner) return { success: false, error: 'Owner profile not found' }
 
-      const { data: property } = await supabaseAdmin
-        .from('properties')
-        .select('id, owner_id')
-        .eq('id', propertyId)
-        .maybeSingle()
+      const property = propRes.data
       if (!property) return { success: false, error: 'Property not found' }
       if (property.owner_id && property.owner_id !== owner.id) {
         return { success: false, error: 'Access denied' }
       }
+      existingRooms = roomsRes.data
     } else {
-      const { data: property } = await supabaseAdmin
-        .from('properties')
-        .select('id')
-        .eq('id', propertyId)
-        .maybeSingle()
-      if (!property) return { success: false, error: 'Property not found' }
+      const [propRes, roomsRes] = await Promise.all([
+        supabaseAdmin.from('properties').select('id').eq('id', propertyId).maybeSingle(),
+        supabaseAdmin
+          .from('property_rooms')
+          .select('id, property_id, room_number, created_at')
+          .eq('property_id', propertyId)
+          .order('room_number', { ascending: true })
+      ])
+      if (!propRes.data) return { success: false, error: 'Property not found' }
+      existingRooms = roomsRes.data
     }
 
     // Parse single or comma-separated room numbers
@@ -649,12 +662,6 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
     if (requestedRooms.length === 0) {
       return { success: false, error: 'Please enter a valid room number.' }
     }
-
-    const { data: existingRooms } = await supabaseAdmin
-      .from('property_rooms')
-      .select('id, property_id, room_number, created_at')
-      .eq('property_id', propertyId)
-      .order('room_number', { ascending: true })
 
     const existingSet = new Set(
       (existingRooms || []).map(r => String(r.room_number).trim().toLowerCase())
@@ -731,7 +738,12 @@ export async function deletePropertyRoom(roomId: string) {
     if (!room) return { success: false, error: 'Room not found' }
 
     if (!isAdmin) {
-      let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+      const [ownerRes, propRes] = await Promise.all([
+        supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle(),
+        supabaseAdmin.from('properties').select('id, owner_id').eq('id', room.property_id).maybeSingle()
+      ])
+
+      let owner = ownerRes.data
       if (!owner && email) {
         const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
         if (matchedOwner) {
@@ -741,12 +753,7 @@ export async function deletePropertyRoom(roomId: string) {
       }
       if (!owner) return { success: false, error: 'Owner profile not found' }
 
-      const { data: property } = await supabaseAdmin
-        .from('properties')
-        .select('id, owner_id')
-        .eq('id', room.property_id)
-        .maybeSingle()
-
+      const property = propRes.data
       if (!property || (property.owner_id && property.owner_id !== owner.id)) {
         return { success: false, error: 'Access denied' }
       }
@@ -785,18 +792,20 @@ export async function assignRoomToGuest(checkinId: string, roomNumber: string | 
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).single()
+    const [ownerRes, checkinRes] = await Promise.all([
+      supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).maybeSingle(),
+      supabaseAdmin
+        .from('guest_checkins')
+        .select('id, property_id, owner_id, guest_name, guest_phone, checkout_date')
+        .eq('id', checkinId)
+        .maybeSingle()
+    ])
+
+    const owner = ownerRes.data
+    const checkin = checkinRes.data
+
     if (!owner) return { success: false, error: 'Owner profile not found' }
-
-    // Fetch the checkin to ensure it belongs to this owner
-    const { data: checkin } = await supabaseAdmin
-      .from('guest_checkins')
-      .select('id, property_id, guest_name, guest_phone, checkout_date')
-      .eq('id', checkinId)
-      .eq('owner_id', owner.id)
-      .single()
-
-    if (!checkin) {
+    if (!checkin || checkin.owner_id !== owner.id) {
       return { success: false, error: 'Check-in record not found or access denied' }
     }
 
@@ -874,18 +883,20 @@ export async function checkoutGuest(checkinId: string) {
     if (!user) return { success: false, error: 'Unauthorized' }
 
     const supabaseAdmin = createAdminClient()
-    const { data: owner } = await supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).single()
+    const [ownerRes, checkinRes] = await Promise.all([
+      supabaseAdmin.from('owners').select('id, name').eq('user_id', user.id).maybeSingle(),
+      supabaseAdmin
+        .from('guest_checkins')
+        .select('id, property_id, owner_id')
+        .eq('id', checkinId)
+        .maybeSingle()
+    ])
+
+    const owner = ownerRes.data
+    const checkin = checkinRes.data
+
     if (!owner) return { success: false, error: 'Owner profile not found' }
-
-    // Fetch the checkin to ensure it belongs to this owner
-    const { data: checkin } = await supabaseAdmin
-      .from('guest_checkins')
-      .select('id, property_id')
-      .eq('id', checkinId)
-      .eq('owner_id', owner.id)
-      .single()
-
-    if (!checkin) {
+    if (!checkin || checkin.owner_id !== owner.id) {
       return { success: false, error: 'Check-in record not found or access denied' }
     }
 

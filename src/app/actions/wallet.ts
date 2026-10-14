@@ -16,24 +16,27 @@ export async function requestPayout(userId: string, amount: number, bankDetails:
   // Let's just trust the passed userId but verify it belongs to the logged in user if possible.
   // For simplicity MVP we will directly query the balance of the requested userId.
   
-  // 1. Calculate available balance
-  const { data: transactions } = await supabaseAdmin
-    .from('wallet_transactions')
-    .select('amount, transaction_type')
-    .eq('user_id', userId)
-    
+  // 1. Calculate available balance (fetch transactions and pending requests in parallel)
+  const [transactionsRes, pendingRequestsRes] = await Promise.all([
+    supabaseAdmin
+      .from('wallet_transactions')
+      .select('amount, transaction_type')
+      .eq('user_id', userId),
+    supabaseAdmin
+      .from('payout_requests')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+  ])
+
+  const transactions = transactionsRes.data
+  const pendingRequests = pendingRequestsRes.data
+
   let balance = 0
   transactions?.forEach(t => {
     if (t.transaction_type === 'earning') balance += Number(t.amount)
     if (t.transaction_type === 'payout') balance -= Math.abs(Number(t.amount))
   })
-
-  // Subtract pending payouts
-  const { data: pendingRequests } = await supabaseAdmin
-    .from('payout_requests')
-    .select('amount')
-    .eq('user_id', userId)
-    .eq('status', 'pending')
 
   let pendingAmount = 0
   pendingRequests?.forEach(r => {

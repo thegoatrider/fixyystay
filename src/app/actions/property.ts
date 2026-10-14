@@ -61,7 +61,12 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   
   // Verify ownership if not admin
   if (!isAdmin) {
-    let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+    const [ownerRes, propRes] = await Promise.all([
+      supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle(),
+      supabaseAdmin.from('properties').select('id, owner_id').eq('id', propertyId).maybeSingle()
+    ])
+
+    let owner = ownerRes.data
     if (!owner && user.email) {
       const { data: matchedOwner } = await supabaseAdmin
         .from('owners')
@@ -75,7 +80,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     }
     if (!owner) return { error: 'Owner profile not found.' }
     
-    const { data: prop } = await supabaseAdmin.from('properties').select('id, owner_id').eq('id', propertyId).maybeSingle()
+    const prop = propRes.data
     if (!prop) return { error: 'Property not found.' }
     
     // If property has no owner, self-heal and associate with this owner

@@ -42,8 +42,32 @@ export default function OwnerDashboardClient({
   console.log('OwnerDashboardClient Rendered:', { userId, email, ownerId, isSuperAdmin })
   
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get('tab') || 'properties'
+  const [activeTab, setActiveTab] = React.useState<string>(() => searchParams.get('tab') || 'properties')
   const queryClient = useQueryClient()
+
+  // Sync state with URL if changed externally (e.g. Next.js router)
+  React.useEffect(() => {
+    setActiveTab(searchParams.get('tab') || 'properties')
+  }, [searchParams])
+
+  // Listen to popstate for instant back/forward button navigation with 0 server roundtrips
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveTab(params.get('tab') || 'properties')
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Client-only tab switcher: 0ms UI update, pushState to URL, 0 server calls
+  const switchTab = React.useCallback((tab: string) => {
+    setActiveTab(tab)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tab)
+    window.history.pushState(null, '', url.pathname + url.search)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [])
 
   const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
@@ -107,7 +131,7 @@ export default function OwnerDashboardClient({
         </div>
         <div className="flex flex-wrap gap-2">
           {isFreeTier && (
-            <Link href="/pricing/starter">
+            <Link href="/pricing/starter" prefetch={false}>
               <Button className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold border-none shadow-lg hover:shadow-orange-200/50 transition-all hover:scale-105 rounded-xl px-6">
                 <Zap className="w-4 h-4 mr-2 animate-pulse" />
                 Upgrade to Pro
@@ -119,15 +143,26 @@ export default function OwnerDashboardClient({
 
       {/* Tabs / Navigation (Only visible on Mobile, hidden on tablet/desktop mode) */}
       <div className="md:hidden flex flex-wrap border-b border-gray-100 w-full mb-2">
-        <TabLink href="/dashboard/owner?tab=properties" active={activeTab === 'properties'} icon={<Home className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
-        <TabLink href="/dashboard/owner?tab=guest-hub" active={activeTab === 'guest-hub'} icon={<QrCode className="w-4 h-4 md:w-5 md:h-5" />} label="Guest Hub" />
-        <TabLink href="/dashboard/owner?tab=leads" active={activeTab === 'leads'} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
-        <TabLink href="/dashboard/owner?tab=guests" active={activeTab === 'guests'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
-        <TabLink href="/dashboard/owner?tab=employees" active={activeTab === 'employees'} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Employees" />
-        <TabLink href="/dashboard/owner?tab=influencers" active={activeTab === 'influencers'} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Influencers" count={pendingInfluencerRequestCount} />
-        <TabLink href="/dashboard/owner?tab=wallet" active={activeTab === 'wallet'} icon={<Wallet className="w-4 h-4 md:w-5 md:h-5" />} label="Wallet" />
-        <TabLink href="/dashboard/owner?tab=marketing" active={activeTab === 'marketing'} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Marketing" />
-        <TabLink href="/dashboard/owner/profile" active={activeTab === 'profile'} icon={<User className="w-4 h-4 md:w-5 md:h-5" />} label="Profile & Plan" />
+        <TabButton active={activeTab === 'properties'} onClick={() => switchTab('properties')} icon={<Home className="w-4 h-4 md:w-5 md:h-5" />} label="Properties" />
+        <TabButton active={activeTab === 'guest-hub'} onClick={() => switchTab('guest-hub')} icon={<QrCode className="w-4 h-4 md:w-5 md:h-5" />} label="Guest Hub" />
+        <TabButton active={activeTab === 'leads'} onClick={() => switchTab('leads')} icon={<MessageSquare className="w-4 h-4 md:w-5 md:h-5" />} label="Leads" count={leads?.length} />
+        <TabButton active={activeTab === 'guests'} onClick={() => switchTab('guests')} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Guests" count={checkins?.length} />
+        <TabButton active={activeTab === 'employees'} onClick={() => switchTab('employees')} icon={<Users className="w-4 h-4 md:w-5 md:h-5" />} label="Employees" />
+        <TabButton active={activeTab === 'influencers'} onClick={() => switchTab('influencers')} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Influencers" count={pendingInfluencerRequestCount} />
+        <TabButton active={activeTab === 'wallet'} onClick={() => switchTab('wallet')} icon={<Wallet className="w-4 h-4 md:w-5 md:h-5" />} label="Wallet" />
+        <TabButton active={activeTab === 'marketing'} onClick={() => switchTab('marketing')} icon={<Megaphone className="w-4 h-4 md:w-5 md:h-5" />} label="Marketing" />
+        <Link 
+          href="/dashboard/owner/profile" 
+          prefetch={false}
+          className={`flex-auto text-center px-2 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center justify-center gap-1 sm:gap-2 min-w-[30%] sm:min-w-[120px] active:scale-[0.98] ${
+            activeTab === 'profile' 
+              ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+              : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <User className="w-4 h-4 md:w-5 md:h-5" />
+          <span>Profile &amp; Plan</span>
+        </Link>
       </div>
 
       {/* Dynamic Tab Content */}
@@ -160,7 +195,7 @@ export default function OwnerDashboardClient({
                 </span>
               </div>
               {!hasGoogleDrive && (
-                <Link href="/dashboard/owner/profile" className="text-blue-600 hover:underline shrink-0 font-bold uppercase tracking-wider text-[10px]">
+                <Link href="/dashboard/owner/profile" prefetch={false} className="text-blue-600 hover:underline shrink-0 font-bold uppercase tracking-wider text-[10px]">
                   Set Up Sync &rarr;
                 </Link>
               )}
@@ -186,7 +221,7 @@ export default function OwnerDashboardClient({
                     <Home className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-gray-900">No properties yet</h3>
                     <p className="text-gray-500 mb-6 max-w-xs mx-auto">Go to Profile &amp; Plan to add your first property.</p>
-                    <Link href="/dashboard/owner/profile">
+                    <Link href="/dashboard/owner/profile" prefetch={false}>
                       <Button>Go to Profile &amp; Plan</Button>
                     </Link>
                   </div>
@@ -250,7 +285,7 @@ export default function OwnerDashboardClient({
             <div>
               <h4 className="font-bold text-lg">Trial Expired</h4>
               <p className="text-gray-400 text-sm mb-4">Your 7-day free trial has ended. Upgrade to Pro to unlock lead and guest details.</p>
-              <Link href="/pricing/starter">
+              <Link href="/pricing/starter" prefetch={false}>
                 <Button className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold rounded-xl h-11">
                   View Pricing Plans
                 </Button>
@@ -263,11 +298,24 @@ export default function OwnerDashboardClient({
   )
 }
 
-function TabLink({ href, active, icon, label, count }: { href: string, active: boolean, icon: React.ReactNode, label: string, count?: number }) {
+function TabButton({ 
+  active, 
+  onClick, 
+  icon, 
+  label, 
+  count 
+}: { 
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  count?: number 
+}) {
   return (
-    <Link 
-      href={href}
-      className={`flex-auto text-center px-2 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center justify-center gap-1 sm:gap-2 min-w-[30%] sm:min-w-[120px] ${
+    <button 
+      type="button"
+      onClick={onClick}
+      className={`flex-auto text-center px-2 md:px-8 py-3.5 font-bold text-[11px] sm:text-sm transition-all border-b-2 flex items-center justify-center gap-1 sm:gap-2 min-w-[30%] sm:min-w-[120px] active:scale-[0.98] ${
         active 
           ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
           : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
@@ -276,9 +324,11 @@ function TabLink({ href, active, icon, label, count }: { href: string, active: b
       {icon}
       <span className="flex items-center">
         {label}
-        {count !== undefined && count > 0 && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-black">{count}</span>}
+        {count !== undefined && count > 0 && (
+          <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-black">{count}</span>
+        )}
       </span>
-    </Link>
+    </button>
   )
 }
 

@@ -130,7 +130,7 @@ export default function AdminPropertiesSearch({
                       </Button>
                       <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} />
                       <Button asChild size="sm" variant="outline" className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50">
-                        <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage</Link>
+                        <Link href={`/dashboard/admin/properties/${prop.id}`} prefetch={false}>Manage</Link>
                       </Button>
                     </div>
                   </td>
@@ -190,7 +190,7 @@ export default function AdminPropertiesSearch({
               </Button>
               <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="flex-1" />
               <Button asChild variant="outline" size="sm" className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 h-9 font-bold">
-                <Link href={`/dashboard/admin/properties/${prop.id}`}>Manage Details</Link>
+                <Link href={`/dashboard/admin/properties/${prop.id}`} prefetch={false}>Manage Details</Link>
               </Button>
             </div>
           </div>

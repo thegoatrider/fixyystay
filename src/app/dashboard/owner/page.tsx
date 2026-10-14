@@ -49,63 +49,47 @@ export default async function OwnerDashboard() {
     }
   }
 
-  // 3. Strict Subscription & Payment Gating
-  if (!isSuperAdmin) {
-    if (!owner) {
-      redirect('/onboarding?step=payment&reason=unpaid')
-    }
+  // 3. Strict Subscription & Payment Gating + Google Token in Parallel
+  if (!isSuperAdmin && !owner) {
+    redirect('/onboarding?step=payment&reason=unpaid')
+  }
 
-    const isFreeTier = (owner as any)?.free_tier_enabled === true
-    if (!isFreeTier) {
-      const { data: sub } = await supabase
-        .from('owner_subscriptions')
-        .select('status, end_date')
-        .eq('owner_id', owner.id)
+  const isFreeTier = (owner as any)?.free_tier_enabled === true
+
+  // Run subscription check and Google drive token lookup concurrently
+  const [subResult, googleTokenResult] = await Promise.all([
+    !isSuperAdmin && owner && !isFreeTier
+      ? supabase.from('owner_subscriptions').select('status, end_date').eq('owner_id', owner.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    owner
+      ? supabase.from('owner_google_tokens').select('google_email').eq('owner_id', owner.id).maybeSingle()
+      : Promise.resolve({ data: null })
+  ])
+
+  if (!isSuperAdmin && owner && !isFreeTier) {
+    const sub = subResult.data
+    const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+    
+    if (!isSubActive) {
+      // Also allow owners who purchased standalone Guest Hub (₹20/room/month)
+      // Single query inner join through FK (guest_hub_settings.property_id -> properties.id)
+      const supabaseAdmin = createAdminClient()
+      const { data: activeHub } = await supabaseAdmin
+        .from('guest_hub_settings')
+        .select('id, properties!inner(id, owner_id)')
+        .eq('properties.owner_id', owner.id)
+        .eq('subscription_status', 'active')
+        .limit(1)
         .maybeSingle()
 
-      const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
-      if (!isSubActive) {
-        // Also allow owners who purchased standalone Guest Hub (₹20/room/month)
-        const supabaseAdmin = createAdminClient()
-        const { data: ownerProps } = await supabaseAdmin
-          .from('properties')
-          .select('id')
-          .eq('owner_id', owner.id)
-
-        const propIds = (ownerProps || []).map((p: any) => p.id)
-        let hasActiveGuestHub = false
-
-        if (propIds.length > 0) {
-          const { data: activeHub } = await supabaseAdmin
-            .from('guest_hub_settings')
-            .select('id')
-            .in('property_id', propIds)
-            .eq('subscription_status', 'active')
-            .limit(1)
-            .maybeSingle()
-
-          if (activeHub) hasActiveGuestHub = true
-        }
-
-        if (!hasActiveGuestHub) {
-          redirect('/onboarding?step=payment&reason=unpaid')
-        }
+      if (!activeHub) {
+        redirect('/onboarding?step=payment&reason=unpaid')
       }
     }
   }
 
-  // 4. Fetch Google token status
-  let hasGoogleDrive = false
-  let googleEmail: string | null = null
-  if (owner) {
-    const { data: googleToken } = await supabase
-      .from('owner_google_tokens')
-      .select('google_email')
-      .eq('owner_id', owner.id)
-      .maybeSingle()
-    hasGoogleDrive = !!googleToken?.google_email
-    googleEmail = googleToken?.google_email || null
-  }
+  const hasGoogleDrive = !!googleTokenResult.data?.google_email
+  const googleEmail = googleTokenResult.data?.google_email || null
   
   // 4. Render the Client Dashboard
   return (

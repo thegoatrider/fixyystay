@@ -435,6 +435,7 @@ export default function GuestHubSection({
             <>
               <Link
                 href={`/staff?propertyId=${selectedPropertyId}`}
+                prefetch={false}
                 target="_blank"
                 className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black flex items-center gap-1.5 shadow-sm"
               >
