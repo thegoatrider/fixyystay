@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import Razorpay from 'razorpay'
 import { addMonths, addYears } from 'date-fns'
 import { headers } from 'next/headers'
@@ -175,16 +175,14 @@ export async function verifyAndUpgrade(
       ownerName = owner.name || ownerName
       if (!owner.user_id) {
         // Auto-link to existing auth user if present
-        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-        const match = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+        const match = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
         if (match) {
           await supabaseAdmin.from('owners').update({ user_id: match.id }).eq('id', owner.id)
         }
       }
     } else {
       // Owner does not exist yet: check if auth user exists first
-      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-      let existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+      let existingUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
       let userId = existingUser?.id || null
 
       if (!userId) {

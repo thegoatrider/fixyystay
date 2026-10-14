@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { addMonths } from 'date-fns'
 import Razorpay from 'razorpay'
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import {
   starter,
@@ -372,10 +372,7 @@ export async function verifyGuestHubPayment(
         ownerId = existingOwner.id
       } else {
         // Check or create Supabase Auth user
-        const {
-          data: { users },
-        } = await supabaseAdmin.auth.admin.listUsers()
-        const matchedAuthUser = users?.find((u) => u.email?.toLowerCase() === email)
+        const matchedAuthUser = await findAuthUserByEmail(supabaseAdmin, email)
         let userId = matchedAuthUser?.id || null
 
         if (!userId) {
@@ -784,10 +781,7 @@ export async function adminOnboardHotelAction(params: {
       .maybeSingle()
 
     if (!owner) {
-      const {
-        data: { users },
-      } = await supabaseAdmin.auth.admin.listUsers()
-      const existingAuth = users?.find((u) => u.email?.toLowerCase() === normalizedEmail)
+      const existingAuth = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
       let userId = existingAuth?.id || null
 
       if (!userId) {

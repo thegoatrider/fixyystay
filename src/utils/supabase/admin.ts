@@ -24,3 +24,31 @@ export function createAdminClient() {
     },
   });
 }
+
+/**
+ * Robust paginated lookup to find an auth user across all pages in Supabase auth.users.
+ * Default listUsers() only returns 50 users on page 1, which causes lookups to fail
+ * when databases grow beyond 50 users.
+ */
+export async function findAuthUserByEmail(supabaseAdmin: any, email: string) {
+  if (!email) return null
+  const target = email.toLowerCase().trim()
+  let page = 1
+  const perPage = 1000
+  while (page <= 25) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    })
+    if (error || !data?.users || data.users.length === 0) {
+      break
+    }
+    const found = data.users.find(
+      (u: any) => u.email?.toLowerCase().trim() === target
+    )
+    if (found) return found
+    if (!data.nextPage || data.users.length < perPage) break
+    page++
+  }
+  return null
+}

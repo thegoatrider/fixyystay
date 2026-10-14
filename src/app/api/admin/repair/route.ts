@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 
 export async function GET() {
   try {
@@ -166,8 +166,7 @@ export async function POST(req: Request) {
     }
 
     // Delete any existing auth user
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-    const existingAuthUser = users?.find(u => u.email?.toLowerCase() === email)
+    const existingAuthUser = await findAuthUserByEmail(supabaseAdmin, email)
     if (existingAuthUser) {
       await supabaseAdmin.auth.admin.deleteUser(existingAuthUser.id)
     }

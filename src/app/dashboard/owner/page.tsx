@@ -40,7 +40,7 @@ export default async function OwnerDashboard() {
           user_id: user.id,
           email: lowerEmail,
           name: user.user_metadata?.name || user.email.split('@')[0],
-          phone_number: ''
+          phone: user.user_metadata?.phone || ''
         })
         .select('id, created_at, free_tier_enabled')
         .single()

@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 import { getCityCode } from '@/lib/india-locations'
@@ -54,8 +54,7 @@ export async function checkEmailAvailability(email: string) {
   }
 
   // Also check if user exists in auth.users directly
-  const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-  const authUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+  const authUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
   if (authUser) {
     return { success: true, unpaidExisting: true }
   }
@@ -80,7 +79,7 @@ export async function submitOnboarding(formData: FormData) {
     return { error: 'A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
   }
 
-  const normalizedEmail = email.toLowerCase()
+  const normalizedEmail = email.toLowerCase().trim()
 
   // 1. Create or update user as an owner with auto-confirmed email
   const supabaseAdmin = createAdminClient()
@@ -99,20 +98,28 @@ export async function submitOnboarding(formData: FormData) {
 
   if (!adminAuthError && adminAuthData?.user) {
     userId = adminAuthData.user.id
-  } else if (adminAuthError?.message?.toLowerCase().includes('already registered') || adminAuthError?.message?.toLowerCase().includes('already exists')) {
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-    const existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+  } else {
+    // If createUser returned an error (e.g. user already exists or already registered),
+    // find the user across all pages and update their credentials and metadata
+    const existingUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
     if (existingUser) {
       userId = existingUser.id
-      await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
         password,
         email_confirm: true,
         user_metadata: {
+          ...(existingUser.user_metadata || {}),
           name,
           role: 'owner',
           phone,
         }
       })
+      if (updateError) {
+        console.error('Error updating existing auth user during onboarding:', updateError)
+      }
+    } else {
+      console.error('Failed to create or find auth user:', adminAuthError)
+      return { error: adminAuthError?.message || 'Failed to create account. Please try again.' }
     }
   }
 
@@ -120,8 +127,12 @@ export async function submitOnboarding(formData: FormData) {
     return { error: adminAuthError?.message || 'Failed to create account' }
   }
 
-  // 2. Get or Insert into owners table
-  const { data: existingOwner } = await supabaseAdmin.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+  // 2. Get or Insert into owners table (check both email and user_id to handle recreated/orphaned accounts)
+  const { data: existingOwner } = await supabaseAdmin
+    .from('owners')
+    .select('id, user_id')
+    .or(`email.eq.${normalizedEmail},user_id.eq.${userId}`)
+    .maybeSingle()
   let ownerId = existingOwner?.id
 
   if (!existingOwner) {
@@ -136,6 +147,15 @@ export async function submitOnboarding(formData: FormData) {
 
     if (dbError) {
       console.error('Failed to create owner record:', dbError)
+      // Retry lookup in case of parallel creation
+      const { data: retryOwner } = await supabaseAdmin
+        .from('owners')
+        .select('id')
+        .or(`email.eq.${normalizedEmail},user_id.eq.${userId}`)
+        .maybeSingle()
+      if (retryOwner) {
+        ownerId = retryOwner.id
+      }
     } else if (newOwner) {
       ownerId = newOwner.id
     }
@@ -143,7 +163,7 @@ export async function submitOnboarding(formData: FormData) {
     // If owner exists, ensure user_id and phone are up to date
     const { error: updateError } = await supabaseAdmin
       .from('owners')
-      .update({ user_id: userId, name, phone })
+      .update({ user_id: userId, name, phone, email: normalizedEmail })
       .eq('id', existingOwner.id)
     
     if (updateError) {

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 async function getAbsoluteOrigin() {
@@ -40,8 +40,7 @@ export async function login(formData: FormData) {
   // If Supabase blocked login due to unconfirmed email, auto-confirm it via admin and retry
   if (error && error.message?.toLowerCase().includes('email not confirmed')) {
     const supabaseAdmin = createAdminClient()
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-    const targetUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    const targetUser = await findAuthUserByEmail(supabaseAdmin, email)
     if (targetUser) {
       await supabaseAdmin.auth.admin.updateUserById(targetUser.id, { email_confirm: true })
       const retry = await supabase.auth.signInWithPassword({ email, password })
@@ -59,7 +58,11 @@ export async function login(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const normalizedEmail = user.email ? user.email.toLowerCase() : ''
-    const { data: owner } = await supabase.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+    let { data: owner } = await supabase.from('owners').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
+    if (!owner) {
+      const { data: ownerByUserId } = await supabase.from('owners').select('id, user_id').eq('user_id', user.id).maybeSingle()
+      if (ownerByUserId) owner = ownerByUserId
+    }
     const { data: influencer } = await supabase.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
 
     if (owner && owner.user_id !== user.id) {
