@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Home, CheckCircle, Clock, Building } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import React from 'react'
+import { getOptimizedImageUrl } from '@/lib/image-url'
 
 type Property = {
   id: string
@@ -18,7 +19,8 @@ type Property = {
 }
 
 export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
-  const displayImage = prop.image_url || (prop.image_urls && prop.image_urls.length > 0 ? prop.image_urls[0] : null)
+  const rawImage = prop.image_url || (prop.image_urls && prop.image_urls.length > 0 ? prop.image_urls[0] : null)
+  const displayImage = getOptimizedImageUrl(rawImage, { width: 600, quality: 75 })
 
   return (
     <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300 flex flex-col group w-full h-full select-none">
@@ -29,9 +31,9 @@ export const PropertyCard = React.memo(({ prop }: { prop: Property }) => {
             src={displayImage} 
             alt={prop.name} 
             fill 
-            unoptimized
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            loading="lazy"
             priority={false}
           />
         ) : (
