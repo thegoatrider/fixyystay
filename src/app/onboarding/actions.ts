@@ -69,9 +69,15 @@ export async function submitOnboarding(formData: FormData) {
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const phone = ((formData.get('phone') as string) || '').trim()
 
   if (!name || !email || !password) {
     return { error: 'Name, email, and password are required' }
+  }
+
+  const cleanPhone = phone.replace(/\D/g, '')
+  if (!phone || cleanPhone.length < 10) {
+    return { error: 'A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
   }
 
   const normalizedEmail = email.toLowerCase()
@@ -87,6 +93,7 @@ export async function submitOnboarding(formData: FormData) {
     user_metadata: {
       name,
       role: 'owner',
+      phone,
     },
   })
 
@@ -103,6 +110,7 @@ export async function submitOnboarding(formData: FormData) {
         user_metadata: {
           name,
           role: 'owner',
+          phone,
         }
       })
     }
@@ -122,6 +130,7 @@ export async function submitOnboarding(formData: FormData) {
         user_id: userId,
         name,
         email: normalizedEmail,
+        phone,
       },
     ]).select('id').single()
 
@@ -131,16 +140,14 @@ export async function submitOnboarding(formData: FormData) {
       ownerId = newOwner.id
     }
   } else {
-    // If owner exists but user_id is null (webhook placeholder), link it!
-    if (!existingOwner.user_id) {
-      const { error: updateError } = await supabaseAdmin
-        .from('owners')
-        .update({ user_id: userId, name })
-        .eq('id', existingOwner.id)
-      
-      if (updateError) {
-        console.error('Failed to link existing owner record:', updateError)
-      }
+    // If owner exists, ensure user_id and phone are up to date
+    const { error: updateError } = await supabaseAdmin
+      .from('owners')
+      .update({ user_id: userId, name, phone })
+      .eq('id', existingOwner.id)
+    
+    if (updateError) {
+      console.error('Failed to link existing owner record:', updateError)
     }
   }
 
@@ -157,13 +164,15 @@ export async function submitOnboarding(formData: FormData) {
   // Capture property details to be passed along with the subscription order.
   // NOTE: Property is created ONLY upon verified payment (or manual admin activation)
   // to avoid unpaid properties from entering the approval queue before completing payment.
-  const propertyData = (propertyName || city || pincode) ? {
+  const propertyData = {
     propertyName: propertyName || `${name}'s Property`,
     city: finalCity,
     cityArea: finalArea,
     pincode: pincode || null,
     state: state || null,
-  } : undefined
+    phone,
+    helpdeskNumber: phone,
+  }
 
   // Sign the user in so their session is active for subsequent steps
   await supabase.auth.signInWithPassword({
@@ -176,6 +185,7 @@ export async function submitOnboarding(formData: FormData) {
     ownerId, 
     userId, 
     email: normalizedEmail,
+    phone,
     propertyData,
   }
 }

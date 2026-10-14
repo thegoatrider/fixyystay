@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail, Zap } from 'lucide-react'
+import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail, Zap, Phone } from 'lucide-react'
 import Link from 'next/link'
 import DeletePropertyButton from './DeletePropertyButton'
 import FeaturedToggle from './FeaturedToggle'
@@ -27,7 +27,7 @@ export default async function AdminDashboard() {
   // 1. Pending Approvals: Fetch all unapproved properties
   const { data: rawPendingProperties } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(id, name, free_tier_enabled), rooms(price_bucket)')
+    .select('*, owners(id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
     .eq('approved', false)
     .neq('city', 'Pending')
     .order('created_at', { ascending: false })
@@ -68,9 +68,9 @@ export default async function AdminDashboard() {
   const unpaidDraftProperties = (rawPendingProperties || []).filter(prop => !isOwnerPaid(prop))
 
   // 2. All Approved Properties
-  const { data: approvedProperties } = await supabase
+  const { data: approvedProperties } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(name)')
+    .select('*, owners(name, email, phone)')
     .eq('approved', true)
     .order('created_at', { ascending: false })
 
@@ -153,11 +153,22 @@ export default async function AdminDashboard() {
   
   const platformCommission = totalRevenueGenerated - paidToOwners - paidToInfluencers
   
-  // 5b. Detailed Owner List for Account Management
-  const { data: allOwnersDetailed } = await supabase
+  // 5b. Detailed Owner List for Account Management (including properties to retrieve contact/phone numbers)
+  const { data: allOwnersDetailed } = await supabaseAdmin
     .from('owners')
-    .select('*, owner_subscriptions(plan_name, status, end_date)')
+    .select('*, owner_subscriptions(plan_name, status, end_date), properties(id, name, helpdesk_number)')
     .order('created_at', { ascending: false })
+
+  // Also fetch auth users to retrieve phone numbers from auth if available
+  let authUsersMap = new Map<string, any>()
+  try {
+    const { data: authUsersRes } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    if (authUsersRes?.users) {
+      authUsersMap = new Map(authUsersRes.users.map(u => [u.id, u]))
+    }
+  } catch (err) {
+    console.warn('Could not list auth users:', err)
+  }
   
   const pendingPayouts = pendingPayoutsRaw?.map(req => {
     const isInf = influencers?.find(i => i.id === req.user_id)
@@ -171,9 +182,9 @@ export default async function AdminDashboard() {
   }) || []
   
   // 6. Inbound Business Leads (New Property Owners)
-  const { data: inboundLeads } = await supabase
+  const { data: inboundLeads } = await supabaseAdmin
     .from('property_owner_leads')
-    .select('id, full_name, area, city, google_link, created_at')
+    .select('id, full_name, phone, area, city, google_link, created_at')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -393,26 +404,52 @@ export default async function AdminDashboard() {
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
                     <th className="px-6 py-3">Lead</th>
+                    <th className="px-6 py-3">Phone / WhatsApp</th>
                     <th className="px-6 py-3">Location</th>
                     <th className="px-6 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {inboundLeads?.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-bold text-gray-900">{lead.full_name}</td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs text-gray-600">{lead.area}</p>
-                        <p className="text-[9px] text-gray-400 font-black uppercase">{lead.city}</p>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <a href={lead.google_link} target="_blank" className="text-blue-600 font-black text-[10px] uppercase">Map</a>
-                      </td>
-                    </tr>
-                  ))}
+                  {inboundLeads?.map((lead) => {
+                    const cleanPhone = (lead.phone || '').replace(/\D/g, '')
+                    return (
+                      <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-gray-900">{lead.full_name}</td>
+                        <td className="px-6 py-4">
+                          {lead.phone ? (
+                            <div className="flex items-center gap-2">
+                              <a href={`tel:${lead.phone}`} className="text-xs font-semibold text-gray-900 hover:text-blue-600 flex items-center gap-1">
+                                <Phone className="w-3.5 h-3.5 text-gray-400" />
+                                {lead.phone}
+                              </a>
+                              {cleanPhone && (
+                                <a 
+                                  href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(lead.full_name)},%20reaching%20out%20from%20FixyStays.`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100 transition-colors inline-flex items-center"
+                                >
+                                  WhatsApp
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-xs text-gray-600">{lead.area}</p>
+                          <p className="text-[9px] text-gray-400 font-black uppercase">{lead.city}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <a href={lead.google_link} target="_blank" className="text-blue-600 font-black text-[10px] uppercase">Map</a>
+                        </td>
+                      </tr>
+                    )
+                  })}
                   {(!inboundLeads || inboundLeads.length === 0) && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-20 text-center text-gray-400">No leads.</td>
+                      <td colSpan={4} className="px-6 py-20 text-center text-gray-400">No leads.</td>
                     </tr>
                   )}
                 </tbody>
@@ -559,7 +596,33 @@ export default async function AdminDashboard() {
                       {prop.uid || 'NO-ID'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">{prop.type} • Owner: {prop.owners?.name}</p>
+                  <p className="text-sm text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{prop.owners?.name || 'Unknown'}</span></p>
+                  {(() => {
+                    const phone = prop.helpdesk_number || prop.owners?.phone
+                    const cleanPhone = phone ? phone.replace(/\D/g, '') : null
+                    return phone ? (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50/60 border border-blue-100 rounded-lg text-xs">
+                        <a href={`tel:${phone}`} className="font-bold text-blue-700 hover:underline flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-blue-600" />
+                          {phone}
+                        </a>
+                        {cleanPhone && (
+                          <a 
+                            href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(prop.owners?.name || 'Owner')},%20reviewing%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded hover:bg-green-100 ml-auto"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        ⚠️ No phone number set
+                      </div>
+                    )
+                  })()}
                   
                   <div className="mt-2 text-sm text-gray-600">
                     <p><span className="font-semibold">Amenities:</span> {prop.amenities?.join(', ') || 'None'}</p>
@@ -615,7 +678,23 @@ export default async function AdminDashboard() {
                       {prop.uid || 'NO-ID'}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500">{prop.type} • Owner: {prop.owners?.name || 'Unknown'}</p>
+                  <p className="text-xs text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{prop.owners?.name || 'Unknown'}</span></p>
+                  {prop.helpdesk_number && (
+                    <div className="flex items-center gap-2 mt-1 text-xs">
+                      <a href={`tel:${prop.helpdesk_number}`} className="font-semibold text-amber-900 hover:underline flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-amber-700" />
+                        {prop.helpdesk_number}
+                      </a>
+                      <a 
+                        href={`https://wa.me/${prop.helpdesk_number.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(prop.owners?.name || 'Owner')},%20following%20up%20on%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100"
+                      >
+                        WhatsApp
+                      </a>
+                    </div>
+                  )}
                   
                   <div className="mt-2 text-xs">
                     <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded text-[11px]">
@@ -700,6 +779,7 @@ export default async function AdminDashboard() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Partner / Email</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone / WhatsApp</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
                 </tr>
@@ -711,11 +791,45 @@ export default async function AdminDashboard() {
                   const daysLeft = sub?.end_date ? Math.ceil((new Date(sub.end_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
                   const isExpiringSoon = isActive && daysLeft <= 7
                   
+                  const authUser = owner.user_id ? authUsersMap.get(owner.user_id) : null
+                  const propWithPhone = owner.properties?.find((p: any) => p.helpdesk_number)
+                  const ownerPhone = owner.phone || authUser?.phone || authUser?.user_metadata?.phone || propWithPhone?.helpdesk_number || null
+                  const cleanPhone = ownerPhone ? ownerPhone.replace(/\D/g, '') : null
+
                   return (
                     <tr key={owner.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <p className="font-bold text-gray-900">{owner.name}</p>
                         <p className="text-[10px] text-gray-400 font-medium">{owner.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {ownerPhone ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <a href={`tel:${ownerPhone}`} className="text-xs font-semibold text-gray-900 hover:text-blue-600 flex items-center gap-1">
+                                <Phone className="w-3.5 h-3.5 text-gray-400" />
+                                {ownerPhone}
+                              </a>
+                              {cleanPhone && (
+                                <a 
+                                  href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(owner.name)},%20reaching%20out%20from%20FixyStays.`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100 transition-colors inline-flex items-center"
+                                >
+                                  WhatsApp
+                                </a>
+                              )}
+                            </div>
+                            {propWithPhone && (
+                              <span className="text-[10px] text-gray-400 truncate max-w-[200px]" title={`Property: ${propWithPhone.name}`}>
+                                Prop: {propWithPhone.name}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">No phone set</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {isActive ? (

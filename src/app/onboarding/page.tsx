@@ -6,7 +6,7 @@ import { createOwnerOrder, verifyAndUpgrade } from '../pricing/business/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle, MapPin, Loader2 } from 'lucide-react'
+import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle, MapPin, Loader2, Phone } from 'lucide-react'
 import Script from 'next/script'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -37,6 +37,7 @@ function OnboardingContent() {
   const [error, setError] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
+  const [userPhone, setUserPhone] = useState('')
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [propertyInfo, setPropertyInfo] = useState<{
     propertyName?: string | null
@@ -44,6 +45,8 @@ function OnboardingContent() {
     cityArea?: string | null
     pincode?: string | null
     state?: string | null
+    phone?: string | null
+    helpdeskNumber?: string | null
   } | null>(null)
 
   // Property Location states
@@ -150,6 +153,14 @@ function OnboardingContent() {
     const formData = new FormData(e.currentTarget)
     const email = (formData.get('email') as string)?.trim()
     const name = formData.get('name') as string
+    const phone = ((formData.get('phone') as string) || '').trim()
+
+    const cleanPhone = phone.replace(/\D/g, '')
+    if (!phone || cleanPhone.length < 10) {
+      setError('A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.')
+      setLoading(null)
+      return
+    }
 
     // 1. Check if email is already registered and has an active subscription
     const checkRes = await checkEmailAvailability(email) as any
@@ -170,6 +181,7 @@ function OnboardingContent() {
 
       setUserEmail(email)
       setUserName(name)
+      setUserPhone(phone)
       if (regRes.ownerId) {
         setOwnerId(regRes.ownerId)
       }
@@ -188,12 +200,16 @@ function OnboardingContent() {
     setLoading(planName)
     try {
       const fullName = `Business ${planName}`
+      const propPayload = propertyInfo 
+        ? { ...propertyInfo, phone: userPhone, helpdeskNumber: userPhone }
+        : { phone: userPhone, helpdeskNumber: userPhone }
+
       const res = await createOwnerOrder(
         fullName, 
         amount, 
         userEmail, 
         ownerId || undefined,
-        propertyInfo || undefined
+        propPayload
       )
       if (res.error) throw new Error(res.error)
 
@@ -204,7 +220,7 @@ function OnboardingContent() {
         name: "FixyStays Onboarding",
         description: `Subscription: ${fullName} Plan`,
         order_id: res.orderId,
-        prefill: { email: userEmail },
+        prefill: { email: userEmail, contact: userPhone },
         theme: { color: "#4F46E5" },
         webview_intent: true,
         config: {
@@ -239,7 +255,7 @@ function OnboardingContent() {
           // Verify and activate subscription & create initial property upon payment
           const verifyRes = await verifyAndUpgrade(response.razorpay_order_id, {
             name: userName,
-            propertyDetails: propertyInfo || undefined
+            propertyDetails: propPayload
           })
           if (verifyRes.success) {
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
@@ -333,6 +349,27 @@ function OnboardingContent() {
                         className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="phone" className="text-gray-700 font-bold">Phone / WhatsApp Number</Label>
+                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Input 
+                        id="phone"
+                        name="phone" 
+                        type="tel"
+                        placeholder="9876543210" 
+                        required 
+                        minLength={10}
+                        maxLength={15}
+                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm font-medium tracking-wide"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500">Required for owner verification, stay booking notifications & WhatsApp support.</p>
                   </div>
 
                   <div className="space-y-2">

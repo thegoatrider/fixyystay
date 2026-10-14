@@ -17,17 +17,9 @@ async function handleSubscriptionReminders(req: NextRequest) {
     const authHeader = req.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
-    // Allow call if CRON_SECRET matches or if called by authorized admin
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // If header doesn't match secret, check if request is from superadmin
-      const { createClient } = await import('@/utils/supabase/server')
-      const { isSuperAdminUser } = await import('@/utils/supabase/auth-roles')
-      const supabase = await createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!isSuperAdminUser(user)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+    // Enforce CRON_SECRET Bearer token authentication
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabaseAdmin = createAdminClient()

@@ -97,7 +97,11 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   const city = formData.get('city') as string
   const city_area = formData.get('cityArea') as string
   const pincode = formData.get('pincode') as string
-  const helpdesk_number = formData.get('helpdeskNumber') as string
+  const helpdesk_number = (formData.get('helpdeskNumber') as string || '').trim()
+  const cleanPhone = helpdesk_number.replace(/\D/g, '')
+  if (!helpdesk_number || cleanPhone.length < 10) {
+    return { error: 'A valid owner contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
+  }
   const amenities = formData.getAll('amenities') as string[]
   const otherAmenitiesRaw = formData.get('otherAmenities') as string || ''
   const otherAmenities = otherAmenitiesRaw.split(',').map(s => s.trim()).filter(s => s !== '')
@@ -178,7 +182,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   }
 
   // 3.8 Check and generate UID if missing (for dummy properties)
-  const { data: currentProp } = await supabaseAdmin.from('properties').select('uid, city, image_url').eq('id', propertyId).single()
+  const { data: currentProp } = await supabaseAdmin.from('properties').select('uid, city, image_url, owner_id').eq('id', propertyId).single()
   let uid = currentProp?.uid
 
   if (!uid && city) {
@@ -239,6 +243,12 @@ export async function updateProperty(propertyId: string, formData: FormData) {
   if (updateError) {
     console.error('Property update error:', updateError)
     return { error: `Update failed: ${updateError.message}` }
+  }
+
+  // Sync phone number to owner record
+  const ownerToSync = targetOwnerId || currentProp?.owner_id
+  if (ownerToSync) {
+    await supabaseAdmin.from('owners').update({ phone: helpdesk_number }).eq('id', ownerToSync)
   }
 
   // 4.5 Handle initial room creation or villa sync

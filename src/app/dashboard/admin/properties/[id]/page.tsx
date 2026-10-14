@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, AlertCircle } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Phone } from 'lucide-react'
 import Link from 'next/link'
 import EditPropertyForm from '@/components/EditPropertyForm'
 import GuestCheckinQR from '@/components/GuestCheckinQR'
@@ -15,7 +15,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
 
   const { data: property, error } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(id, name, free_tier_enabled)')
+    .select('*, owners(id, name, phone, email, free_tier_enabled)')
     .eq('id', propertyId)
     .single()
 
@@ -63,6 +63,9 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
     .eq('property_id', propertyId)
     .order('room_number', { ascending: true })
 
+  const ownerPhone = property.helpdesk_number || (property.owners as any)?.phone || null
+  const cleanPhone = ownerPhone ? ownerPhone.replace(/\D/g, '') : null
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-8">
       <div className="flex items-center gap-4">
@@ -80,6 +83,26 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
               <div>
                 <h2 className="text-lg font-bold">This property is pending approval</h2>
                 <p className="text-sm opacity-80">Review the images and details below before approving.</p>
+                {ownerPhone ? (
+                  <div className="flex items-center gap-3 mt-2 text-sm">
+                    <a href={`tel:${ownerPhone}`} className="font-bold text-orange-950 hover:underline flex items-center gap-1.5">
+                      <Phone className="w-4 h-4 text-orange-600" />
+                      {ownerPhone}
+                    </a>
+                    {cleanPhone && (
+                      <a 
+                        href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20reviewing%20your%20property%20listing%20${encodeURIComponent(property.name)}.`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-xs font-bold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded shadow-sm hover:bg-green-50"
+                      >
+                        WhatsApp Owner
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs font-semibold text-red-600 mt-1">⚠️ No phone number provided</p>
+                )}
               </div>
             </div>
             <div className="w-full sm:w-auto min-w-[200px]">
@@ -95,6 +118,24 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
                 <p className="text-sm opacity-90">
                   The property owner ({property.owners?.name || 'Owner'}) has not completed payment for their subscription. This property is blocked from approval until their subscription is active.
                 </p>
+                {ownerPhone && (
+                  <div className="flex items-center gap-3 mt-2 text-sm">
+                    <a href={`tel:${ownerPhone}`} className="font-bold text-amber-950 hover:underline flex items-center gap-1.5">
+                      <Phone className="w-4 h-4 text-amber-700" />
+                      {ownerPhone}
+                    </a>
+                    {cleanPhone && (
+                      <a 
+                        href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20following%20up%20on%20your%20FixyStays%20listing%20${encodeURIComponent(property.name)}.`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-xs font-bold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded shadow-sm hover:bg-green-50"
+                      >
+                        WhatsApp Owner
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="w-full sm:w-auto min-w-[160px] flex justify-end">
@@ -111,6 +152,26 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
               <div className="flex flex-col gap-1">
                 <div className="text-xs font-black text-gray-400 uppercase tracking-widest">Business Partner</div>
                 <div className="text-xl font-bold text-blue-600">{property.owners?.name || 'Unknown Owner'}</div>
+                {ownerPhone ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <a href={`tel:${ownerPhone}`} className="text-xs font-bold text-gray-800 hover:text-blue-600 flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-blue-500" />
+                      {ownerPhone}
+                    </a>
+                    {cleanPhone && (
+                      <a 
+                        href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20regarding%20your%20property%20${encodeURIComponent(property.name)}.`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100"
+                      >
+                        WhatsApp
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-red-500 font-semibold mt-1">⚠️ No phone number provided</span>
+                )}
               </div>
               <div className="text-right">
                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest">Property ID</div>

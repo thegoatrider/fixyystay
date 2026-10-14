@@ -84,6 +84,12 @@ export default function CreatePropertyForm() {
     }
     
     const formData = new FormData(formEl)
+    const phoneVal = ((formData.get('helpdeskNumber') as string) || '').replace(/\D/g, '')
+    if (phoneVal.length < 10) {
+      alert('A valid phone number with at least 10 digits is mandatory.')
+      setIsLoading(false)
+      return
+    }
     
     if (!coverImage && selectedFiles.length === 0) {
       alert('Please upload a cover image or at least one property image.')
@@ -469,8 +475,23 @@ export default function CreatePropertyForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="helpdeskNumber">Helpdesk Number</Label>
-        <Input id="helpdeskNumber" name="helpdeskNumber" required placeholder="e.g. +91 98765 43210" />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="helpdeskNumber" className="font-bold text-gray-900">Owner Contact / WhatsApp Phone Number</Label>
+          <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
+        </div>
+        <Input 
+          id="helpdeskNumber" 
+          name="helpdeskNumber" 
+          type="tel"
+          required 
+          minLength={10}
+          maxLength={15}
+          placeholder="e.g. 9876543210 or +91 98765 43210" 
+          className="font-medium"
+        />
+        <p className="text-[11px] text-gray-500">
+          Direct phone and WhatsApp number for this property to receive guest enquiries and booking updates.
+        </p>
       </div>
 
       <div className="space-y-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">

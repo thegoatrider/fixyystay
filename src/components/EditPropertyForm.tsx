@@ -598,8 +598,22 @@ export default function EditPropertyForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="helpdeskNumber" className="text-gray-700 font-bold">Helpdesk Number</Label>
-        <Input id="helpdeskNumber" name="helpdeskNumber" required defaultValue={property.helpdesk_number || ""} placeholder="e.g. +91 98765 43210" />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="helpdeskNumber" className="text-gray-700 font-bold">Owner Contact / WhatsApp Phone Number</Label>
+          <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
+        </div>
+        <Input 
+          id="helpdeskNumber" 
+          name="helpdeskNumber" 
+          type="tel"
+          required 
+          minLength={10}
+          maxLength={15}
+          defaultValue={property.helpdesk_number || ""} 
+          placeholder="e.g. 9876543210 or +91 98765 43210" 
+          className="font-medium"
+        />
+        <p className="text-[11px] text-gray-500">Direct phone/WhatsApp number for booking enquiries and guest coordination.</p>
       </div>
 
       <div className="space-y-4 bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-5">

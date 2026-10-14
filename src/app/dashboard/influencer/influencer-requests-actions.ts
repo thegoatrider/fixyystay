@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -52,7 +53,7 @@ export async function submitPromotionRequest(propertyId: string, proposalText: s
 
     if (!existingInfluencer) {
       // Auto-create if they have the role but no record
-      if (user.user_metadata?.role === 'influencer' || user.email === 'superadmin@fixstay.com') {
+      if (getEffectiveUserRole(user) === 'influencer' || isSuperAdminUser(user)) {
         const { data: newInfluencer, error: createError } = await supabase
           .from('influencers')
           .insert({

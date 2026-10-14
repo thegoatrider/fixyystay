@@ -168,7 +168,7 @@ export async function createProperty(formData: FormData) {
   }
 
   // 2.5 Strict Subscription Gate: Block unpaid owners from creating properties
-  const isSuperAdmin = user.email === 'superadmin@fixstay.com' || user.user_metadata?.role === 'superadmin' || user.user_metadata?.role === 'admin'
+  const isSuperAdmin = isSuperAdminUser(user)
   if (!isSuperAdmin) {
     let isPaid = (owner as any)?.free_tier_enabled === true
     if (!isPaid) {
@@ -222,7 +222,11 @@ export async function createProperty(formData: FormData) {
   const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
   const city = (formData.get('city') as string) || 'Raigad'
-  const helpdeskNumber = formData.get('helpdeskNumber') as string
+  const helpdeskNumber = (formData.get('helpdeskNumber') as string || '').trim()
+  const cleanPhone = helpdeskNumber.replace(/\D/g, '')
+  if (!helpdeskNumber || cleanPhone.length < 10) {
+    return { error: 'A valid phone/WhatsApp number (at least 10 digits) is mandatory.' }
+  }
   const max_guests = parseInt(formData.get('max_guests') as string) || 2
   const max_capacity = parseInt(formData.get('max_capacity') as string) || 20
   const extra_per_pax = parseFloat(formData.get('extra_per_pax') as string) || 0
@@ -347,6 +351,9 @@ export async function createProperty(formData: FormData) {
     console.error('Property insert error:', insertError)
     return { error: `DB Error (${insertError.code}): ${insertError.message}` }
   }
+
+  // Sync phone to owner profile
+  await supabaseAdmin.from('owners').update({ phone: helpdeskNumber }).eq('id', owner.id)
 
   // 6. Create initial room(s)
   if (property?.id) {

@@ -38,6 +38,8 @@ export async function createOwnerOrder(
     cityArea?: string | null
     pincode?: string | null
     state?: string | null
+    phone?: string | null
+    helpdeskNumber?: string | null
   }
 ) {
   try {
@@ -77,6 +79,10 @@ export async function createOwnerOrder(
     if (propertyDetails?.state) {
       notes.state = propertyDetails.state.slice(0, 40)
     }
+    const phoneToPass = propertyDetails?.phone || propertyDetails?.helpdeskNumber
+    if (phoneToPass) {
+      notes.phone = phoneToPass.slice(0, 20)
+    }
 
     const options = {
       amount: amount * 100, // Razorpay works in paise
@@ -111,6 +117,8 @@ export async function verifyAndUpgrade(
       cityArea?: string | null
       pincode?: string | null
       state?: string | null
+      phone?: string | null
+      helpdeskNumber?: string | null
     }
   }
 ) {
@@ -230,8 +238,14 @@ export async function verifyAndUpgrade(
       .eq('owner_id', ownerId)
       .limit(1)
 
+    const orderNotes = (order.notes || {}) as Record<string, any>
+    const phone = orderNotes.phone || signupData?.propertyDetails?.phone || signupData?.propertyDetails?.helpdeskNumber || null
+
+    if (phone && ownerId) {
+      await supabaseAdmin.from('owners').update({ phone }).eq('id', ownerId)
+    }
+
     if (!existingProperties || existingProperties.length === 0) {
-      const orderNotes = (order.notes || {}) as Record<string, any>
       const propName = 
         orderNotes.property_name || 
         signupData?.propertyName || 
@@ -270,6 +284,7 @@ export async function verifyAndUpgrade(
           state: state || null,
           type: 'multi-room property',
           uid,
+          helpdesk_number: phone,
           approved: false,
         }
       ])
