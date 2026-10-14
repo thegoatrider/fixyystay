@@ -27,12 +27,33 @@ export default async function AdminDashboard() {
   const supabaseAdmin = createAdminClient()
 
   // 1. Pending Approvals: Fetch all unapproved properties
-  const { data: rawPendingProperties } = await supabaseAdmin
-    .from('properties')
-    .select('*, owners(id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
-    .eq('approved', false)
-    .neq('city', 'Pending')
-    .order('created_at', { ascending: false })
+  let rawPendingProperties: any[] = []
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('properties')
+      .select('*, owners(id, name, email, free_tier_enabled), rooms(price_bucket)')
+      .eq('approved', false)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.warn('Pending properties fetch error (retrying without rooms):', error)
+      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+        .from('properties')
+        .select('*, owners(id, name, email, free_tier_enabled)')
+        .eq('approved', false)
+        .order('created_at', { ascending: false })
+
+      if (fallbackError) {
+        console.error('Pending properties fallback fetch error:', fallbackError)
+      } else {
+        rawPendingProperties = fallbackData || []
+      }
+    } else {
+      rawPendingProperties = data || []
+    }
+  } catch (e) {
+    console.error('Failed to load pending properties:', e)
+  }
 
   // Active subscriptions for owners
   const { data: activeSubs } = await supabaseAdmin
@@ -58,21 +79,22 @@ export default async function AdminDashboard() {
 
   const isOwnerPaid = (prop: any) => {
     if (!prop) return false
-    const owner = prop.owners
+    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
     if (owner?.free_tier_enabled === true) return true
     if (prop.owner_id && activeSubOwnerIds.has(prop.owner_id)) return true
     if (activeHubPropertyIds.has(prop.id)) return true
     return false
   }
 
-  // Filter properties: ONLY show for approval if owner has completed payment
-  const pendingProperties = (rawPendingProperties || []).filter(prop => isOwnerPaid(prop))
-  const unpaidDraftProperties = (rawPendingProperties || []).filter(prop => !isOwnerPaid(prop))
+  // Filter properties: exclude draft placeholder 'Pending' properties and partition by paid status
+  const validUnapproved = (rawPendingProperties || []).filter(prop => prop.city !== 'Pending')
+  const pendingProperties = validUnapproved.filter(prop => isOwnerPaid(prop))
+  const unpaidDraftProperties = validUnapproved.filter(prop => !isOwnerPaid(prop))
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(name, email, phone)')
+    .select('*, owners(id, name, email, free_tier_enabled)')
     .eq('approved', true)
     .order('created_at', { ascending: false })
 
@@ -598,38 +620,46 @@ export default async function AdminDashboard() {
                       {prop.uid || 'NO-ID'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{prop.owners?.name || 'Unknown'}</span></p>
                   {(() => {
-                    const phone = prop.helpdesk_number || prop.owners?.phone
+                    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+                    const ownerName = owner?.name || 'Unknown'
+                    const phone = prop.helpdesk_number || owner?.phone
                     const cleanPhone = phone ? phone.replace(/\D/g, '') : null
-                    return phone ? (
-                      <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50/60 border border-blue-100 rounded-lg text-xs">
-                        <a href={`tel:${phone}`} className="font-bold text-blue-700 hover:underline flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-blue-600" />
-                          {phone}
-                        </a>
-                        {cleanPhone && (
-                          <a 
-                            href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(prop.owners?.name || 'Owner')},%20reviewing%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded hover:bg-green-100 ml-auto"
-                          >
-                            WhatsApp
-                          </a>
+                    const priceBucket = prop.rooms?.[0]?.price_bucket || prop.room_categories?.[0]?.price_bucket || 'N/A'
+
+                    return (
+                      <>
+                        <p className="text-sm text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{ownerName}</span></p>
+                        {phone ? (
+                          <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50/60 border border-blue-100 rounded-lg text-xs">
+                            <a href={`tel:${phone}`} className="font-bold text-blue-700 hover:underline flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-blue-600" />
+                              {phone}
+                            </a>
+                            {cleanPhone && (
+                              <a 
+                                href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(ownerName)},%20reviewing%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded hover:bg-green-100 ml-auto"
+                              >
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                            ⚠️ No phone number set
+                          </div>
                         )}
-                      </div>
-                    ) : (
-                      <div className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                        ⚠️ No phone number set
-                      </div>
+                        
+                        <div className="mt-2 text-sm text-gray-600">
+                          <p><span className="font-semibold">Amenities:</span> {prop.amenities?.join(', ') || 'None'}</p>
+                          <p><span className="font-semibold">Max Price Tier:</span> {priceBucket}</p>
+                        </div>
+                      </>
                     )
                   })()}
-                  
-                  <div className="mt-2 text-sm text-gray-600">
-                    <p><span className="font-semibold">Amenities:</span> {prop.amenities?.join(', ') || 'None'}</p>
-                    <p><span className="font-semibold">Max Price Tier:</span> {prop.rooms?.[0]?.price_bucket || 'N/A'}</p>
-                  </div>
                 </div>
                 
                 <div className="mt-auto flex flex-col gap-2">
@@ -680,23 +710,31 @@ export default async function AdminDashboard() {
                       {prop.uid || 'NO-ID'}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{prop.owners?.name || 'Unknown'}</span></p>
-                  {prop.helpdesk_number && (
-                    <div className="flex items-center gap-2 mt-1 text-xs">
-                      <a href={`tel:${prop.helpdesk_number}`} className="font-semibold text-amber-900 hover:underline flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5 text-amber-700" />
-                        {prop.helpdesk_number}
-                      </a>
-                      <a 
-                        href={`https://wa.me/${prop.helpdesk_number.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(prop.owners?.name || 'Owner')},%20following%20up%20on%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100"
-                      >
-                        WhatsApp
-                      </a>
-                    </div>
-                  )}
+                  {(() => {
+                    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+                    const ownerName = owner?.name || 'Unknown'
+                    return (
+                      <>
+                        <p className="text-xs text-gray-500">{prop.type} • Owner: <span className="font-semibold text-gray-800">{ownerName}</span></p>
+                        {prop.helpdesk_number && (
+                          <div className="flex items-center gap-2 mt-1 text-xs">
+                            <a href={`tel:${prop.helpdesk_number}`} className="font-semibold text-amber-900 hover:underline flex items-center gap-1">
+                              <Phone className="w-3.5 h-3.5 text-amber-700" />
+                              {prop.helpdesk_number}
+                            </a>
+                            <a 
+                              href={`https://wa.me/${prop.helpdesk_number.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(ownerName)},%20following%20up%20on%20your%20FixyStays%20listing%20${encodeURIComponent(prop.name)}.`} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100"
+                            >
+                              WhatsApp
+                            </a>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                   
                   <div className="mt-2 text-xs">
                     <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded text-[11px]">

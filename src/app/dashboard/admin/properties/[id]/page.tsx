@@ -15,7 +15,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
 
   const { data: property, error } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(id, name, phone, email, free_tier_enabled)')
+    .select('*, owners(id, name, email, free_tier_enabled)')
     .eq('id', propertyId)
     .single()
 
@@ -25,7 +25,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
   }
 
   // Check if owner has completed payment
-  const owner = property.owners as any
+  const owner = (Array.isArray(property.owners) ? property.owners[0] : property.owners) as any
   let isOwnerPaid = owner?.free_tier_enabled === true
 
   if (!isOwnerPaid && property.owner_id) {
@@ -63,7 +63,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
     .eq('property_id', propertyId)
     .order('room_number', { ascending: true })
 
-  const ownerPhone = property.helpdesk_number || (property.owners as any)?.phone || null
+  const ownerPhone = property.helpdesk_number || owner?.phone || null
   const cleanPhone = ownerPhone ? ownerPhone.replace(/\D/g, '') : null
 
   return (
