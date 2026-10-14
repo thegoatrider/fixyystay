@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, purgeUserAndRecordsByEmail } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 
@@ -513,5 +513,21 @@ export async function onboardAgent(formData: FormData) {
     return { success: true, tempPassword: password }
   } catch (err: any) {
     return { error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+export async function purgeAccountAction(email: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!isSuperAdminUser(user)) {
+      return { success: false, error: 'Unauthorized: Admin privileges required.' }
+    }
+
+    const res = await purgeUserAndRecordsByEmail(email)
+    revalidatePath('/dashboard/admin')
+    return res
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Purge failed.' }
   }
 }

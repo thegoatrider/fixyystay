@@ -19,6 +19,8 @@ import OrganizationsManagement from './OrganizationsManagement'
 import SubscriptionCheckButton from './SubscriptionCheckButton'
 import PushBroadcastModal from './PushBroadcastModal'
 import PlatformGuestHubManager from './PlatformGuestHubManager'
+import QuickPurgeTool from './QuickPurgeTool'
+import PurgeAccountButton from './PurgeAccountButton'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -773,6 +775,8 @@ export default async function AdminDashboard() {
           </div>
         </div>
         
+        <QuickPurgeTool />
+
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -782,6 +786,7 @@ export default async function AdminDashboard() {
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone / WhatsApp</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Plan Status</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Joined</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -852,6 +857,9 @@ export default async function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 text-right text-gray-400 text-xs font-medium">
                         {new Date(owner.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <PurgeAccountButton email={owner.email} ownerName={owner.name} />
                       </td>
                     </tr>
                   )
