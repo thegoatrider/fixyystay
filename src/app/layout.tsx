@@ -65,6 +65,7 @@ export const viewport: Viewport = {
 };
 
 import Script from "next/script";
+import { TravelpayoutsScript } from '@/components/TravelpayoutsScript';
 
 export default function RootLayout({
   children,
@@ -73,33 +74,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <script
-          {...{
-            nowprocket: '',
-            'data-noptimize': '1',
-            'data-cfasync': 'false',
-            'data-wpfc-render': 'false',
-            'seraph-accel-crit': '1',
-            'data-no-defer': '1',
-            'data-cmp-ab': '2',
-          }}
-          dangerouslySetInnerHTML={{
-            __html: `(function () {
-      var script = document.createElement("script");
-      script.async = 1;
-      script.setAttribute("data-cmp-ab","2");
-      script.src = 'https://emrld.ltd/NTc1MTM5.js?t=575139';
-      document.head.appendChild(script);
-  })();`,
-          }}
-        />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
         <div id="google_translate_element" style={{ display: 'none' }}></div>
-        <Script id="google-translate-init" strategy="beforeInteractive">
+        <Script id="google-translate-init" strategy="lazyOnload">
           {`
             function googleTranslateElementInit() {
               new google.translate.TranslateElement({
@@ -112,8 +91,9 @@ export default function RootLayout({
         </Script>
         <Script 
           src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" 
-          strategy="beforeInteractive" 
+          strategy="lazyOnload" 
         />
+        <TravelpayoutsScript />
 
         <Providers>
           <PullToRefresh />
