@@ -7,6 +7,7 @@ import { addMonths } from 'date-fns'
 import Razorpay from 'razorpay'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import {
   starter,
   slugifyHotelName,
@@ -139,16 +140,7 @@ export async function getAuthorizedHubActor(targetPropertyId?: string): Promise<
 
   if (user) {
     const email = user.email?.toLowerCase().trim() || ''
-    const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
-    const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
-    const isSuperAdmin =
-      email === 'superadmin@fixstay.com' ||
-      email === 'admin@fixstay.com' ||
-      email.endsWith('@fixstay.com') ||
-      userRole === 'admin' ||
-      userRole === 'superadmin' ||
-      appRole === 'admin' ||
-      appRole === 'superadmin'
+    const isSuperAdmin = isSuperAdminUser(user)
 
     if (isSuperAdmin) {
       return {

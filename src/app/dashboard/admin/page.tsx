@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, Users, Wallet, CreditCard, Banknote, MapPin, BarChart3, Building2, Megaphone, XCircle, Clock, TrendingUp, Mail, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -21,14 +22,50 @@ import PlatformGuestHubManager from './PlatformGuestHubManager'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
 
-  // 1. Pending Approvals (excluding onboarding placeholder properties that are not fully edited)
-  const { data: pendingProperties } = await supabase
+  // 1. Pending Approvals: Fetch all unapproved properties
+  const { data: rawPendingProperties } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(name), rooms(price_bucket)')
+    .select('*, owners(id, name, free_tier_enabled), rooms(price_bucket)')
     .eq('approved', false)
     .neq('city', 'Pending')
     .order('created_at', { ascending: false })
+
+  // Active subscriptions for owners
+  const { data: activeSubs } = await supabaseAdmin
+    .from('owner_subscriptions')
+    .select('owner_id, end_date, status')
+    .eq('status', 'active')
+
+  // Active standalone guest hub settings
+  const { data: activeGuestHubs } = await supabaseAdmin
+    .from('guest_hub_settings')
+    .select('property_id')
+    .eq('subscription_status', 'active')
+
+  const now = new Date()
+  const activeSubOwnerIds = new Set(
+    (activeSubs || [])
+      .filter(s => s.end_date && new Date(s.end_date) > now)
+      .map(s => s.owner_id)
+  )
+  const activeHubPropertyIds = new Set(
+    (activeGuestHubs || []).map(g => g.property_id)
+  )
+
+  const isOwnerPaid = (prop: any) => {
+    if (!prop) return false
+    const owner = prop.owners
+    if (owner?.free_tier_enabled === true) return true
+    if (prop.owner_id && activeSubOwnerIds.has(prop.owner_id)) return true
+    if (activeHubPropertyIds.has(prop.id)) return true
+    return false
+  }
+
+  // Filter properties: ONLY show for approval if owner has completed payment
+  const pendingProperties = (rawPendingProperties || []).filter(prop => isOwnerPaid(prop))
+  const unpaidDraftProperties = (rawPendingProperties || []).filter(prop => !isOwnerPaid(prop))
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabase
@@ -554,6 +591,49 @@ export default async function AdminDashboard() {
         )}
       </section>
 
+      {/* SECTION 1A: Unpaid Onboarding Drafts (Blocked from approval) */}
+      {unpaidDraftProperties && unpaidDraftProperties.length > 0 && (
+        <section className="bg-amber-50/60 border border-amber-200 rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-amber-950 flex items-center gap-2">
+                <Clock className="text-amber-600 w-5 h-5" /> Incomplete Onboarding / Unpaid Properties ({unpaidDraftProperties.length})
+              </h2>
+              <p className="text-xs text-amber-700 mt-0.5">
+                These properties were registered during onboarding but the owner dropped off without completing payment. They are blocked from approval until their subscription is active.
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {unpaidDraftProperties.map((prop) => (
+              <div key={prop.id} className="border border-amber-200/80 bg-white rounded-xl p-4 shadow-sm flex flex-col gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-base leading-tight text-gray-900">{prop.name}</h3>
+                    <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                      {prop.uid || 'NO-ID'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">{prop.type} • Owner: {prop.owners?.name || 'Unknown'}</p>
+                  
+                  <div className="mt-2 text-xs">
+                    <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded text-[11px]">
+                      ❌ Payment Not Completed
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-gray-400 font-medium">Approval Blocked</span>
+                  <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="h-8 text-xs" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* SECTION 1B: Pending Influencers */}
       <section>
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
@@ -627,8 +707,8 @@ export default async function AdminDashboard() {
               <tbody className="divide-y divide-gray-50">
                 {allOwnersDetailed?.map((owner: any) => {
                   const sub = owner.owner_subscriptions?.[0]
-                  const isActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
-                  const daysLeft = sub?.end_date ? Math.ceil((new Date(sub.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0
+                  const isActive = sub?.status === 'active' && new Date(sub.end_date) > now
+                  const daysLeft = sub?.end_date ? Math.ceil((new Date(sub.end_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
                   const isExpiringSoon = isActive && daysLeft <= 7
                   
                   return (

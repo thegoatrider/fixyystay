@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -45,14 +46,9 @@ export async function updateSession(request: NextRequest) {
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
-
-    // Basic role-based routing check based on user metadata
-    const role = user.user_metadata?.role
-
-    const isSuperAdmin =
-      role === 'admin' ||
-      role === 'superadmin' ||
-      user.email?.toLowerCase() === 'superadmin@fixstay.com'
+    // Server-trusted role verification
+    const isSuperAdmin = isSuperAdminUser(user)
+    const role = getEffectiveUserRole(user)
 
     if (request.nextUrl.pathname.startsWith('/dashboard/admin') && !isSuperAdmin) {
       url.pathname = '/'
@@ -64,7 +60,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (request.nextUrl.pathname.startsWith('/dashboard/influencer') && role !== 'influencer') {
+    if (request.nextUrl.pathname.startsWith('/dashboard/influencer') && role !== 'influencer' && !isSuperAdmin) {
       url.pathname = '/'
       return NextResponse.redirect(url)
     }
@@ -75,8 +71,9 @@ export async function updateSession(request: NextRequest) {
     user &&
     (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')
   ) {
-    const role = user.user_metadata?.role
-    if (role === 'admin') url.pathname = '/dashboard/admin'
+    const isSuperAdmin = isSuperAdminUser(user)
+    const role = getEffectiveUserRole(user)
+    if (isSuperAdmin || role === 'admin') url.pathname = '/dashboard/admin'
     else if (role === 'owner') url.pathname = '/dashboard/owner'
     else if (role === 'influencer') url.pathname = '/dashboard/influencer'
     else url.pathname = '/guest'

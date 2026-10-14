@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { createClient } from '@/utils/supabase/server';
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { SignupDropdown } from '@/components/SignupDropdown';
 import { LayoutDashboard, LogOut } from 'lucide-react';
@@ -48,7 +49,7 @@ export default async function Index() {
                 </div>
                 
                 <Link 
-                  href={`/dashboard/${user.email === 'superadmin@fixstay.com' ? 'admin' : (user.user_metadata?.role || 'guest')}`}
+                  href={`/dashboard/${getEffectiveUserRole(user)}`}
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-blue-600 bg-blue-50 font-bold hover:bg-blue-100 transition-all text-sm shadow-sm whitespace-nowrap"
                 >
                   <LayoutDashboard className="w-4 h-4" />

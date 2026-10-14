@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/DashboardHeader'
 
@@ -11,13 +12,13 @@ export default async function AdminLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = isSuperAdminUser(user)
 
-  if (!user || (user.user_metadata?.role !== 'admin' && !isSuperAdmin)) {
+  if (!user || !isSuperAdmin) {
     redirect('/')
   }
 
-  const role = isSuperAdmin ? 'admin' : (user.user_metadata?.role || 'admin')
+  const role = 'admin'
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">

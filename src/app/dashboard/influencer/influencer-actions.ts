@@ -1,13 +1,14 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 
 export async function getInfluencerDashboardData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const isSuperAdmin = user.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = isSuperAdminUser(user)
 
   const { data, error } = await supabase.rpc('get_influencer_dashboard_data', {
     p_influencer_id: user.id,

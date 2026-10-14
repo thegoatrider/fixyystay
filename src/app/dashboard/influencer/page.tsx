@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import InfluencerDashboardClient from './InfluencerDashboardClient'
 
@@ -10,7 +11,7 @@ export default async function InfluencerDashboard() {
     redirect('/login')
   }
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = isSuperAdminUser(user)
   const influencerId = user?.id || ''
 
   // Self-healing: if role is influencer but profile user_id is not set, link by email

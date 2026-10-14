@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 export async function sendSupportMessage(
   ownerId: string,
@@ -17,10 +18,10 @@ export async function sendSupportMessage(
       return { success: false, error: 'Unauthorized' }
     }
 
-    const role = user.user.user_metadata?.role
-    const isSuperAdmin = user.user.email === 'superadmin@fixstay.com'
+    const isSuperAdmin = isSuperAdminUser(user.user)
+    const role = isSuperAdmin ? 'admin' : getEffectiveUserRole(user.user)
 
-    if (senderType === 'admin' && role !== 'admin' && !isSuperAdmin) {
+    if (senderType === 'admin' && !isSuperAdmin) {
       return { success: false, error: 'Unauthorized role' }
     }
     if (senderType === 'owner' && role !== 'owner' && !isSuperAdmin) {
@@ -118,10 +119,7 @@ export async function getSupportOwners() {
       return { success: false, error: 'Unauthorized' }
     }
 
-    const role = user.user.user_metadata?.role
-    const isSuperAdmin = user.user.email === 'superadmin@fixstay.com'
-
-    if (role !== 'admin' && !isSuperAdmin) {
+    if (!isSuperAdminUser(user.user)) {
       return { success: false, error: 'Unauthorized' }
     }
 
@@ -199,10 +197,7 @@ export async function sendSupportBroadcast(
       return { success: false, error: 'Unauthorized' }
     }
 
-    const role = user.user.user_metadata?.role
-    const isSuperAdmin = user.user.email === 'superadmin@fixstay.com'
-
-    if (role !== 'admin' && !isSuperAdmin) {
+    if (!isSuperAdminUser(user.user)) {
       return { success: false, error: 'Unauthorized role' }
     }
 

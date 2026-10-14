@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/DashboardHeader'
 import SupportWidget from '@/components/SupportWidget'
@@ -12,13 +13,12 @@ export default async function OwnerLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = isSuperAdminUser(user)
+  const role = isSuperAdmin ? 'owner' : getEffectiveUserRole(user)
 
-  if (!user || (user.user_metadata?.role !== 'owner' && !isSuperAdmin)) {
+  if (!user || (role !== 'owner' && !isSuperAdmin)) {
     redirect('/')
   }
-
-  const role = isSuperAdmin ? 'owner' : (user.user_metadata?.role || 'owner')
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row w-full">

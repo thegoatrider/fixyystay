@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 
 export async function updateProperty(propertyId: string, formData: FormData) {
@@ -9,7 +10,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
 
     // Verify admin role
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 

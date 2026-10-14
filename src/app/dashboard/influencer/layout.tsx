@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/DashboardHeader'
 
@@ -10,13 +11,12 @@ export default async function InfluencerLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com'
+  const isSuperAdmin = isSuperAdminUser(user)
+  const role = isSuperAdmin ? 'influencer' : getEffectiveUserRole(user)
 
-  if (!user || (user.user_metadata?.role !== 'influencer' && !isSuperAdmin)) {
+  if (!user || (role !== 'influencer' && !isSuperAdmin)) {
     redirect('/')
   }
-
-  const role = isSuperAdmin ? 'influencer' : (user.user_metadata?.role || 'influencer')
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

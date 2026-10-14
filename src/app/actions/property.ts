@@ -5,21 +5,10 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getCityCode } from '@/lib/india-locations'
 
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
+
 function isUserAdmin(user: any): boolean {
-  if (!user) return false
-  const email = (user.email || '').toLowerCase().trim()
-  const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
-  const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
-  
-  return (
-    email === 'superadmin@fixstay.com' ||
-    email === 'admin@fixstay.com' ||
-    email.endsWith('@fixstay.com') ||
-    userRole === 'admin' ||
-    userRole === 'superadmin' ||
-    appRole === 'admin' ||
-    appRole === 'superadmin'
-  )
+  return isSuperAdminUser(user)
 }
 
 export async function uploadPropertyImage(formData: FormData) {

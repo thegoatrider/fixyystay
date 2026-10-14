@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 import { GoogleGenAI } from '@google/genai'
 import { getCityCode } from '@/lib/india-locations'
@@ -146,14 +147,14 @@ export async function createProperty(formData: FormData) {
   // 2. Get owner record (using admin to bypass any RLS, with email fallback)
   let { data: owner } = await supabaseAdmin
     .from('owners')
-    .select('id')
+    .select('id, free_tier_enabled')
     .eq('user_id', user.id)
     .maybeSingle()
 
   if (!owner && user.email) {
     const { data: matchedOwner } = await supabaseAdmin
       .from('owners')
-      .select('id')
+      .select('id, free_tier_enabled')
       .eq('email', user.email.toLowerCase().trim())
       .maybeSingle()
     if (matchedOwner) {
@@ -164,6 +165,28 @@ export async function createProperty(formData: FormData) {
 
   if (!owner) {
     return { error: `Owner profile not found. Contact support. (uid: ${user.id})` }
+  }
+
+  // 2.5 Strict Subscription Gate: Block unpaid owners from creating properties
+  const isSuperAdmin = user.email === 'superadmin@fixstay.com' || user.user_metadata?.role === 'superadmin' || user.user_metadata?.role === 'admin'
+  if (!isSuperAdmin) {
+    let isPaid = (owner as any)?.free_tier_enabled === true
+    if (!isPaid) {
+      const { data: sub } = await supabaseAdmin
+        .from('owner_subscriptions')
+        .select('status, end_date')
+        .eq('owner_id', owner.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (sub && new Date(sub.end_date) > new Date()) {
+        isPaid = true
+      }
+    }
+
+    if (!isPaid) {
+      return { error: 'Your subscription is inactive or unpaid. Please activate your subscription before adding new properties.' }
+    }
   }
 
   // 3. Extract form fields
@@ -575,16 +598,7 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
 
     const supabaseAdmin = createAdminClient()
     const email = (user.email || '').toLowerCase().trim()
-    const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
-    const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
-    const isAdmin = 
-      email === 'superadmin@fixstay.com' ||
-      email === 'admin@fixstay.com' ||
-      email.endsWith('@fixstay.com') ||
-      userRole === 'admin' ||
-      userRole === 'superadmin' ||
-      appRole === 'admin' ||
-      appRole === 'superadmin'
+    const isAdmin = isSuperAdminUser(user)
 
     if (!isAdmin) {
       let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
@@ -699,16 +713,7 @@ export async function deletePropertyRoom(roomId: string) {
 
     const supabaseAdmin = createAdminClient()
     const email = (user.email || '').toLowerCase().trim()
-    const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
-    const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
-    const isAdmin = 
-      email === 'superadmin@fixstay.com' ||
-      email === 'admin@fixstay.com' ||
-      email.endsWith('@fixstay.com') ||
-      userRole === 'admin' ||
-      userRole === 'superadmin' ||
-      appRole === 'admin' ||
-      appRole === 'superadmin'
+    const isAdmin = isSuperAdminUser(user)
 
     const { data: room } = await supabaseAdmin
       .from('property_rooms')

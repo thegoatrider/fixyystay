@@ -21,10 +21,11 @@ async function handleSubscriptionReminders(req: NextRequest) {
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       // If header doesn't match secret, check if request is from superadmin
       const { createClient } = await import('@/utils/supabase/server')
+      const { isSuperAdminUser } = await import('@/utils/supabase/auth-roles')
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      if (user?.email !== 'superadmin@fixstay.com' && user?.user_metadata?.role !== 'admin') {
+      if (!isSuperAdminUser(user)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }

@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import OwnerDashboardClient from './OwnerDashboardClient'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -12,7 +13,7 @@ export default async function OwnerDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const isSuperAdmin = user?.email === 'superadmin@fixstay.com' || user?.user_metadata?.role === 'admin'
+  const isSuperAdmin = isSuperAdminUser(user)
   
   // 2. Initial owner lookup (fast)
   let { data: owner } = await supabase.from('owners').select('id, created_at, free_tier_enabled').eq('user_id', user?.id).maybeSingle()

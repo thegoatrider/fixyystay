@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -17,16 +18,7 @@ export default async function EditPropertyPage(
   if (!user) redirect('/login')
 
   const email = user.email?.toLowerCase().trim() || ''
-  const userRole = (user.user_metadata?.role || '').toLowerCase().trim()
-  const appRole = (user.app_metadata?.role || '').toLowerCase().trim()
-  const isAdmin = 
-    email === 'superadmin@fixstay.com' ||
-    email === 'admin@fixstay.com' ||
-    email.endsWith('@fixstay.com') ||
-    userRole === 'admin' ||
-    userRole === 'superadmin' ||
-    appRole === 'admin' ||
-    appRole === 'superadmin'
+  const isAdmin = isSuperAdminUser(user)
 
   const supabaseAdmin = createAdminClient()
 

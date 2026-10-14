@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 export async function sendMessage(ownerId: string, senderType: 'police' | 'owner', content: string, attachmentUrl?: string) {
   try {
@@ -12,7 +13,7 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
       return { success: false, error: 'Unauthorized' }
     }
 
-    const role = user.user.user_metadata?.role;
+    const role = getEffectiveUserRole(user.user);
     if (senderType === 'police' && role !== 'police') {
       return { success: false, error: 'Unauthorized role' }
     }
@@ -149,7 +150,7 @@ export async function sendBroadcastMessage(ownerIds: string[], senderType: 'poli
       return { success: false, error: 'Unauthorized' }
     }
 
-    const role = user.user.user_metadata?.role;
+    const role = getEffectiveUserRole(user.user);
     if (role !== 'police' || senderType !== 'police') {
       return { success: false, error: 'Unauthorized role' }
     }

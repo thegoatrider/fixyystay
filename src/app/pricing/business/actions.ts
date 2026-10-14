@@ -6,6 +6,7 @@ import Razorpay from 'razorpay'
 import { addMonths, addYears } from 'date-fns'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
+import { getCityCode } from '@/lib/india-locations'
 
 async function getAbsoluteOrigin() {
   const reqHeaders = await headers()
@@ -26,7 +27,19 @@ async function getAbsoluteOrigin() {
   return origin
 }
 
-export async function createOwnerOrder(planName: string, amount: number, email: string, ownerId?: string) {
+export async function createOwnerOrder(
+  planName: string, 
+  amount: number, 
+  email: string, 
+  ownerId?: string,
+  propertyDetails?: {
+    propertyName?: string | null
+    city?: string | null
+    cityArea?: string | null
+    pincode?: string | null
+    state?: string | null
+  }
+) {
   try {
     const normalizedEmail = email.toLowerCase()
 
@@ -48,6 +61,21 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
     }
     if (ownerId) {
       notes.owner_id = ownerId
+    }
+    if (propertyDetails?.propertyName) {
+      notes.property_name = propertyDetails.propertyName.slice(0, 40)
+    }
+    if (propertyDetails?.city) {
+      notes.city = propertyDetails.city.slice(0, 40)
+    }
+    if (propertyDetails?.cityArea) {
+      notes.city_area = propertyDetails.cityArea.slice(0, 40)
+    }
+    if (propertyDetails?.pincode) {
+      notes.pincode = propertyDetails.pincode.slice(0, 10)
+    }
+    if (propertyDetails?.state) {
+      notes.state = propertyDetails.state.slice(0, 40)
     }
 
     const options = {
@@ -73,7 +101,18 @@ export async function createOwnerOrder(planName: string, amount: number, email: 
 
 export async function verifyAndUpgrade(
   razorpayOrderId: string,
-  signupData?: { name: string; password?: string; propertyName?: string }
+  signupData?: { 
+    name?: string
+    password?: string
+    propertyName?: string
+    propertyDetails?: {
+      propertyName?: string | null
+      city?: string | null
+      cityArea?: string | null
+      pincode?: string | null
+      state?: string | null
+    }
+  }
 ) {
   try {
     const supabase = await createClient()
@@ -178,22 +217,62 @@ export async function verifyAndUpgrade(
       }
       ownerId = newOwner.id
       ownerName = displayName
-
-      // Create dummy property if propertyName is provided
-      if (signupData?.propertyName && ownerId) {
-        await supabaseAdmin.from('properties').insert([
-          {
-            owner_id: ownerId,
-            name: signupData.propertyName,
-            city: 'Pending',
-            type: 'multi-room property',
-          }
-        ])
-      }
     }
 
     if (!ownerId) {
       return { error: 'Could not associate payment with an owner account.' }
+    }
+
+    // Ensure initial property is created for this owner upon verified payment
+    const { data: existingProperties } = await supabaseAdmin
+      .from('properties')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .limit(1)
+
+    if (!existingProperties || existingProperties.length === 0) {
+      const orderNotes = (order.notes || {}) as Record<string, any>
+      const propName = 
+        orderNotes.property_name || 
+        signupData?.propertyName || 
+        signupData?.propertyDetails?.propertyName || 
+        `${ownerName || 'Partner'}'s Property`
+      const finalCity = orderNotes.city || signupData?.propertyDetails?.city || 'Raigad'
+      const finalArea = orderNotes.city_area || signupData?.propertyDetails?.cityArea || null
+      const pincode = orderNotes.pincode || signupData?.propertyDetails?.pincode || null
+      const state = orderNotes.state || signupData?.propertyDetails?.state || null
+
+      const prefix = getCityCode(finalCity)
+      const { data: properties } = await supabaseAdmin
+        .from('properties')
+        .select('uid')
+        .like('uid', `${prefix}%`)
+        .order('uid', { ascending: false })
+        .limit(1)
+
+      let nextNum = 1
+      if (properties && properties.length > 0 && properties[0].uid) {
+        const match = properties[0].uid.match(/\d+$/)
+        if (match) {
+          nextNum = parseInt(match[0], 10) + 1
+        }
+      }
+      const uid = `${prefix}${nextNum.toString().padStart(3, '0')}`
+
+      await supabaseAdmin.from('properties').insert([
+        {
+          owner_id: ownerId,
+          name: propName,
+          city: finalCity,
+          city_area: finalArea,
+          area_name: finalArea,
+          pincode: pincode || null,
+          state: state || null,
+          type: 'multi-room property',
+          uid,
+          approved: false,
+        }
+      ])
     }
 
     // Auto-sign in if password was provided and in browser context

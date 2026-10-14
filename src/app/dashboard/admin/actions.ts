@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 
 export async function approveProperty(propertyId: string) {
@@ -10,30 +11,76 @@ export async function approveProperty(propertyId: string) {
     
     // Verify admin role
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
-    // Generate a collision-safe unique ALB-XXXXXXXX identifier (Standard for Alibag)
-    let uid = ''
-    let attempts = 0
-    while (attempts < 10) {
-      const candidate = 'ALB-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-        .toUpperCase()
-      // Check if this UID already exists in the database
-      const { data: existing } = await supabase
-        .from('properties')
-        .select('id')
-        .eq('uid', candidate)
-        .maybeSingle()
-      if (!existing) { uid = candidate; break }
-      attempts++
-    }
-    if (!uid) return { error: 'Failed to generate a unique property UID after 10 attempts' }
+    const supabaseAdmin = createAdminClient()
 
-    const { error } = await supabase
+    // Verify property and owner payment status
+    const { data: propData } = await supabaseAdmin
+      .from('properties')
+      .select('id, uid, owner_id, owners(id, free_tier_enabled)')
+      .eq('id', propertyId)
+      .maybeSingle()
+
+    if (!propData) {
+      return { error: 'Property not found.' }
+    }
+
+    const owner = propData.owners as any
+    let isOwnerPaid = owner?.free_tier_enabled === true
+
+    if (!isOwnerPaid && propData.owner_id) {
+      const { data: sub } = await supabaseAdmin
+        .from('owner_subscriptions')
+        .select('status, end_date')
+        .eq('owner_id', propData.owner_id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (sub && new Date(sub.end_date) > new Date()) {
+        isOwnerPaid = true
+      }
+    }
+
+    if (!isOwnerPaid && propData.id) {
+      const { data: hub } = await supabaseAdmin
+        .from('guest_hub_settings')
+        .select('id')
+        .eq('property_id', propData.id)
+        .eq('subscription_status', 'active')
+        .maybeSingle()
+
+      if (hub) isOwnerPaid = true
+    }
+
+    if (!isOwnerPaid) {
+      return { error: 'Cannot approve property: Property owner has not completed payment or does not have an active subscription.' }
+    }
+
+    // Keep existing UID if present, or generate a collision-safe identifier
+    let uid = propData.uid
+    if (!uid) {
+      let attempts = 0
+      while (attempts < 10) {
+        const candidate = 'ALB-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('')
+          .toUpperCase()
+        // Check if this UID already exists in the database
+        const { data: existing } = await supabaseAdmin
+          .from('properties')
+          .select('id')
+          .eq('uid', candidate)
+          .maybeSingle()
+        if (!existing) { uid = candidate; break }
+        attempts++
+      }
+      if (!uid) return { error: 'Failed to generate a unique property UID after 10 attempts' }
+    }
+
+    const { error } = await supabaseAdmin
       .from('properties')
       .update({ approved: true, uid })
       .eq('id', propertyId)
@@ -58,7 +105,7 @@ export async function deleteProperty(propertyId: string) {
     
     // Verify admin role
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -126,7 +173,7 @@ export async function assignInfluencer(propertyId: string, influencerId: string)
 
     // Verify admin role
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -163,7 +210,7 @@ export async function toggleFeatured(propertyId: string, currentValue: boolean) 
     const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -191,7 +238,7 @@ export async function approveInfluencer(formData: FormData) {
     const supabaseAdmin = createAdminClient()
     
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -226,7 +273,7 @@ export async function rejectInfluencer(influencerId: string) {
     const supabaseAdmin = createAdminClient()
     
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -253,7 +300,7 @@ export async function processPayout(requestId: string, action: 'approve' | 'reje
     const supabaseAdmin = createAdminClient()
     
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -292,7 +339,7 @@ export async function onboardPartner(formData: FormData) {
     
     // Verify admin
     const { data: { user: admin } } = await supabase.auth.getUser()
-    if (admin?.user_metadata?.role !== 'admin' && admin?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(admin)) {
       return { error: 'Unauthorized' }
     }
 
@@ -385,7 +432,7 @@ export async function toggleFreeTier(ownerId: string, currentValue: boolean) {
     
     // Verify admin role
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.user_metadata?.role !== 'admin' && user?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(user)) {
       return { error: 'Unauthorized' }
     }
 
@@ -413,7 +460,7 @@ export async function onboardAgent(formData: FormData) {
     
     // Verify admin
     const { data: { user: admin } } = await supabase.auth.getUser()
-    if (admin?.user_metadata?.role !== 'admin' && admin?.email !== 'superadmin@fixstay.com') {
+    if (!isSuperAdminUser(admin)) {
       return { error: 'Unauthorized' }
     }
 

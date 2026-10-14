@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldAlert, LogOut } from 'lucide-react'
@@ -11,8 +12,9 @@ export default async function PoliceLayout({
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  const role = getEffectiveUserRole(user)
 
-  if (!user || user.user_metadata?.role !== 'police') {
+  if (!user || role !== 'police') {
     redirect('/login')
   }
 

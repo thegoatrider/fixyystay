@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { broadcastPushNotification, sendPushNotificationToUser } from '@/utils/fcm'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Only superadmin or admin role can broadcast notifications
-    if (user.email !== 'superadmin@fixstay.com' && user.user_metadata?.role !== 'admin') {
+    if (!isSuperAdminUser(user)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 

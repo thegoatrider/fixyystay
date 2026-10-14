@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import PoliceDashboardClient from './PoliceDashboardClient'
 import { redirect } from 'next/navigation'
 
@@ -8,8 +9,9 @@ export const dynamic = 'force-dynamic'
 export default async function PoliceDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const role = getEffectiveUserRole(user)
   
-  if (!user || user.user_metadata?.role !== 'police') {
+  if (!user || role !== 'police') {
     redirect('/login')
   }
 

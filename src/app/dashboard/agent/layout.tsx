@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Briefcase, LogOut } from 'lucide-react'
@@ -11,8 +12,9 @@ export default async function AgentLayout({
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  const role = getEffectiveUserRole(user)
 
-  if (!user || (user.user_metadata?.role !== 'autowala' && user.user_metadata?.role !== 'agent')) {
+  if (!user || (role !== 'autowala' && role !== 'agent')) {
     redirect('/login')
   }
 

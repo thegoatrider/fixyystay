@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 
 async function getAbsoluteOrigin() {
   const reqHeaders = await headers()
@@ -68,33 +69,22 @@ export async function login(formData: FormData) {
       await supabase.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
     }
 
-    let role = user.user_metadata?.role
-    const isAdminUser = 
-      normalizedEmail === 'superadmin@fixstay.com' ||
-      normalizedEmail === 'admin@fixstay.com' ||
-      normalizedEmail.endsWith('@fixstay.com') ||
-      role === 'admin' ||
-      role === 'superadmin'
+    const isSuperAdmin = isSuperAdminUser(user)
+    let role = isSuperAdmin ? 'admin' : getEffectiveUserRole(user)
 
-    if (!isAdminUser && role !== 'police' && role !== 'autowala' && role !== 'agent') {
-      if (!role || (owner && role !== 'owner') || (influencer && role !== 'influencer')) {
+    if (!isSuperAdmin && role !== 'police' && role !== 'autowala' && role !== 'agent') {
+      if (!role || role === 'guest' || (owner && role !== 'owner') || (influencer && role !== 'influencer')) {
         role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
         await supabase.auth.updateUser({
           data: { role }
         })
       }
-    } else if (isAdminUser && role !== 'admin' && role !== 'superadmin') {
-      role = 'admin'
-      await supabase.auth.updateUser({
-        data: { role: 'admin' }
-      })
     }
     
     // If they are logging in without a 'next' param, redirect them to their dashboard
     if (next === '/') {
-      if (isAdminUser || role === 'admin' || role === 'superadmin') return redirect('/dashboard/admin')
+      if (isSuperAdmin || role === 'admin') return redirect('/dashboard/admin')
       if (role === 'owner') {
-        const isSuperAdmin = isAdminUser
         if (!isSuperAdmin && owner) {
           const { data: sub } = await supabase
             .from('owner_subscriptions')

@@ -38,6 +38,13 @@ function OnboardingContent() {
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
   const [ownerId, setOwnerId] = useState<string | null>(null)
+  const [propertyInfo, setPropertyInfo] = useState<{
+    propertyName?: string | null
+    city?: string | null
+    cityArea?: string | null
+    pincode?: string | null
+    state?: string | null
+  } | null>(null)
 
   // Property Location states
   const [pincode, setPincode] = useState('')
@@ -166,6 +173,9 @@ function OnboardingContent() {
       if (regRes.ownerId) {
         setOwnerId(regRes.ownerId)
       }
+      if (regRes.propertyData) {
+        setPropertyInfo(regRes.propertyData)
+      }
       setStep(2)
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during account registration.')
@@ -178,7 +188,13 @@ function OnboardingContent() {
     setLoading(planName)
     try {
       const fullName = `Business ${planName}`
-      const res = await createOwnerOrder(fullName, amount, userEmail, ownerId || undefined)
+      const res = await createOwnerOrder(
+        fullName, 
+        amount, 
+        userEmail, 
+        ownerId || undefined,
+        propertyInfo || undefined
+      )
       if (res.error) throw new Error(res.error)
 
       const options = {
@@ -220,8 +236,11 @@ function OnboardingContent() {
         },
         handler: async function (response: any) {
           setLoading('Processing...')
-          // Verify and activate subscription
-          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id)
+          // Verify and activate subscription & create initial property upon payment
+          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id, {
+            name: userName,
+            propertyDetails: propertyInfo || undefined
+          })
           if (verifyRes.success) {
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           } else {

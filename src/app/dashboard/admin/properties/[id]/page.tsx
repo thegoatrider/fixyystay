@@ -6,21 +6,50 @@ import Link from 'next/link'
 import EditPropertyForm from '@/components/EditPropertyForm'
 import GuestCheckinQR from '@/components/GuestCheckinQR'
 import PropertyApprovalActions from '@/app/dashboard/admin/PropertyApprovalActions'
+import DeletePropertyButton from '@/app/dashboard/admin/DeletePropertyButton'
 
 export default async function ManagePropertyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: propertyId } = await params
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
-  const { data: property, error } = await supabase
+  const { data: property, error } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(name)')
+    .select('*, owners(id, name, free_tier_enabled)')
     .eq('id', propertyId)
     .single()
 
   if (error || !property) {
     console.error('Property Load Error:', error, 'Property Data:', property)
     redirect('/dashboard/admin')
+  }
+
+  // Check if owner has completed payment
+  const owner = property.owners as any
+  let isOwnerPaid = owner?.free_tier_enabled === true
+
+  if (!isOwnerPaid && property.owner_id) {
+    const { data: sub } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('status, end_date')
+      .eq('owner_id', property.owner_id)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (sub && new Date(sub.end_date) > new Date()) {
+      isOwnerPaid = true
+    }
+  }
+
+  if (!isOwnerPaid && property.id) {
+    const { data: hub } = await supabaseAdmin
+      .from('guest_hub_settings')
+      .select('id')
+      .eq('property_id', property.id)
+      .eq('subscription_status', 'active')
+      .maybeSingle()
+
+    if (hub) isOwnerPaid = true
   }
 
   const { data: rooms } = await supabaseAdmin
@@ -44,18 +73,35 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
       </div>
 
       {!property.approved && (
-        <div className="bg-orange-50 border border-orange-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
-          <div className="flex items-center gap-4 text-orange-800">
-            <AlertCircle className="w-8 h-8 text-orange-500 flex-shrink-0" />
-            <div>
-              <h2 className="text-lg font-bold">This property is pending approval</h2>
-              <p className="text-sm opacity-80">Review the images and details below before approving.</p>
+        isOwnerPaid ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
+            <div className="flex items-center gap-4 text-orange-800">
+              <AlertCircle className="w-8 h-8 text-orange-500 flex-shrink-0" />
+              <div>
+                <h2 className="text-lg font-bold">This property is pending approval</h2>
+                <p className="text-sm opacity-80">Review the images and details below before approving.</p>
+              </div>
+            </div>
+            <div className="w-full sm:w-auto min-w-[200px]">
+              <PropertyApprovalActions propertyId={property.id} />
             </div>
           </div>
-          <div className="w-full sm:w-auto min-w-[200px]">
-            <PropertyApprovalActions propertyId={property.id} />
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
+            <div className="flex items-center gap-4 text-amber-900">
+              <AlertCircle className="w-8 h-8 text-amber-600 flex-shrink-0" />
+              <div>
+                <h2 className="text-lg font-bold">Payment Incomplete / Unpaid Account</h2>
+                <p className="text-sm opacity-90">
+                  The property owner ({property.owners?.name || 'Owner'}) has not completed payment for their subscription. This property is blocked from approval until their subscription is active.
+                </p>
+              </div>
+            </div>
+            <div className="w-full sm:w-auto min-w-[160px] flex justify-end">
+              <DeletePropertyButton propertyId={property.id} propertyName={property.name} />
+            </div>
           </div>
-        </div>
+        )
       )}
 
       <div className="grid lg:grid-cols-3 gap-8">
