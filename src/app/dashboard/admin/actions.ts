@@ -596,3 +596,34 @@ export async function onboardPolice(formData: FormData) {
     return { error: err.message || 'An unexpected error occurred' }
   }
 }
+
+export async function runSubscriptionExpiryRemindersAction(): Promise<import('@/utils/subscription-reminders').SubscriptionCheckResult> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!isSuperAdminUser(user)) {
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        summary: { totalActive: 0, reminders3DaySent: 0, reminders1DaySent: 0, expiredMarked: 0, trialRemindersSent: 0, logs: [] },
+        error: 'Unauthorized: Only platform administrators can trigger push reminder checks.'
+      }
+    }
+
+    const { executeSubscriptionRemindersCheck } = await import('@/utils/subscription-reminders')
+    const result = await executeSubscriptionRemindersCheck()
+
+    revalidatePath('/dashboard/admin')
+    return result
+  } catch (err: any) {
+    return {
+      success: false,
+      timestamp: new Date().toISOString(),
+      summary: { totalActive: 0, reminders3DaySent: 0, reminders1DaySent: 0, expiredMarked: 0, trialRemindersSent: 0, logs: [] },
+      error: err.message || 'An unexpected error occurred while scanning subscriptions'
+    }
+  }
+}
+
+

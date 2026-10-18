@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { BellRing, Loader2, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { runSubscriptionExpiryRemindersAction } from './actions'
 
 export default function SubscriptionCheckButton() {
   const [loading, setLoading] = useState(false)
@@ -14,19 +15,30 @@ export default function SubscriptionCheckButton() {
     setStatusText(null)
 
     try {
-      const res = await fetch('/api/cron/subscription-reminders', {
-        method: 'POST',
-      })
-
-      const data = await res.json()
+      // 1. First attempt via direct Server Action (native Next.js session authentication)
+      const data = await runSubscriptionExpiryRemindersAction()
 
       if (data.success && data.summary) {
         const s = data.summary
         const summaryMsg = `Check Complete: ${s.totalActive} active subscriptions scanned. ${s.reminders3DaySent} 3-day reminders, ${s.reminders1DaySent} 1-day reminders, ${s.expiredMarked} expired, ${s.trialRemindersSent} trial reminders dispatched via Push.`
         setStatusText(summaryMsg)
         router.refresh()
+        return
+      }
+
+      // 2. Fallback to authenticated API endpoint if server action returned an error
+      const res = await fetch('/api/cron/subscription-reminders', {
+        method: 'POST',
+      })
+      const apiData = await res.json()
+
+      if (apiData.success && apiData.summary) {
+        const s = apiData.summary
+        const summaryMsg = `Check Complete: ${s.totalActive} active subscriptions scanned. ${s.reminders3DaySent} 3-day reminders, ${s.reminders1DaySent} 1-day reminders, ${s.expiredMarked} expired, ${s.trialRemindersSent} trial reminders dispatched via Push.`
+        setStatusText(summaryMsg)
+        router.refresh()
       } else {
-        alert(data.error || 'Failed to complete subscription check.')
+        alert(apiData.error || data.error || 'Failed to complete subscription check.')
       }
     } catch (err: any) {
       alert('Error running subscription check: ' + err.message)
