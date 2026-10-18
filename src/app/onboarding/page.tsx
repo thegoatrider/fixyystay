@@ -136,9 +136,10 @@ function OnboardingContent() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user?.email) {
         setUserEmail(user.email)
-        setUserName(user.user_metadata?.name || user.email.split('@')[0])
-        const { data: owner } = await supabase.from('owners').select('id').eq('email', user.email.toLowerCase()).maybeSingle()
+        const { data: owner } = await supabase.from('owners').select('id, phone, name').eq('email', user.email.toLowerCase()).maybeSingle()
         if (owner?.id) setOwnerId(owner.id)
+        if (owner?.phone) setUserPhone(owner.phone)
+        if (owner?.name) setUserName(owner.name)
         if (searchParams.get('step') === 'payment') setStep(2)
       }
     }

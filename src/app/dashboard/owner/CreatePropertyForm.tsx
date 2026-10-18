@@ -13,7 +13,7 @@ import { PlusCircle, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
 import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
 import { SearchableCitySelect } from '@/components/SearchableCitySelect'
 
-export default function CreatePropertyForm() {
+export default function CreatePropertyForm({ initialPhone }: { initialPhone?: string } = {}) {
   const [propertyType, setPropertyType] = useState('villa')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -486,6 +486,7 @@ export default function CreatePropertyForm() {
           required 
           minLength={10}
           maxLength={15}
+          defaultValue={initialPhone || ""}
           placeholder="e.g. 9876543210 or +91 98765 43210" 
           className="font-medium"
         />

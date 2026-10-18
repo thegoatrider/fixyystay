@@ -24,14 +24,14 @@ export default async function OwnerProfilePage() {
   // 1. Fetch owner record with self-healing email fallback
   let { data: owner } = await supabaseAdmin
     .from('owners')
-    .select('id, name, email, created_at, free_tier_enabled')
+    .select('id, name, email, phone, created_at, free_tier_enabled')
     .eq('user_id', user.id)
     .maybeSingle()
 
   if (!owner && user.email) {
     const { data: matchedOwner } = await supabaseAdmin
       .from('owners')
-      .select('id, name, email, created_at, free_tier_enabled')
+      .select('id, name, email, phone, created_at, free_tier_enabled')
       .eq('email', user.email.toLowerCase().trim())
       .maybeSingle()
 
@@ -329,7 +329,7 @@ export default async function OwnerProfilePage() {
           <div className="space-y-8">
             <div className="space-y-4">
               <h3 className="text-xl font-black text-gray-900 tracking-tight">Property Management</h3>
-              <CreatePropertyForm />
+              <CreatePropertyForm initialPhone={owner?.phone || ""} />
             </div>
 
             <ChangePasswordForm />
