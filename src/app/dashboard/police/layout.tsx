@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
+import { getEffectiveUserRole, isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldAlert, LogOut } from 'lucide-react'
@@ -12,9 +12,14 @@ export default async function PoliceLayout({
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  const isSuperAdmin = isSuperAdminUser(user)
   const role = getEffectiveUserRole(user)
+  const isPolice = role === 'police' || 
+                   user?.email?.toLowerCase().includes('police') || 
+                   user?.user_metadata?.role === 'police' || 
+                   user?.app_metadata?.role === 'police'
 
-  if (!user || role !== 'police') {
+  if (!user || (!isPolice && !isSuperAdmin)) {
     redirect('/login')
   }
 

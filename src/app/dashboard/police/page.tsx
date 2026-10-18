@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
+import { getEffectiveUserRole, isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import PoliceDashboardClient from './PoliceDashboardClient'
 import { redirect } from 'next/navigation'
 
@@ -9,10 +9,24 @@ export const dynamic = 'force-dynamic'
 export default async function PoliceDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const isSuperAdmin = isSuperAdminUser(user)
   const role = getEffectiveUserRole(user)
+  const isPolice = role === 'police' || 
+                   user?.email?.toLowerCase().includes('police') || 
+                   user?.user_metadata?.role === 'police' || 
+                   user?.app_metadata?.role === 'police'
   
-  if (!user || role !== 'police') {
+  if (!user || (!isPolice && !isSuperAdmin)) {
     redirect('/login')
+  }
+
+  // Self-heal and sync police role in backend if needed
+  if (user && isPolice && !isSuperAdmin && (user.user_metadata?.role !== 'police' || user.app_metadata?.role !== 'police')) {
+    const admin = createAdminClient()
+    await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...user.user_metadata, role: 'police' },
+      app_metadata: { ...user.app_metadata, role: 'police' }
+    })
   }
 
   // Fetch all check-ins with related property and owner data using admin client to bypass RLS

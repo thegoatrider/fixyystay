@@ -75,7 +75,23 @@ export async function login(formData: FormData) {
     const isSuperAdmin = isSuperAdminUser(user)
     let role = isSuperAdmin ? 'admin' : getEffectiveUserRole(user)
 
-    if (!isSuperAdmin && role !== 'police' && role !== 'autowala' && role !== 'agent') {
+    // Detect if this is a police account (explicit role or police official email)
+    const isPolice = role === 'police' || 
+                     normalizedEmail.includes('police') || 
+                     user.user_metadata?.role === 'police' || 
+                     user.app_metadata?.role === 'police'
+
+    if (isPolice && !isSuperAdmin) {
+      role = 'police'
+      // Ensure backend role synchronization across both user_metadata AND app_metadata (so RLS policies match)
+      if (user.user_metadata?.role !== 'police' || user.app_metadata?.role !== 'police') {
+        const supabaseAdmin = createAdminClient()
+        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          user_metadata: { ...user.user_metadata, role: 'police' },
+          app_metadata: { ...user.app_metadata, role: 'police' }
+        })
+      }
+    } else if (!isSuperAdmin && role !== 'police' && role !== 'autowala' && role !== 'agent') {
       if (!role || role === 'guest' || (owner && role !== 'owner') || (influencer && role !== 'influencer')) {
         role = owner ? 'owner' : (influencer ? 'influencer' : 'guest')
         await supabase.auth.updateUser({
@@ -85,8 +101,9 @@ export async function login(formData: FormData) {
     }
     
     // If they are logging in without a 'next' param, redirect them to their dashboard
-    if (next === '/') {
+    if (next === '/' || next === '/guest' || (role === 'police' && (next === '/' || next === '/dashboard/police'))) {
       if (isSuperAdmin || role === 'admin') return redirect('/dashboard/admin')
+      if (role === 'police') return redirect('/dashboard/police')
       if (role === 'owner') {
         if (!isSuperAdmin && owner) {
           const { data: sub } = await supabase

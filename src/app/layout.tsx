@@ -11,11 +11,13 @@ import Providers from "@/components/Providers";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -66,6 +68,7 @@ export const viewport: Viewport = {
 
 import Script from "next/script";
 import { TravelpayoutsScript } from '@/components/TravelpayoutsScript';
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 
 export default function RootLayout({
   children,
@@ -74,6 +77,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://emyawufsqwdpqxnygobe.supabase.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://emyawufsqwdpqxnygobe.supabase.co" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-gray-900 bg-gray-50 flex flex-col min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0 overflow-x-hidden overscroll-y-none`}
       >
@@ -96,6 +104,7 @@ export default function RootLayout({
         <TravelpayoutsScript />
 
         <Providers>
+          <ServiceWorkerRegister />
           <PullToRefresh />
           <CapacitorBackButton />
           <CapacitorDeepLink />

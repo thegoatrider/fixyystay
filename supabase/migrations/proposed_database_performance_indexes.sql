@@ -393,9 +393,8 @@ BEGIN
       'room_number', gc.room_number,
       'source', gc.source,
       'register_date', gc.register_date,
-      'register_image_url', gc.register_image_url,
       'id_documents', gc.id_documents,
-      'identities', gc.identities,
+      'identities', (SELECT COALESCE(json_agg(gi.*), '[]'::json) FROM public.guest_identity gi WHERE gi.checkin_id = gc.id),
       'created_at', gc.created_at,
       'uid', gc.uid,
       'properties', json_build_object('name', pr.name)
@@ -419,7 +418,7 @@ BEGIN
       'register_date', gc.register_date,
       'register_image_url', gc.register_image_url,
       'id_documents', gc.id_documents,
-      'identities', gc.identities,
+      'identities', (SELECT COALESCE(json_agg(gi.*), '[]'::json) FROM public.guest_identity gi WHERE gi.checkin_id = gc.id),
       'created_at', gc.created_at,
       'uid', gc.uid,
       'properties', json_build_object('name', pr.name)

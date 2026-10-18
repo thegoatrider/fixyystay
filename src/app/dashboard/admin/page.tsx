@@ -12,6 +12,7 @@ import InfluencerApprovalActions from './InfluencerApprovalActions'
 import InfluencerPerformanceHub from './InfluencerPerformanceHub'
 import { CreatePartnerForm } from './CreatePartnerForm'
 import { CreateAgentForm } from './CreateAgentForm'
+import { CreatePoliceForm } from './CreatePoliceForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
 import FreeTierToggle from './FreeTierToggle'
@@ -344,9 +345,10 @@ export default async function AdminDashboard() {
             totalInfluencers: influencers?.length || 0,
             activePromotions: promotions?.filter(p => p.bookingsCount > 0).length || 0
           }}>
-            <div className="grid sm:grid-cols-2 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <CreatePartnerForm />
               <CreateAgentForm />
+              <CreatePoliceForm />
             </div>
           </GrowthHubWrapper>
         </div>

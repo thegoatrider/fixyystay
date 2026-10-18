@@ -15,65 +15,112 @@ export async function searchPoliceRecords(query: string, authPin: string) {
   const supabase = createAdminClient()
   
   try {
-    // 1. Search for matching identities
-    const { data: identities, error: identityError } = await supabase
-      .from('guest_identity')
-      .select('id, full_name, document_type, document_number, date_of_birth, address, document_image_url, checkin_id, created_at')
-      .or(`document_number.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .limit(50)
+    const cleanQuery = query.trim()
 
-    if (identityError) {
-      console.error('[POLICE] Identity search error:', identityError)
-      return { error: 'Database error while searching identities.' }
+    // 1. Concurrently search guest_identity and guest_checkins
+    const [identitiesRes, directCheckinsRes] = await Promise.all([
+      supabase
+        .from('guest_identity')
+        .select('id, full_name, document_type, document_number, date_of_birth, address, document_image_url, checkin_id, created_at')
+        .or(`document_number.ilike.%${cleanQuery}%,full_name.ilike.%${cleanQuery}%,address.ilike.%${cleanQuery}%`)
+        .limit(50),
+      supabase
+        .from('guest_checkins')
+        .select(`
+          id,
+          guest_name,
+          guest_phone,
+          checkin_date,
+          checkout_date,
+          num_people,
+          room_number,
+          vehicle_number,
+          uid,
+          properties:property_id (
+            name,
+            city,
+            pincode,
+            helpdesk_number
+          ),
+          identities:guest_identity(*)
+        `)
+        .or(`guest_name.ilike.%${cleanQuery}%,guest_phone.ilike.%${cleanQuery}%,vehicle_number.ilike.%${cleanQuery}%,uid.ilike.%${cleanQuery}%`)
+        .limit(50)
+    ])
+
+    const matchedIdentities = identitiesRes.data || []
+    const directCheckins = directCheckinsRes.data || []
+
+    // 2. Fetch any missing checkins referenced by matched identities
+    const existingCheckinIds = new Set(directCheckins.map(c => c.id))
+    const missingCheckinIds = [
+      ...new Set(
+        matchedIdentities
+          .map(i => i.checkin_id)
+          .filter(id => id && !existingCheckinIds.has(id))
+      )
+    ]
+
+    let additionalCheckins: any[] = []
+    if (missingCheckinIds.length > 0) {
+      const { data: fetched } = await supabase
+        .from('guest_checkins')
+        .select(`
+          id,
+          guest_name,
+          guest_phone,
+          checkin_date,
+          checkout_date,
+          num_people,
+          room_number,
+          vehicle_number,
+          uid,
+          properties:property_id (
+            name,
+            city,
+            pincode,
+            helpdesk_number
+          ),
+          identities:guest_identity(*)
+        `)
+        .in('id', missingCheckinIds)
+
+      additionalCheckins = fetched || []
     }
 
-    if (!identities || identities.length === 0) {
-      return { success: true, data: [] }
-    }
+    const allCheckins = [...directCheckins, ...additionalCheckins]
 
-    // 2. Fetch associated checkins and properties
-    const checkinIds = [...new Set(identities.map(i => i.checkin_id).filter(Boolean))]
-    
-    if (checkinIds.length === 0) {
-      return { success: true, data: identities }
-    }
-
-    const { data: checkins, error: checkinError } = await supabase
-      .from('guest_checkins')
-      .select(`
-        id,
-        guest_name,
-        guest_phone,
-        checkin_date,
-        checkout_date,
-        num_people,
-        room_number,
-        vehicle_number,
-        properties:property_id (
-          name,
-          city,
-          pincode,
-          helpdesk_number
+    // 3. Format result: if we have full check-in records, return them with all accompanying guests
+    if (allCheckins.length > 0) {
+      const formatted = allCheckins.map(checkin => {
+        // Collect all accompanying guests
+        const accompanying = (checkin.identities || []).filter(
+          (doc: any) => (doc.full_name || '').toLowerCase().trim() !== (checkin.guest_name || '').toLowerCase().trim()
         )
-      `)
-      .in('id', checkinIds)
+        const primaryDoc = (checkin.identities || []).find(
+          (doc: any) => (doc.full_name || '').toLowerCase().trim() === (checkin.guest_name || '').toLowerCase().trim()
+        ) || (checkin.identities || [])[0]
 
-    if (checkinError) {
-      console.error('[POLICE] Checkin fetch error:', checkinError)
-      // Return identities even if checkin fetch fails
-      return { success: true, data: identities }
+        return {
+          id: primaryDoc?.id || checkin.id,
+          full_name: checkin.guest_name,
+          document_number: primaryDoc?.document_number || '—',
+          document_type: primaryDoc?.document_type || 'ID',
+          address: primaryDoc?.address || null,
+          document_image_url: primaryDoc?.document_image_url || null,
+          created_at: checkin.created_at,
+          checkin_id: checkin.id,
+          checkin_details: checkin,
+          accompanying_guests: accompanying,
+          all_identities: checkin.identities || []
+        }
+      })
+
+      return { success: true, data: formatted }
     }
 
-    // 3. Merge data
-    const mergedData = identities.map(identity => {
-      const checkin = checkins?.find(c => c.id === identity.checkin_id)
-      return {
-        ...identity,
-        checkin_details: checkin || null
-      }
-    })
-
-    return { success: true, data: mergedData }
+    // Fallback: return standalone matched identities if no checkin was linked
+    return { success: true, data: matchedIdentities }
   } catch (error) {
     console.error('[POLICE] Unexpected error:', error)
     return { error: 'An unexpected system error occurred.' }

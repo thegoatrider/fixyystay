@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient, purgeUserAndRecordsByEmail } from '@/utils/supabase/admin'
+import { createAdminClient, purgeUserAndRecordsByEmail, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
 
@@ -529,5 +529,70 @@ export async function purgeAccountAction(email: string) {
     return res
   } catch (err: any) {
     return { success: false, error: err.message || 'Purge failed.' }
+  }
+}
+
+export async function onboardPolice(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
+
+    // Verify admin
+    const { data: { user: admin } } = await supabase.auth.getUser()
+    if (!isSuperAdminUser(admin)) {
+      return { error: 'Unauthorized' }
+    }
+
+    const email = (formData.get('email') as string || '').toLowerCase().trim()
+    const stationName = (formData.get('stationName') as string || '').trim()
+    const officerName = (formData.get('officerName') as string || '').trim()
+    const password = (formData.get('password') as string || 'Police@2026').trim()
+
+    if (!email || !stationName) {
+      return { error: 'Email and Police Station Name are required.' }
+    }
+
+    // 1. Create or update auth user with both user_metadata and app_metadata synced to role: 'police'
+    const targetUser = await findAuthUserByEmail(supabaseAdmin, email)
+
+    if (targetUser) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
+        password,
+        email_confirm: true,
+        user_metadata: {
+          ...targetUser.user_metadata,
+          role: 'police',
+          station_name: stationName,
+          officer_name: officerName
+        },
+        app_metadata: {
+          ...targetUser.app_metadata,
+          role: 'police'
+        }
+      })
+      if (updateError) return { error: `Failed to update police user: ${updateError.message}` }
+    } else {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          role: 'police',
+          station_name: stationName,
+          officer_name: officerName
+        },
+        app_metadata: {
+          role: 'police'
+        }
+      })
+      if (authError || !authData.user) {
+        return { error: `Police creation failed: ${authError?.message}` }
+      }
+    }
+
+    revalidatePath('/dashboard/admin')
+    return { success: true, tempPassword: password }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
   }
 }

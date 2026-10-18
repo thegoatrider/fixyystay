@@ -11,6 +11,51 @@ import React, { useEffect } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toast'
 import { approveIdentity, assignRoomToGuest, checkoutGuest } from './actions'
+import { cn } from '@/lib/utils'
+
+type AccompanyingGuest = {
+  name: string
+  docNumber?: string
+  isMatched?: boolean
+}
+
+function getAccompanyingGuests(c: any, cleanQ?: string): AccompanyingGuest[] {
+  const result: AccompanyingGuest[] = []
+  const mainName = (c.guest_name || '').toLowerCase().trim().replace(/[\s+]+/g, '')
+  const seen = new Set<string>()
+
+  if (c.identities && Array.isArray(c.identities)) {
+    for (const doc of c.identities) {
+      const name = (doc.full_name || '').trim()
+      const cleanName = name.toLowerCase().replace(/[\s+]+/g, '')
+      if (name && cleanName !== mainName && !seen.has(cleanName)) {
+        seen.add(cleanName)
+        const docNum = doc.document_number ? String(doc.document_number) : undefined
+        const isMatched = cleanQ 
+          ? (cleanName.includes(cleanQ) || (docNum && docNum.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)))
+          : false
+        result.push({ name, docNumber: docNum, isMatched })
+      }
+    }
+  }
+
+  if (c.id_documents && Array.isArray(c.id_documents)) {
+    for (const doc of c.id_documents) {
+      const name = (doc.fullName || doc.full_name || doc.name || '').trim()
+      const cleanName = name.toLowerCase().replace(/[\s+]+/g, '')
+      if (name && cleanName !== mainName && !seen.has(cleanName)) {
+        seen.add(cleanName)
+        const docNum = doc.documentNumber || doc.document_number ? String(doc.documentNumber || doc.document_number) : undefined
+        const isMatched = cleanQ 
+          ? (cleanName.includes(cleanQ) || (docNum && docNum.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)))
+          : false
+        result.push({ name, docNumber: docNum, isMatched })
+      }
+    }
+  }
+
+  return result
+}
 
 const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -345,7 +390,7 @@ function GuestList({
     
     // Search query filter
     if (searchTerm) {
-      const q = searchTerm.toLowerCase()
+      const q = searchTerm.toLowerCase().trim()
       const cleanQ = q.replace(/[\s+]+/g, '')
       list = list.filter(c => {
         let matchesIdentity = false
@@ -353,22 +398,33 @@ function GuestList({
           matchesIdentity = c.identities.some((doc: any) => 
             (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
             (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-            (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
-          )
-        } else if (c.id_documents && Array.isArray(c.id_documents)) {
-          matchesIdentity = c.id_documents.some((doc: any) => 
-            (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-            (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
+            (doc.raw_ocr_text && String(doc.raw_ocr_text).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+            (doc.address && String(doc.address).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
           )
         }
+        
+        if (!matchesIdentity && c.id_documents && Array.isArray(c.id_documents)) {
+          matchesIdentity = c.id_documents.some((doc: any) => 
+            (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+            (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+            (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+            (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+            (doc.name && String(doc.name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ))
+          )
+        }
+
         const cleanPhone = (c.guest_phone || '').replace(/[\s+]+/g, '')
         const cleanVehicle = (c.vehicle_number || '').toLowerCase().replace(/[\s+]+/g, '')
+        const cleanRoom = (c.room_number || '').toLowerCase().replace(/[\s+]+/g, '')
+        const cleanUid = (c.uid || '').toLowerCase().replace(/[\s+]+/g, '')
         
-        return (c.guest_name && c.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
+        return !cleanQ ||
+               (c.guest_name && c.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
                cleanPhone.includes(cleanQ) ||
                cleanVehicle.includes(cleanQ) ||
+               cleanRoom.includes(cleanQ) ||
+               cleanUid.includes(cleanQ) ||
                (c.properties?.name && c.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanQ)) ||
-               (c.uid && c.uid.toLowerCase().includes(q)) ||
                matchesIdentity
       })
     }
@@ -567,7 +623,54 @@ function GuestList({
                         className="hover:bg-indigo-50/20 transition cursor-pointer"
                       >
                         <td className="px-6 py-4 font-mono text-indigo-500 uppercase tracking-tighter">{g.uid || '—'}</td>
-                        <td className="px-6 py-4 font-bold text-gray-900">{g.guest_name}</td>
+                        <td className="px-6 py-4">
+                          {(() => {
+                            const cleanQ = searchTerm.toLowerCase().trim().replace(/[\s+]+/g, '')
+                            const accompanying = getAccompanyingGuests(g, cleanQ)
+                            const matchedAccompanying = cleanQ ? accompanying.filter(a => a.isMatched) : []
+
+                            return (
+                              <div className="space-y-1">
+                                <div className="font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
+                                  <span>{g.guest_name}</span>
+                                  {accompanying.length > 0 && (
+                                    <span className="text-[9px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.2 rounded border border-blue-100">
+                                      Primary
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Highlight if an accompanying guest matched the search */}
+                                {matchedAccompanying.length > 0 && (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-[10px] font-bold text-amber-900">
+                                    <span>🎯 Matched:</span>
+                                    <span>{matchedAccompanying.map(m => m.name).join(', ')}</span>
+                                  </div>
+                                )}
+
+                                {/* Accompanying Guests */}
+                                {accompanying.length > 0 && (
+                                  <div className="text-[10px] text-gray-500 font-medium flex flex-wrap items-center gap-1">
+                                    <span className="text-gray-400 font-semibold">With:</span>
+                                    {accompanying.map((acc, aIdx) => (
+                                      <span
+                                        key={aIdx}
+                                        className={cn(
+                                          "px-1.5 py-0.2 rounded border",
+                                          acc.isMatched 
+                                            ? "bg-amber-100 text-amber-900 border-amber-300 font-bold" 
+                                            : "bg-gray-100 text-gray-650 border-gray-200"
+                                        )}
+                                      >
+                                        {acc.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </td>
                         <td className="px-6 py-4 font-normal text-gray-500">{g.guest_phone}</td>
                         <td className="px-6 py-4 truncate max-w-[150px]">{g.properties?.name}</td>
                         <td className="px-6 py-4 text-center">

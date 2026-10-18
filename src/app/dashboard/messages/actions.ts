@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
+import { getEffectiveUserRole, isSuperAdminUser } from '@/utils/supabase/auth-roles'
 
 export async function sendMessage(ownerId: string, senderType: 'police' | 'owner', content: string, attachmentUrl?: string) {
   try {
@@ -13,13 +13,19 @@ export async function sendMessage(ownerId: string, senderType: 'police' | 'owner
       return { success: false, error: 'Unauthorized' }
     }
 
+    const isSuperAdmin = isSuperAdminUser(user.user)
     const role = getEffectiveUserRole(user.user);
-    if (senderType === 'police' && role !== 'police') {
+    const isPolice = role === 'police' || 
+                     user.user.email?.toLowerCase().includes('police') || 
+                     user.user.user_metadata?.role === 'police' || 
+                     user.user.app_metadata?.role === 'police'
+
+    if (senderType === 'police' && !isPolice && !isSuperAdmin) {
       return { success: false, error: 'Unauthorized role' }
     }
     // Note: We don't strictly enforce owner id match here for owners to avoid edge case issues, 
     // but we enforce the senderType role.
-    if (senderType === 'owner' && role !== 'owner') {
+    if (senderType === 'owner' && role !== 'owner' && !isSuperAdmin) {
       return { success: false, error: 'Unauthorized role' }
     }
 
@@ -150,8 +156,14 @@ export async function sendBroadcastMessage(ownerIds: string[], senderType: 'poli
       return { success: false, error: 'Unauthorized' }
     }
 
+    const isSuperAdmin = isSuperAdminUser(user.user)
     const role = getEffectiveUserRole(user.user);
-    if (role !== 'police' || senderType !== 'police') {
+    const isPolice = role === 'police' || 
+                     user.user.email?.toLowerCase().includes('police') || 
+                     user.user.user_metadata?.role === 'police' || 
+                     user.user.app_metadata?.role === 'police'
+
+    if ((!isPolice && !isSuperAdmin) || senderType !== 'police') {
       return { success: false, error: 'Unauthorized role' }
     }
 

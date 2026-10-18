@@ -21,6 +21,62 @@ import {
 } from 'lucide-react'
 import { updateEmployeePoliceStatus } from './police-actions'
 
+import { cn } from '@/lib/utils'
+
+type AccompanyingGuest = {
+  name: string
+  docNumber?: string
+  docType?: string
+  isMatched?: boolean
+}
+
+function getAccompanyingGuests(item: any, cleanSearchStr?: string): AccompanyingGuest[] {
+  const result: AccompanyingGuest[] = []
+  const mainName = (item.guest_name || '').toLowerCase().trim().replace(/[\s+]+/g, '')
+  const seen = new Set<string>()
+
+  if (item.identities && Array.isArray(item.identities)) {
+    for (const doc of item.identities) {
+      const name = (doc.full_name || '').trim()
+      const cleanName = name.toLowerCase().replace(/[\s+]+/g, '')
+      if (name && cleanName !== mainName && !seen.has(cleanName)) {
+        seen.add(cleanName)
+        const isMatched = cleanSearchStr 
+          ? (cleanName.includes(cleanSearchStr) || (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)))
+          : false
+        result.push({
+          name,
+          docNumber: doc.document_number || undefined,
+          docType: doc.document_type || undefined,
+          isMatched
+        })
+      }
+    }
+  }
+
+  if (item.id_documents && Array.isArray(item.id_documents)) {
+    for (const doc of item.id_documents) {
+      const name = (doc.fullName || doc.full_name || doc.name || '').trim()
+      const cleanName = name.toLowerCase().replace(/[\s+]+/g, '')
+      if (name && cleanName !== mainName && !seen.has(cleanName)) {
+        seen.add(cleanName)
+        const docNum = doc.documentNumber || doc.document_number
+        const isMatched = cleanSearchStr 
+          ? (cleanName.includes(cleanSearchStr) || (docNum && String(docNum).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)))
+          : false
+        result.push({
+          name,
+          docNumber: docNum || undefined,
+          docType: doc.documentType || doc.document_type || undefined,
+          isMatched
+        })
+      }
+    }
+  }
+
+  return result
+}
+
 export default function PoliceDashboardClient({ 
   initialCheckins,
   initialEmployees 
@@ -37,7 +93,7 @@ export default function PoliceDashboardClient({
 
   const filteredCheckins = useMemo(() => {
     return initialCheckins.filter(item => {
-      const searchStr = searchTerm.toLowerCase()
+      const searchStr = searchTerm.toLowerCase().trim()
       const cleanSearchStr = searchStr.replace(/[\s+]+/g, '')
       
       let matchesIdentity = false;
@@ -49,20 +105,30 @@ export default function PoliceDashboardClient({
           (doc.address && String(doc.address).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
           (doc.raw_ocr_text_back && String(doc.raw_ocr_text_back).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
         )
-      } else if (item.id_documents && Array.isArray(item.id_documents)) {
+      }
+      
+      if (!matchesIdentity && item.id_documents && Array.isArray(item.id_documents)) {
         matchesIdentity = item.id_documents.some((doc: any) => 
           (doc.documentNumber && String(doc.documentNumber).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
-          (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
+          (doc.document_number && String(doc.document_number).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.fullName && String(doc.fullName).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.full_name && String(doc.full_name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
+          (doc.name && String(doc.name).toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr))
         )
       }
 
       const cleanPhone = (item.guest_phone || '').replace(/[\s+]+/g, '')
       const cleanVehicle = (item.vehicle_number || '').toLowerCase().replace(/[\s+]+/g, '')
+      const cleanRoom = (item.room_number || '').toLowerCase().replace(/[\s+]+/g, '')
+      const cleanUid = (item.uid || '').toLowerCase().replace(/[\s+]+/g, '')
 
       const matchesSearch = 
+        !cleanSearchStr ||
         (item.guest_name && item.guest_name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         cleanPhone.includes(cleanSearchStr) ||
         cleanVehicle.includes(cleanSearchStr) ||
+        cleanRoom.includes(cleanSearchStr) ||
+        cleanUid.includes(cleanSearchStr) ||
         (item.properties?.name && item.properties.name.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         (item.properties?.city_area && item.properties.city_area.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         matchesIdentity
@@ -179,23 +245,74 @@ export default function PoliceDashboardClient({
                 {filteredCheckins.map((item) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
                     <td className="px-6 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-900 font-black text-xl shrink-0">
-                          {item.guest_name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
-                            {item.status === 'draft' && (
-                              <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
-                            )}
+                      {(() => {
+                        const cleanSearchStr = searchTerm.toLowerCase().trim().replace(/[\s+]+/g, '')
+                        const accompanying = getAccompanyingGuests(item, cleanSearchStr)
+                        const matchedAccompanying = cleanSearchStr ? accompanying.filter(a => a.isMatched) : []
+
+                        return (
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-900 font-black text-xl shrink-0 mt-0.5">
+                              {item.guest_name.charAt(0)}
+                            </div>
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
+                                <span className="text-[10px] bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-blue-200">
+                                  Primary Guest
+                                </span>
+                                {item.status === 'draft' && (
+                                  <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-500">
+                                <Phone className="w-3 h-3 text-gray-400" />
+                                <span className="text-xs font-bold">{item.guest_phone}</span>
+                                {item.room_number && (
+                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    Room {item.room_number}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Search Match Highlight for Accompanying Guest */}
+                              {matchedAccompanying.length > 0 && (
+                                <div className="p-2 bg-amber-50 border border-amber-300 rounded-xl mt-1 text-xs text-amber-900 font-bold flex items-center gap-1.5 shadow-sm">
+                                  <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded">Search Match</span>
+                                  <span>Accompanying: <strong>{matchedAccompanying.map(m => m.name).join(', ')}</strong></span>
+                                </div>
+                              )}
+
+                              {/* Accompanying Guests List */}
+                              {accompanying.length > 0 && (
+                                <div className="mt-1 pt-1.5 border-t border-gray-100">
+                                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-1">
+                                    Accompanying Guests ({accompanying.length}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {accompanying.map((acc, aIdx) => (
+                                      <span
+                                        key={aIdx}
+                                        className={cn(
+                                          "text-xs px-2 py-0.5 rounded-lg border font-medium flex items-center gap-1",
+                                          acc.isMatched 
+                                            ? "bg-amber-100 text-amber-900 border-amber-300 font-bold ring-1 ring-amber-400" 
+                                            : "bg-gray-50 text-gray-700 border-gray-200"
+                                        )}
+                                      >
+                                        <span>{acc.name}</span>
+                                        {acc.docNumber && (
+                                          <span className="text-[10px] text-gray-400 font-mono">({acc.docNumber})</span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-gray-500 mt-1">
-                            <Phone className="w-3 h-3" />
-                            <span className="text-xs font-bold">{item.guest_phone}</span>
-                          </div>
-                        </div>
-                      </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-6 py-6">
                       <div className="space-y-1.5">

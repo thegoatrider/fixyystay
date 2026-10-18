@@ -92,8 +92,25 @@ export async function submitCheckin(formData: FormData, identityIds: string[]) {
     // Generate UID
     const uid = 'GST-' + Date.now().toString(16).toUpperCase().slice(-8)
 
-    // Store identity IDs as an array for reference
-    const idDocuments = identityIds.map((id, i) => ({ personIndex: i + 1, identityId: id }))
+    // Store identity IDs as an array for reference with complete guest metadata
+    const idDocuments = identityIds.map((id, i) => {
+      const match = identities?.find(iden => iden.id === id)
+      const resolvedName = match?.full_name?.trim() || (i === 0 ? guestName : `Accompanying Guest ${i + 1}`)
+      const resolvedDocNum = match?.document_number?.trim() || ''
+      const resolvedDocType = match?.document_type || 'UNKNOWN'
+      return {
+        personIndex: i + 1,
+        identityId: id,
+        fullName: resolvedName,
+        full_name: resolvedName,
+        documentNumber: resolvedDocNum,
+        document_number: resolvedDocNum,
+        documentType: resolvedDocType,
+        document_type: resolvedDocType,
+        isVerified: match?.is_verified ?? true,
+        is_verified: match?.is_verified ?? true
+      }
+    })
 
     const isForeigner = formData.get('isForeigner') === 'on'
     const formCData = isForeigner ? {

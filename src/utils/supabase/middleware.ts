@@ -64,6 +64,11 @@ export async function updateSession(request: NextRequest) {
       url.pathname = '/'
       return NextResponse.redirect(url)
     }
+
+    if (request.nextUrl.pathname.startsWith('/dashboard/police') && role !== 'police' && !isSuperAdmin) {
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Prevent logged in users from seeing login/signup
@@ -74,8 +79,10 @@ export async function updateSession(request: NextRequest) {
     const isSuperAdmin = isSuperAdminUser(user)
     const role = getEffectiveUserRole(user)
     if (isSuperAdmin || role === 'admin') url.pathname = '/dashboard/admin'
+    else if (role === 'police') url.pathname = '/dashboard/police'
     else if (role === 'owner') url.pathname = '/dashboard/owner'
     else if (role === 'influencer') url.pathname = '/dashboard/influencer'
+    else if (role === 'autowala' || role === 'agent') url.pathname = '/dashboard/agent'
     else url.pathname = '/guest'
     
     return NextResponse.redirect(url)
