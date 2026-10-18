@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone, QrCode } from 'lucide-react'
+import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone, QrCode, Calendar, Clock, ShieldCheck } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
@@ -16,6 +16,7 @@ import { requestPayout } from '@/app/actions/wallet'
 import React, { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
 
 // Lazy load heavy tab sections
 const LeadsSection = dynamic(() => import('./LeadsSection'), { loading: () => <DashboardSkeleton /> })
@@ -76,21 +77,66 @@ export default function OwnerDashboardClient({
 
   const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
-  // Use useMemo for trial calculation to avoid redundant calculations
-  const { isFreeTier } = useMemo(() => {
+  // Comprehensive subscription and status calculation
+  const subscriptionInfo = useMemo(() => {
     const sub = (data as any)?.subscription || initialSubscription
     const own = (data as any)?.owner || initialOwner
-    if (!sub && !own) return { isFreeTier: false }
     
-    const isPaid = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+    const isFreeTierUser = own?.free_tier_enabled === true
+    const isPaid = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
     
     // 7-day Trial Logic from Owner Creation Date
     const ownerCreatedAt = own?.created_at ? new Date(own.created_at) : null
     const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
-    const isExpired = !isPaid && trialEndDate ? trialEndDate <= new Date() : false
-    
-    return { isFreeTier: isExpired }
+    const isTrialActive = !isPaid && !isFreeTierUser && !!trialEndDate && trialEndDate > new Date()
+    const isExpired = !isPaid && !isTrialActive && !isFreeTierUser
+
+    let endDate: Date | null = null
+    let daysRemaining = 0
+    let planDisplayName = 'FixyStays Partner'
+
+    if (isPaid && sub?.end_date) {
+      endDate = new Date(sub.end_date)
+      daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      planDisplayName = sub.plan_name ? sub.plan_name.toUpperCase() : 'ACTIVE SUBSCRIPTION'
+    } else if (isTrialActive && trialEndDate) {
+      endDate = trialEndDate
+      daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      planDisplayName = '7-DAY FREE TRIAL'
+    } else if (sub?.end_date) {
+      endDate = new Date(sub.end_date)
+      daysRemaining = 0
+      planDisplayName = sub.plan_name ? `${sub.plan_name.toUpperCase()} (EXPIRED)` : 'EXPIRED SUBSCRIPTION'
+    } else if (isFreeTierUser) {
+      planDisplayName = 'COURTESY PARTNER ACCESS'
+    } else {
+      planDisplayName = 'FREE TIER (RESTRICTED)'
+    }
+
+    const formattedEndDate = endDate
+      ? endDate.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        })
+      : null
+
+    const isExpiringSoon = isPaid && daysRemaining <= 7
+
+    return {
+      isFreeTier: isExpired,
+      isPaid,
+      isTrialActive,
+      isFreeTierUser,
+      planDisplayName,
+      formattedEndDate,
+      daysRemaining,
+      isExpiringSoon,
+      hasEndDate: !!endDate
+    }
   }, [data, initialOwner, initialSubscription])
+
+  const isFreeTier = subscriptionInfo.isFreeTier
 
 
 
@@ -141,6 +187,99 @@ export default function OwnerDashboardClient({
               <Button className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold border-none shadow-lg hover:shadow-orange-200/50 transition-all hover:scale-105 rounded-xl px-6">
                 <Zap className="w-4 h-4 mr-2 animate-pulse" />
                 Upgrade to Pro
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* Subscription & Plan Status Banner */}
+      <div className={cn(
+        "rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border transition-all",
+        subscriptionInfo.isPaid
+          ? "bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-blue-50/40 border-emerald-200/80"
+          : subscriptionInfo.isTrialActive
+            ? "bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-yellow-50/40 border-amber-200/80"
+            : subscriptionInfo.isFreeTierUser
+              ? "bg-gradient-to-r from-purple-50/90 via-indigo-50/50 to-blue-50/40 border-purple-200/80"
+              : "bg-gradient-to-r from-red-50/90 via-rose-50/50 to-orange-50/40 border-red-200/80"
+      )}>
+        <div className="flex items-center gap-3.5">
+          <div className={cn(
+            "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+            subscriptionInfo.isPaid
+              ? "bg-emerald-600 text-white"
+              : subscriptionInfo.isTrialActive
+                ? "bg-amber-600 text-white"
+                : subscriptionInfo.isFreeTierUser
+                  ? "bg-purple-600 text-white"
+                  : "bg-red-600 text-white"
+          )}>
+            {subscriptionInfo.isPaid ? (
+              <ShieldCheck className="w-6 h-6" />
+            ) : subscriptionInfo.isTrialActive ? (
+              <Clock className="w-6 h-6" />
+            ) : subscriptionInfo.isFreeTierUser ? (
+              <Zap className="w-6 h-6" />
+            ) : (
+              <Clock className="w-6 h-6" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-gray-900 text-sm sm:text-base tracking-tight">
+                {subscriptionInfo.planDisplayName}
+              </span>
+              <span className={cn(
+                "text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border",
+                subscriptionInfo.isPaid
+                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                  : subscriptionInfo.isTrialActive
+                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                    : subscriptionInfo.isFreeTierUser
+                      ? "bg-purple-100 text-purple-800 border-purple-300"
+                      : "bg-red-100 text-red-800 border-red-300"
+              )}>
+                {subscriptionInfo.isPaid ? 'Active' : subscriptionInfo.isTrialActive ? 'Free Trial' : subscriptionInfo.isFreeTierUser ? 'VIP Access' : 'Expired'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-1">
+              <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              {subscriptionInfo.hasEndDate ? (
+                <span>
+                  {subscriptionInfo.isPaid ? 'Subscription ends on ' : subscriptionInfo.isTrialActive ? 'Trial ends on ' : 'Subscription ended on '}
+                  <strong className="text-gray-900 font-bold">{subscriptionInfo.formattedEndDate}</strong>
+                  {subscriptionInfo.isPaid && (
+                    <span className={cn("ml-1.5 font-semibold", subscriptionInfo.isExpiringSoon ? "text-amber-600 font-bold" : "text-gray-500")}>
+                      ({subscriptionInfo.daysRemaining} {subscriptionInfo.daysRemaining === 1 ? 'day' : 'days'} left)
+                    </span>
+                  )}
+                  {subscriptionInfo.isTrialActive && (
+                    <span className="ml-1.5 font-bold text-amber-700">
+                      ({subscriptionInfo.daysRemaining} {subscriptionInfo.daysRemaining === 1 ? 'day' : 'days'} left)
+                    </span>
+                  )}
+                </span>
+              ) : subscriptionInfo.isFreeTierUser ? (
+                <span>Full courtesy access enabled by FixyStays admin</span>
+              ) : (
+                <span>Upgrade to unlock full property leads, guest register, and marketing</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end shrink-0">
+          <Link href="/dashboard/owner/profile" prefetch={false}>
+            <Button variant="outline" size="sm" className="rounded-xl text-xs font-bold bg-white/90 hover:bg-white border-gray-200 shadow-sm h-9 px-3.5">
+              Account &amp; Plan Details →
+            </Button>
+          </Link>
+          {(subscriptionInfo.isFreeTier || subscriptionInfo.isExpiringSoon || subscriptionInfo.isTrialActive) && (
+            <Link href="/pricing/starter" prefetch={false}>
+              <Button size="sm" className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-extrabold rounded-xl text-xs shadow-md h-9 px-3.5">
+                <Zap className="w-3.5 h-3.5 mr-1" />
+                {subscriptionInfo.isFreeTier ? 'Upgrade to Pro' : subscriptionInfo.isExpiringSoon ? 'Renew Subscription' : 'Upgrade Plan'}
               </Button>
             </Link>
           )}

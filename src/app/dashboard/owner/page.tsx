@@ -55,11 +55,12 @@ export default async function OwnerDashboard() {
   }
 
   const isFreeTier = (owner as any)?.free_tier_enabled === true
+  const supabaseAdmin = createAdminClient()
 
   // Run subscription check and Google drive token lookup concurrently
   const [subResult, googleTokenResult] = await Promise.all([
-    !isSuperAdmin && owner && !isFreeTier
-      ? supabase.from('owner_subscriptions').select('status, end_date').eq('owner_id', owner.id).maybeSingle()
+    owner
+      ? supabaseAdmin.from('owner_subscriptions').select('plan_name, status, end_date').eq('owner_id', owner.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
     owner
       ? supabase.from('owner_google_tokens').select('google_email').eq('owner_id', owner.id).maybeSingle()
@@ -68,12 +69,11 @@ export default async function OwnerDashboard() {
 
   if (!isSuperAdmin && owner && !isFreeTier) {
     const sub = subResult.data
-    const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
+    const isSubActive = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
     
     if (!isSubActive) {
       // Also allow owners who purchased standalone Guest Hub (₹20/room/month)
       // Single query inner join through FK (guest_hub_settings.property_id -> properties.id)
-      const supabaseAdmin = createAdminClient()
       const { data: activeHub } = await supabaseAdmin
         .from('guest_hub_settings')
         .select('id, properties!inner(id, owner_id)')
