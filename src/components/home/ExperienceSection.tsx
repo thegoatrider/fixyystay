@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
+import { getOptimizedImageUrl } from '@/lib/image-url';
 
 const EXPERIENCES = [
   {
@@ -44,8 +45,9 @@ function ExperienceBlock({ experience, index }: { experience: any, index: number
         >
           <motion.img 
             style={{ y, scale: 1.1 }}
-            src={experience.image} 
+            src={getOptimizedImageUrl(experience.image, { width: 800, quality: 75 })} 
             alt={experience.title} 
+            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover"
           />
         </motion.div>

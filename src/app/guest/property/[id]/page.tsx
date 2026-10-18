@@ -83,25 +83,28 @@ export default async function PropertyDetailPage(
   const propertyId = params.id
   const supabase = await createClient()
 
-  const { data: { session } } = await supabase.auth.getSession()
-  const isLoggedIn = !!session
+  const [sessionResult, propertyResult] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase
+      .from('properties')
+      .select(`
+        *,
+        rooms (
+          id,
+          name,
+          category,
+          base_price,
+          room_rates (date, price),
+          room_availability (date, available),
+          bookings (*)
+        )
+      `)
+      .eq('id', propertyId)
+      .single()
+  ])
 
-  const { data: property, error } = await supabase
-    .from('properties')
-    .select(`
-      *,
-      rooms (
-        id,
-        name,
-        category,
-        base_price,
-        room_rates (date, price),
-        room_availability (date, available),
-        bookings (*)
-      )
-    `)
-    .eq('id', propertyId)
-    .single()
+  const isLoggedIn = !!sessionResult.data?.session
+  const { data: property, error } = propertyResult
 
   if (error || !property || !property.approved) {
     redirect('/guest')

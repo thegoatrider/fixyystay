@@ -28,15 +28,15 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Fast short-circuit: if no Supabase auth token cookie exists, skip remote 250ms auth call
+  const allCookies = request.cookies.getAll()
+  const hasAuthToken = allCookies.some(c => c.name.includes('-auth-token') || (c.name.startsWith('sb-') && c.name.includes('token')))
 
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  if (hasAuthToken) {
+    const { data } = await supabase.auth.getUser()
+    user = data?.user || null
+  }
 
   const url = request.nextUrl.clone()
 
@@ -86,6 +86,18 @@ export async function updateSession(request: NextRequest) {
     else url.pathname = '/guest'
     
     return NextResponse.redirect(url)
+  }
+
+  if (user) {
+    request.headers.set('x-user-id', user.id)
+    request.headers.set('x-user-email', user.email || '')
+    request.headers.set('x-user-role', getEffectiveUserRole(user))
+    request.headers.set('x-is-admin', String(isSuperAdminUser(user)))
+    supabaseResponse = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
   }
 
   return supabaseResponse

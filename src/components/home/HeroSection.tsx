@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getOptimizedImageUrl } from '@/lib/image-url';
 
 const HERO_IMAGES = [
   'https://emyawufsqwdpqxnygobe.supabase.co/storage/v1/object/public/property_images/prop-d2f9341f-6f36-44d7-8af6-dd9efe054e93-1784269865939-fom1s.jpg',
@@ -38,7 +39,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
             className="absolute inset-0 w-full h-full"
           >
             <Image
-              src={HERO_IMAGES[currentImage]}
+              src={getOptimizedImageUrl(HERO_IMAGES[currentImage], { width: 1400, quality: 75 })}
               alt="Beautiful travel destination"
               fill
               priority={currentImage === 0}

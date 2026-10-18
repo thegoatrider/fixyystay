@@ -24,9 +24,18 @@ export const metadata: Metadata = {
   description: 'Discover the best luxury villas, premium cottages, hotels, and vacation rentals. Book your perfect getaway with FixyStays today.',
 };
 
+import { cookies } from 'next/headers';
+
 export default async function Index() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const hasAuthToken = cookieStore.getAll().some(c => c.name.includes('-auth-token') || (c.name.startsWith('sb-') && c.name.includes('token')));
+
+  let user = null;
+  if (hasAuthToken) {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  }
 
   return (
     <div className="flex-1 w-full flex flex-col bg-white">

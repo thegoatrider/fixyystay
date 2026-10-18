@@ -1,4 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
+import { getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import Link from 'next/link'
 import Image from 'next/image'
 import { MapPin, Star } from 'lucide-react'
@@ -60,10 +62,17 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     query = query.or(`city.eq.${selectedCity},city_area.eq.${selectedCity}`)
   }
 
-  const { data: properties, error } = await query
+  const cookieStore = await cookies()
+  const hasAuthToken = cookieStore.getAll().some(c => c.name.includes('-auth-token') || (c.name.startsWith('sb-') && c.name.includes('token')))
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const isInfluencer = user?.user_metadata?.role === 'influencer'
+  const [propertiesResult, userResult] = await Promise.all([
+    query,
+    hasAuthToken ? supabase.auth.getUser() : Promise.resolve({ data: { user: null }, error: null })
+  ])
+
+  const { data: properties, error } = propertiesResult
+  const user = userResult.data?.user || null
+  const isInfluencer = getEffectiveUserRole(user) === 'influencer'
 
   // Prepare simple helper for image fallbacks
   const getPropImage = (prop: any) => {

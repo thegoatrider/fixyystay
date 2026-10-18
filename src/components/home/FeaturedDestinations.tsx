@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
+import { getOptimizedImageUrl } from '@/lib/image-url';
 
 const DESTINATIONS = [
   {
@@ -72,10 +73,11 @@ export function FeaturedDestinations() {
                 {/* Background Image */}
                 <div className="absolute inset-0 w-full h-full">
                 <Image 
-                  src={dest.image} 
+                  src={getOptimizedImageUrl(dest.image, { width: 800, quality: 75 }) || dest.image} 
                   alt={dest.name} 
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out"
                 />
                 {/* Gradient Overlay for text readability */}
