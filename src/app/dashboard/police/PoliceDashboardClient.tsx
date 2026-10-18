@@ -81,8 +81,18 @@ function normalizeDateStr(val: any): string | null {
   if (!val) return null
   if (typeof val === 'string') {
     const trimmed = val.trim()
-    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)
-    if (match) return match[1]
+    // Match YYYY-MM-DD or YYYY/MM/DD
+    const matchYmd = trimmed.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/)
+    if (matchYmd) {
+      const [_, y, m, d] = matchYmd
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    // Match DD-MM-YYYY or DD/MM/YYYY (common in Indian registers and legacy forms)
+    const matchDmy = trimmed.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/)
+    if (matchDmy) {
+      const [_, d, m, y] = matchDmy
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
   }
   try {
     const d = new Date(val)
@@ -95,6 +105,15 @@ function normalizeDateStr(val: any): string | null {
 
 function formatDateSafe(val: any, fallback = '—'): string {
   if (!val) return fallback
+  const normalized = normalizeDateStr(val)
+  if (normalized) {
+    try {
+      const d = new Date(normalized + 'T00:00:00')
+      if (!isNaN(d.getTime()) && d.getFullYear() > 1970) {
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      }
+    } catch {}
+  }
   try {
     const d = new Date(val)
     if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return fallback
@@ -109,11 +128,11 @@ function checkinMatchesDate(item: any, dateFilter: string): boolean {
   const target = normalizeDateStr(dateFilter)
   if (!target) return true
 
-  const checkin = normalizeDateStr(item.checkin_date)
+  const checkin = normalizeDateStr(item.checkin_date || item.register_date)
   const checkout = normalizeDateStr(item.checkout_date)
   const createdAt = normalizeDateStr(item.created_at)
 
-  // Direct match on check-in or creation date
+  // Direct match on check-in, register date or creation date
   if (checkin && checkin === target) return true
   if (!checkin && createdAt && createdAt === target) return true
 
@@ -192,9 +211,15 @@ export default function PoliceDashboardClient({
     })
 
     return list.sort((a, b) => {
-      const timeA = new Date(a.checkin_date || a.created_at || 0).getTime()
-      const timeB = new Date(b.checkin_date || b.created_at || 0).getTime()
-      return timeB - timeA
+      const dateA = normalizeDateStr(a.checkin_date || a.register_date) || normalizeDateStr(a.created_at) || ''
+      const dateB = normalizeDateStr(b.checkin_date || b.register_date) || normalizeDateStr(b.created_at) || ''
+      
+      const timeA = dateA ? new Date(dateA + 'T00:00:00').getTime() : (new Date(a.created_at || 0).getTime() || 0)
+      const timeB = dateB ? new Date(dateB + 'T00:00:00').getTime() : (new Date(b.created_at || 0).getTime() || 0)
+      
+      const safeA = isNaN(timeA) ? 0 : timeA
+      const safeB = isNaN(timeB) ? 0 : timeB
+      return safeB - safeA
     })
   }, [searchTerm, dateFilter, initialCheckins])
 
@@ -326,11 +351,11 @@ export default function PoliceDashboardClient({
                         return (
                           <div className="flex items-start gap-4">
                             <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-900 font-black text-xl shrink-0 mt-0.5">
-                              {item.guest_name.charAt(0)}
+                              {(item.guest_name || 'Guest').charAt(0)}
                             </div>
                             <div className="space-y-1.5 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name}</p>
+                                <p className="font-black text-gray-900 text-lg leading-tight">{item.guest_name || 'Guest'}</p>
                                 <span className="text-[10px] bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-blue-200">
                                   Primary Guest
                                 </span>
@@ -397,7 +422,7 @@ export default function PoliceDashboardClient({
                         <div className="flex items-center gap-2 text-gray-700">
                           <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                           <span className="text-sm font-bold">
-                            {formatDateSafe(item.checkin_date, formatDateSafe(item.created_at, 'Check-in TBD'))}
+                            {formatDateSafe(item.checkin_date || item.register_date, formatDateSafe(item.created_at, 'Check-in TBD'))}
                             {item.checkout_date ? ` — ${formatDateSafe(item.checkout_date)}` : ' (Ongoing Stay)'}
                           </span>
                         </div>
