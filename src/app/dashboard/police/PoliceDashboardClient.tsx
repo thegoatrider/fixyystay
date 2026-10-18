@@ -77,6 +77,59 @@ function getAccompanyingGuests(item: any, cleanSearchStr?: string): Accompanying
   return result
 }
 
+function normalizeDateStr(val: any): string | null {
+  if (!val) return null
+  if (typeof val === 'string') {
+    const trimmed = val.trim()
+    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (match) return match[1]
+  }
+  try {
+    const d = new Date(val)
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1970) {
+      return d.toISOString().split('T')[0]
+    }
+  } catch {}
+  return null
+}
+
+function formatDateSafe(val: any, fallback = '—'): string {
+  if (!val) return fallback
+  try {
+    const d = new Date(val)
+    if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return fallback
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch {
+    return fallback
+  }
+}
+
+function checkinMatchesDate(item: any, dateFilter: string): boolean {
+  if (!dateFilter) return true
+  const target = normalizeDateStr(dateFilter)
+  if (!target) return true
+
+  const checkin = normalizeDateStr(item.checkin_date)
+  const checkout = normalizeDateStr(item.checkout_date)
+  const createdAt = normalizeDateStr(item.created_at)
+
+  // Direct match on check-in or creation date
+  if (checkin && checkin === target) return true
+  if (!checkin && createdAt && createdAt === target) return true
+
+  // Date range match: guest active on the filtered date
+  if (checkin && checkout) {
+    return checkin <= target && target <= checkout
+  }
+
+  // Ongoing stay with no checkout date set yet
+  if (checkin && !checkout) {
+    return checkin <= target
+  }
+
+  return false
+}
+
 export default function PoliceDashboardClient({ 
   initialCheckins,
   initialEmployees 
@@ -92,7 +145,7 @@ export default function PoliceDashboardClient({
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
 
   const filteredCheckins = useMemo(() => {
-    return initialCheckins.filter(item => {
+    const list = initialCheckins.filter(item => {
       const searchStr = searchTerm.toLowerCase().trim()
       const cleanSearchStr = searchStr.replace(/[\s+]+/g, '')
       
@@ -133,9 +186,15 @@ export default function PoliceDashboardClient({
         (item.properties?.city_area && item.properties.city_area.toLowerCase().replace(/[\s+]+/g, '').includes(cleanSearchStr)) ||
         matchesIdentity
       
-      const matchesDate = !dateFilter || item.checkin_date === dateFilter
+      const matchesDate = checkinMatchesDate(item, dateFilter)
       
       return matchesSearch && matchesDate
+    })
+
+    return list.sort((a, b) => {
+      const timeA = new Date(a.checkin_date || a.created_at || 0).getTime()
+      const timeB = new Date(b.checkin_date || b.created_at || 0).getTime()
+      return timeB - timeA
     })
   }, [searchTerm, dateFilter, initialCheckins])
 
@@ -194,13 +253,13 @@ export default function PoliceDashboardClient({
           className={`pb-4 px-4 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${activeTab === 'guests' ? 'border-blue-600 text-blue-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           onClick={() => setActiveTab('guests')}
         >
-          <Users className="w-5 h-5" /> Guest Registry
+          <Users className="w-5 h-5" /> Guest Registry ({filteredCheckins.length})
         </button>
         <button 
           className={`pb-4 px-4 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${activeTab === 'staff' ? 'border-blue-600 text-blue-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           onClick={() => setActiveTab('staff')}
         >
-          <Briefcase className="w-5 h-5" /> Staff Registry
+          <Briefcase className="w-5 h-5" /> Staff Registry ({filteredEmployees.length})
         </button>
       </div>
 
@@ -216,14 +275,28 @@ export default function PoliceDashboardClient({
           />
         </div>
         {activeTab === 'guests' && (
-          <div className="relative">
-            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input 
-              type="date"
-              className="pl-12 h-14 rounded-2xl border-gray-200 bg-white shadow-sm"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+              <Input 
+                type="date"
+                className="pl-12 h-14 rounded-2xl border-gray-200 bg-white shadow-sm"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+              />
+            </div>
+            {dateFilter && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDateFilter('')}
+                className="h-14 px-3 rounded-2xl border-gray-200 text-xs font-bold text-gray-600 hover:text-red-600 hover:bg-red-50"
+                title="Clear date filter"
+              >
+                <FilterX className="w-4 h-4 mr-1" />
+                All Dates
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -263,6 +336,11 @@ export default function PoliceDashboardClient({
                                 </span>
                                 {item.status === 'draft' && (
                                   <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-100">Draft</span>
+                                )}
+                                {item.source && (
+                                  <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-indigo-200">
+                                    {item.source}
+                                  </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2 text-gray-500">
@@ -317,8 +395,11 @@ export default function PoliceDashboardClient({
                     <td className="px-6 py-6">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2 text-gray-700">
-                          <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                          <span className="text-sm font-bold">{new Date(item.checkin_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} — {new Date(item.checkout_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                          <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="text-sm font-bold">
+                            {formatDateSafe(item.checkin_date, formatDateSafe(item.created_at, 'Check-in TBD'))}
+                            {item.checkout_date ? ` — ${formatDateSafe(item.checkout_date)}` : ' (Ongoing Stay)'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-400">
                           <Users className="w-3.5 h-3.5" />
