@@ -15,9 +15,9 @@ export function BottomNav() {
     let isMounted = true
     const supabase = createClient()
     async function getRole() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user && isMounted) {
-        setRole(getEffectiveUserRole(user))
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user && isMounted) {
+        setRole(getEffectiveUserRole(session.user))
       }
     }
     getRole()
