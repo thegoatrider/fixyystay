@@ -12,6 +12,83 @@
 -- ======================================================================================
 
 -- --------------------------------------------------------------------------------------
+-- PART 0: ENSURE ANCILLARY TABLES EXIST
+-- --------------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.property_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
+  room_number TEXT NOT NULL,
+  room_name TEXT,
+  qr_token TEXT UNIQUE,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.guest_hub_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  property_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE CASCADE,
+  subscription_status TEXT DEFAULT 'none',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.wallet_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount NUMERIC NOT NULL,
+  transaction_type TEXT NOT NULL DEFAULT 'earning',
+  booking_id UUID REFERENCES public.bookings(id) ON DELETE SET NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.payout_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount NUMERIC NOT NULL,
+  bank_details TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.owner_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+  plan_name TEXT DEFAULT 'starter',
+  status TEXT DEFAULT 'active',
+  start_date TIMESTAMPTZ DEFAULT NOW(),
+  end_date TIMESTAMPTZ DEFAULT NOW() + INTERVAL '1 month',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.owner_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+  amount NUMERIC,
+  payment_method TEXT,
+  status TEXT DEFAULT 'success',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.owner_payments ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE;
+
+CREATE TABLE IF NOT EXISTS public.owner_google_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+  refresh_token TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.influencer_promotion_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
+  influencer_id UUID,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- --------------------------------------------------------------------------------------
 -- PART 1: MISSING INDEXES ON FOREIGN KEYS, FILTERING & SORTING COLUMNS
 -- --------------------------------------------------------------------------------------
 
@@ -69,15 +146,44 @@ CREATE INDEX IF NOT EXISTS idx_owner_subscriptions_owner_status
 CREATE INDEX IF NOT EXISTS idx_guest_hub_settings_property_sub 
   ON public.guest_hub_settings(property_id, subscription_status);
 
--- 10. Employees & Attendance:
-CREATE INDEX IF NOT EXISTS idx_employees_owner_id 
-  ON public.employees(owner_id);
+-- 10. Employees & Attendance (ensure tables exist before creating indexes):
+CREATE TABLE IF NOT EXISTS public.property_employees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
+    owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    mobile_number TEXT NOT NULL,
+    permanent_address TEXT,
+    property_address TEXT,
+    role TEXT NOT NULL,
+    govt_verification_id TEXT,
+    attendance_pin TEXT NOT NULL,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'fired')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-CREATE INDEX IF NOT EXISTS idx_employees_property_id 
-  ON public.employees(property_id);
+CREATE TABLE IF NOT EXISTS public.employee_attendance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID REFERENCES public.property_employees(id) ON DELETE CASCADE,
+    owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    time_in TIMESTAMP WITH TIME ZONE,
+    time_out TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_property_employees_owner_id 
+  ON public.property_employees(owner_id);
+
+CREATE INDEX IF NOT EXISTS idx_property_employees_property_id 
+  ON public.property_employees(property_id);
 
 CREATE INDEX IF NOT EXISTS idx_employee_attendance_emp_date 
   ON public.employee_attendance(employee_id, date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_employee_attendance_owner_id 
+  ON public.employee_attendance(owner_id);
 
 -- 11. Influencer Promotion Requests: Index for pending request badge queries.
 CREATE INDEX IF NOT EXISTS idx_influencer_requests_property_status 
@@ -232,25 +338,25 @@ CREATE POLICY "Owners can delete their own google tokens" ON public.owner_google
     )
   );
 
--- 11. Table: public.employees
-DROP POLICY IF EXISTS "Owners can view their own employees" ON public.employees;
-CREATE POLICY "Owners can view their own employees" ON public.employees 
+-- 11. Table: public.property_employees
+DROP POLICY IF EXISTS "Owners can view their own employees" ON public.property_employees;
+CREATE POLICY "Owners can view their own employees" ON public.property_employees 
   FOR SELECT USING (
     owner_id IN (
       SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
     )
   );
 
-DROP POLICY IF EXISTS "Owners can insert their own employees" ON public.employees;
-CREATE POLICY "Owners can insert their own employees" ON public.employees 
+DROP POLICY IF EXISTS "Owners can insert their own employees" ON public.property_employees;
+CREATE POLICY "Owners can insert their own employees" ON public.property_employees 
   FOR INSERT WITH CHECK (
     owner_id IN (
       SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
     )
   );
 
-DROP POLICY IF EXISTS "Owners can update their own employees" ON public.employees;
-CREATE POLICY "Owners can update their own employees" ON public.employees 
+DROP POLICY IF EXISTS "Owners can update their own employees" ON public.property_employees;
+CREATE POLICY "Owners can update their own employees" ON public.property_employees 
   FOR UPDATE USING (
     owner_id IN (
       SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
@@ -261,11 +367,24 @@ CREATE POLICY "Owners can update their own employees" ON public.employees
 DROP POLICY IF EXISTS "Owners can view their employees attendance" ON public.employee_attendance;
 CREATE POLICY "Owners can view their employees attendance" ON public.employee_attendance 
   FOR SELECT USING (
-    employee_id IN (
-      SELECT e.id FROM public.employees e 
-      WHERE e.owner_id IN (
-        SELECT o.id FROM public.owners o WHERE o.user_id = (SELECT auth.uid())
-      )
+    owner_id IN (
+      SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
+    )
+  );
+
+DROP POLICY IF EXISTS "Owners can insert their employees attendance" ON public.employee_attendance;
+CREATE POLICY "Owners can insert their employees attendance" ON public.employee_attendance 
+  FOR INSERT WITH CHECK (
+    owner_id IN (
+      SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
+    )
+  );
+
+DROP POLICY IF EXISTS "Owners can update their employees attendance" ON public.employee_attendance;
+CREATE POLICY "Owners can update their employees attendance" ON public.employee_attendance 
+  FOR UPDATE USING (
+    owner_id IN (
+      SELECT id FROM public.owners WHERE user_id = (SELECT auth.uid())
     )
   );
 
