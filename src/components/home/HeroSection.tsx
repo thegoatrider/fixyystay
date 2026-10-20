@@ -49,7 +49,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
           </motion.div>
         </AnimatePresence>
         {/* Soft overlay to ensure text remains readable */}
-        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+        <div className="absolute inset-0 bg-black/35"></div>
       </div>
 
       {/* Content */}

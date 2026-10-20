@@ -10,18 +10,19 @@ const config: CapacitorConfig = {
   },
   appendUserAgent: 'FixyStaysApp',
   android: {
-    appendUserAgent: 'FixyStaysApp'
+    appendUserAgent: 'FixyStaysApp',
+    backgroundColor: '#ffffff'
   },
   ios: {
-    appendUserAgent: 'FixyStaysApp'
+    appendUserAgent: 'FixyStaysApp',
+    backgroundColor: '#ffffff'
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
+      launchShowDuration: 0,
+      launchAutoHide: true,
       backgroundColor: "#ffffff",
-      showSpinner: true,
-      androidSpinnerStyle: "large",
-      spinnerColor: "#2563eb",
+      showSpinner: false
     }
   }
 };

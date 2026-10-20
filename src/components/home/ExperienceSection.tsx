@@ -1,8 +1,7 @@
 'use client';
 
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { useRef } from 'react';
 import { getOptimizedImageUrl } from '@/lib/image-url';
 
 const EXPERIENCES = [
@@ -22,33 +21,24 @@ const EXPERIENCES = [
 
 function ExperienceBlock({ experience, index }: { experience: any, index: number }) {
   const isLeft = experience.align === 'left';
-  const ref = useRef(null);
-  
-  // Parallax effect for image
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"]
-  });
-  const y = useTransform(scrollYProgress, [0, 1], [-50, 50]);
 
   return (
-    <div ref={ref} className={`flex flex-col ${isLeft ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-12 lg:gap-24 mb-32 last:mb-0`}>
+    <div className={`flex flex-col ${isLeft ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-12 lg:gap-24 mb-32 last:mb-0`}>
       
       {/* Image Side */}
       <div className="w-full lg:w-1/2 relative">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.7 }}
-          className="relative rounded-[2rem] overflow-hidden aspect-[4/5] md:aspect-square shadow-2xl"
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6 }}
+          className="relative rounded-[2rem] overflow-hidden aspect-[4/5] md:aspect-square shadow-2xl group"
         >
-          <motion.img 
-            style={{ y, scale: 1.1 }}
+          <img 
             src={getOptimizedImageUrl(experience.image, { width: 800, quality: 75 })} 
             alt={experience.title} 
             loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           />
         </motion.div>
         

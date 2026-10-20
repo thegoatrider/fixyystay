@@ -14,7 +14,17 @@ import { MapPin, User, Phone, CheckCircle, Share, Copy, X, ChevronLeft, ChevronR
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
 import { eachDayOfInterval, isSameDay as isSameDayDate, subDays } from 'date-fns'
-import PropertyMap from '@/components/PropertyMap'
+import dynamic from 'next/dynamic'
+
+const PropertyMap = dynamic(() => import('@/components/PropertyMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-64 md:h-80 bg-gray-50 border border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-400 gap-2">
+      <MapPin className="w-6 h-6 animate-pulse text-gray-300" />
+      <span className="text-xs">Loading map...</span>
+    </div>
+  ),
+})
 
 // Simple client wrapper for logging click
 function ClickTracker({ propertyId, refId }: { propertyId: string, refId: string }) {

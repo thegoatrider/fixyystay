@@ -4,6 +4,17 @@ import { useEffect } from 'react'
 
 export function ServiceWorkerRegister() {
   useEffect(() => {
+    // Dismiss Capacitor native splash screen immediately once client mounts
+    if (typeof window !== 'undefined') {
+      import('@capacitor/core').then(({ Capacitor }) => {
+        if (Capacitor.isNativePlatform()) {
+          import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+            SplashScreen.hide().catch(() => {})
+          }).catch(() => {})
+        }
+      }).catch(() => {})
+    }
+
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       const registerSW = () => {
         navigator.serviceWorker
