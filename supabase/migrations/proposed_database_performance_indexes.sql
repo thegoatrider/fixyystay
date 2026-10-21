@@ -425,39 +425,13 @@ BEGIN
 
   SELECT o.user_id INTO v_user_id FROM public.owners o WHERE o.id = p_owner_id;
 
-  -- 1. Properties: Explicit column projection
+  -- 1. Properties: Safe projection using p.* reflecting actual properties schema
   IF p_is_superadmin THEN
-    SELECT json_agg(json_build_object(
-      'id', p.id,
-      'name', p.name,
-      'title', p.title,
-      'city', p.city,
-      'type', p.type,
-      'images', p.images,
-      'cover_image', p.cover_image,
-      'price_per_night', p.price_per_night,
-      'owner_id', p.owner_id,
-      'slug', p.slug,
-      'created_at', p.created_at
-    )) INTO v_properties 
-    FROM public.properties p 
-    LIMIT 100;
+    SELECT json_agg(p.*) INTO v_properties 
+    FROM (SELECT * FROM public.properties LIMIT 100) p;
   ELSE
-    SELECT json_agg(json_build_object(
-      'id', p.id,
-      'name', p.name,
-      'title', p.title,
-      'city', p.city,
-      'type', p.type,
-      'images', p.images,
-      'cover_image', p.cover_image,
-      'price_per_night', p.price_per_night,
-      'owner_id', p.owner_id,
-      'slug', p.slug,
-      'created_at', p.created_at
-    )) INTO v_properties 
-    FROM public.properties p 
-    WHERE p.owner_id = p_owner_id;
+    SELECT json_agg(p.*) INTO v_properties 
+    FROM (SELECT * FROM public.properties WHERE owner_id = p_owner_id) p;
   END IF;
 
   -- 2. Leads: Explicit column projection with safety limit of 200

@@ -963,3 +963,107 @@ export async function syncOwnerCheckinsAction(sinceDate: string = '2026-08-30') 
     return { success: false, error: err.message || 'Failed to sync check-ins' }
   }
 }
+
+export async function getOwnerDashboardDataDirect(ownerId: string | undefined, isSuperAdmin: boolean) {
+  try {
+    const supabaseAdmin = createAdminClient()
+
+    let owner: any = null
+    if (ownerId) {
+      const { data: o } = await supabaseAdmin
+        .from('owners')
+        .select('id, name, free_tier_enabled, created_at, user_id')
+        .eq('id', ownerId)
+        .maybeSingle()
+      owner = o
+    }
+
+    if (!owner && !isSuperAdmin) {
+      return { success: false, error: 'Owner profile not found' }
+    }
+
+    // Parallel queries using admin client (bypasses RLS & avoids RPC column mismatch errors)
+    const [
+      propsRes,
+      leadsRes,
+      checkinsRes,
+      subRes,
+      roomsRes,
+      infRes,
+      walletRes,
+      payoutRes
+    ] = await Promise.all([
+      isSuperAdmin 
+        ? supabaseAdmin.from('properties').select('*').limit(100)
+        : ownerId
+          ? supabaseAdmin.from('properties').select('*').eq('owner_id', ownerId)
+          : Promise.resolve({ data: [] }),
+      isSuperAdmin
+        ? supabaseAdmin.from('leads').select('*').order('created_at', { ascending: false }).limit(200)
+        : ownerId
+          ? supabaseAdmin.from('leads').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(200)
+          : Promise.resolve({ data: [] }),
+      isSuperAdmin
+        ? supabaseAdmin.from('guest_checkins').select('*, properties(name), identities:guest_identity(*)').order('created_at', { ascending: false }).limit(200)
+        : ownerId
+          ? supabaseAdmin.from('guest_checkins').select('*, properties(name), identities:guest_identity(*)').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(200)
+          : Promise.resolve({ data: [] }),
+      ownerId
+        ? supabaseAdmin.from('owner_subscriptions').select('status, end_date, plan_name').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabaseAdmin.from('property_rooms').select('*').limit(500),
+      supabaseAdmin.from('influencer_promotion_requests').select('*').limit(50),
+      isSuperAdmin
+        ? supabaseAdmin.from('wallet_transactions').select('*').order('created_at', { ascending: false }).limit(50)
+        : owner?.user_id
+          ? supabaseAdmin.from('wallet_transactions').select('*').eq('user_id', owner.user_id).order('created_at', { ascending: false }).limit(50)
+          : Promise.resolve({ data: [] }),
+      isSuperAdmin
+        ? supabaseAdmin.from('payout_requests').select('*').order('created_at', { ascending: false }).limit(50)
+        : owner?.user_id
+          ? supabaseAdmin.from('payout_requests').select('*').eq('user_id', owner.user_id).order('created_at', { ascending: false }).limit(50)
+          : Promise.resolve({ data: [] })
+    ])
+
+    const sub = subRes?.data
+    const subscription = {
+      plan_name: sub?.plan_name || 'Pro',
+      end_date: sub?.end_date || '',
+      status: sub?.status || 'inactive',
+      is_active: sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
+    }
+
+    const properties = propsRes.data || []
+    const propIdSet = new Set(properties.map((p: any) => p.id))
+
+    const property_rooms = isSuperAdmin
+      ? (roomsRes.data || [])
+      : (roomsRes.data || []).filter((r: any) => propIdSet.has(r.property_id))
+
+    const influencer_requests = isSuperAdmin
+      ? (infRes.data || [])
+      : (infRes.data || []).filter((r: any) => propIdSet.has(r.property_id))
+
+    return {
+      success: true,
+      data: {
+        properties,
+        leads: leadsRes.data || [],
+        checkins: checkinsRes.data || [],
+        property_rooms,
+        influencer_requests,
+        wallet_transactions: walletRes.data || [],
+        payout_requests: payoutRes.data || [],
+        subscription,
+        owner: owner ? {
+          id: owner.id,
+          free_tier_enabled: owner.free_tier_enabled ?? false,
+          created_at: owner.created_at
+        } : undefined
+      }
+    }
+  } catch (err: any) {
+    console.error('[getOwnerDashboardDataDirect] Failed to fetch fallback dashboard data:', err)
+    return { success: false, error: err.message || 'Unknown error fetching dashboard data' }
+  }
+}
