@@ -214,29 +214,34 @@ Return ONLY the JSON. No explanations, no preamble, no markdown.
 const SYSTEM_PROMPT = OCR_PROMPT
 
 const BACK_SYSTEM_PROMPT = `
-You are an expert Government ID verification AI.
-Analyze the back side of the provided ID image and extract information strictly in JSON format.
-Your task is to identify and extract the address.
+You are an expert Government ID verification OCR system.
+Analyze the back side of the provided Indian or International Government ID image (e.g. Aadhaar back with address/QR code, Driving Licence back with validity/address, Voter ID back with address, or Passport page).
+Extract the information strictly in JSON format.
 
-Guidelines for cropped digital layouts and photographed physical cards:
-- Cropped electronic back-sides, screenshots of electronic documents, or DigiLocker cards are COMPLETELY VALID. Do NOT flag them as suspicious or as "photo of a screen" just because they are clean digital images.
-- Laminated physical cards photographed under ambient light often have reflection, glare, or a visible desk/hand background. This is standard physical photography. Do NOT flag them as suspicious or as a "photo of a screen" unless you literally see the bezel and screen pixels of another phone or computer monitor displaying the card.
-- If the document is valid and the text/address is legible, set the confidence to at least 0.85. Only set confidence below 0.50 if it is completely unreadable or blurry beyond recognition.
-- For passports, the second/back upload is often an Indian or foreign visa sticker, immigration stamp page, passport back page, or passport cover. These are valid government travel documents (set is_government_id: true). If no residential address is present, return an empty string "" for address.
+ABSOLUTE RULES:
+1. "is_government_id": MUST be true ONLY IF the image is genuinely the back side of an official government-issued ID document (e.g. Aadhaar back with address and QR code, Driving Licence back, Voter ID back, Passport page).
+2. If the image is NOT a government ID (for example: a restaurant menu, food photo, recipe, bill, invoice, receipt, selfie, meme, random photograph, furniture, animal, or general non-ID document), you MUST set "is_government_id": false.
+3. If "is_government_id" is false, provide a clear "rejection_reason" explaining what the image actually is (e.g. "This appears to be a restaurant menu/receipt, not the back of a government ID.").
+4. Identify "id_type": "Aadhaar" | "PAN" | "Passport" | "Voter ID" | "Driving Licence" | "UNKNOWN".
+5. Extract "address": the complete residential address printed on the back. If no address exists, use "".
+6. Extract "id_number": if an ID number (like a 12-digit Aadhaar number or DL number) is printed on the back.
+7. Guidelines for digital and physical cards:
+   - Cropped digital cards, screenshots from official apps (DigiLocker, mAadhaar) are completely valid (set is_government_id: true).
+   - Laminated physical cards photographed under ambient light are completely valid.
+   - For passports, visa stickers, immigration stamps, or back pages are valid travel documents (set is_government_id: true). If no residential address is present on the passport page, return "" for address.
 
-Return STRICTLY this JSON (no markdown, just raw JSON):
+Return STRICTLY this JSON structure and nothing else (no markdown fences, just raw JSON):
 {
   "is_government_id": boolean,
+  "rejection_reason": string | null,
+  "id_type": string,
+  "id_number": string,
+  "address": string,
   "confidence": number,
   "suspicious": boolean,
   "reason": string,
-  "address": string,
   "raw_ocr_text_back": string
 }
-
-Rules for abuse detection (set suspicious: true if any are met):
-- It is a selfie, meme, cartoon, or random picture.
-- It is clearly a handwritten note or forged text.
 
 Calculate confidence score (0.0 to 1.0) based on how clear and readable the text is.
 If a field cannot be read, use empty string "".
@@ -791,35 +796,11 @@ export async function uploadBackImage(formData: FormData) {
     }
 
     if (aiUnavailableError) {
-      const supabaseAdmin = createAdminClient()
-      const { error: updateError } = await supabaseAdmin
-        .from('guest_identity')
-        .update({ back_image_url: backUrl })
-        .eq('id', identityId)
-
-      if (updateError) {
-        console.error('[VERIFY-BACK] DB update failed:', updateError)
+      console.error('[VERIFY-BACK] AI call failed:', aiUnavailableError)
+      return {
+        success: false,
+        error: 'Scanning back side timed out. Please upload a clear, well-lit photo of the back side.'
       }
-
-      return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
-    }
-
-    const saveManualReview = async (reason: string) => {
-      try {
-        const supabaseAdmin = createAdminClient()
-        await supabaseAdmin
-          .from('guest_identity')
-          .update({
-            back_image_url: backUrl,
-            raw_ocr_text_back: aiResponseText,
-            verification_status: 'MANUAL_REVIEW',
-            verification_reason: reason
-          })
-          .eq('id', identityId)
-      } catch (dbErr) {
-        console.error('[VERIFY-BACK] DB update fallback failed:', dbErr)
-      }
-      return { success: true, backUrl, address: 'Pending manual review', raw_ocr_text_back: '' }
     }
 
     if (!isFromCache) {
@@ -830,12 +811,15 @@ export async function uploadBackImage(formData: FormData) {
         parseFailed = true
       }
 
-      if (parseFailed) {
-        return saveManualReview('Back side OCR parsing failed.')
+      if (parseFailed || !result) {
+        return {
+          success: false,
+          error: 'Could not read back side of ID. Please ensure the image is clear and well-lit.'
+        }
       }
 
-      // Cache it!
-      if (result && result.is_government_id !== false) {
+      // Cache it only if valid government ID
+      if (result && result.is_government_id === true) {
         await saveCachedOcr(imageHash, result, result.id_type || 'UNKNOWN')
       }
     }
@@ -855,16 +839,22 @@ export async function uploadBackImage(formData: FormData) {
     const frontIdType = existingRecord.document_type
     const isPassport = frontIdType === 'PASSPORT'
 
+    // 1. Strict rejection if image is not a government ID
     if (result.is_government_id === false && !isPassport) {
-      return saveManualReview(result.rejection_reason || 'Back side is not recognized as a government ID.')
+      const reason = result.rejection_reason || result.reason || 'This image does not appear to be the back side of a government ID. Please upload a valid document.'
+      return { success: false, error: reason }
     }
 
+    // 2. Document type match
     const backIdType = mapIdType(result.id_type || result.idType)
-
     if (backIdType !== 'UNKNOWN' && frontIdType !== 'UNKNOWN' && backIdType !== frontIdType && !isPassport) {
-      return saveManualReview(`Back side document type (${backIdType}) does not match front side (${frontIdType}).`)
+      return {
+        success: false,
+        error: `Back side document (${backIdType}) does not match front side (${frontIdType}). Please upload both sides of the same ID.`
+      }
     }
 
+    // 3. Document number match (for Aadhaar, etc.)
     const backIdNumber = cleanFieldValue(result.id_number || result.idNumber || result.document_number || result.documentNumber)
     if (backIdNumber && existingRecord.document_number) {
       const cleanBackNum = backIdNumber.trim().replace(/[\s-]/g, '')
@@ -876,30 +866,33 @@ export async function uploadBackImage(formData: FormData) {
 
       if (digitsBack && digitsFront) {
         if (digitsBack.length === 12 && digitsFront.length === 12 && digitsBack !== digitsFront) {
-          return saveManualReview('Aadhaar number on back side does not match front side.')
+          return { success: false, error: 'Aadhaar number on back side does not match front side.' }
         }
         
         const last4Back = digitsBack.slice(-4)
         const last4Front = digitsFront.slice(-4)
         if (last4Back.length === 4 && last4Front.length === 4 && last4Back !== last4Front && !isPassport) {
-          return saveManualReview('Document number on back side does not match front side.')
+          return { success: false, error: 'Document number on back side does not match front side.' }
         }
       }
     }
 
+    // 4. Confidence / blurriness check
     const confidence = typeof result.confidence === 'number'
       ? result.confidence
       : mapConfidenceToNumeric(result.confidence?.overall || (typeof result.confidence === 'string' ? result.confidence : 'medium'))
-    if (confidence < 0.40 && !isPassport) {
-      return saveManualReview('Back side image quality is too poor or text is blurry.')
+    if (confidence < 0.35 && !isPassport) {
+      return { success: false, error: 'Back side image text is blurry or unreadable. Please capture a sharper, well-lit photo.' }
     }
 
+    // 5. Address check (Aadhaar, Voter ID, Driving Licence MUST have an address on back)
     const address = cleanFieldValue(result.address)
-    // Passports (especially international passports which do not print residential addresses, and Indian passports)
-    // as well as PAN cards are exempt from requiring an address on the back side.
     if (frontIdType !== 'PAN' && frontIdType !== 'PASSPORT') {
-      if (!address || address.trim() === '') {
-        return saveManualReview('Could not extract address from back side.')
+      if (!address || address.trim().length < 5) {
+        return {
+          success: false,
+          error: 'Could not extract residential address from back side. Please ensure the address text is clearly visible.'
+        }
       }
     }
 
@@ -921,8 +914,8 @@ export async function uploadBackImage(formData: FormData) {
       return { success: false, error: 'Failed to save back image to database.' }
     }
 
-    console.log('[VERIFY-BACK] Back image saved successfully for identity:', identityId)
-    return { success: true, back_image_url: backUrl, address }
+    console.log('[VERIFY-BACK] Back image verified successfully for identity:', identityId)
+    return { success: true, back_image_url: backUrl, address, status: 'VERIFIED' }
   } catch (err: any) {
     console.error('[VERIFY-BACK] Uncaught exception:', err)
     return { success: false, error: 'Internal error during back image upload.' }

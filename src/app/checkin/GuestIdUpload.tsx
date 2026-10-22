@@ -234,8 +234,9 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
       if (identityId && frontDone) onVerified(identityId)
     } else {
       setBackStatus('FAILED')
-      setBackReason(result.error || 'Back image upload failed.')
+      setBackReason(result.error || 'Back image verification failed.')
       setPendingBackFile(null)
+      onVerified(null)
     }
   }
 
@@ -396,7 +397,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                 {backStatus === 'UPLOADING' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white gap-1">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-[9px] font-bold uppercase">Saving...</span>
+                    <span className="text-[9px] font-bold uppercase">Scanning Back...</span>
                   </div>
                 )}
                 {backStatus === 'PENDING' && (
@@ -411,7 +412,7 @@ export function GuestIdUpload({ guestIndex, onVerified }: GuestIdUploadProps) {
                 {backStatus === 'DONE' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 gap-1">
                     <CheckCircle className="w-6 h-6 text-green-600 bg-white rounded-full" />
-                    <span className="text-[9px] font-bold text-green-800 bg-white px-2 py-0.5 rounded-full">✓ Saved</span>
+                    <span className="text-[9px] font-bold text-green-800 bg-white px-2 py-0.5 rounded-full">✓ Back Verified</span>
                   </div>
                 )}
                 {backStatus === 'FAILED' && (
