@@ -167,19 +167,22 @@ export async function createProperty(formData: FormData) {
   // 2. Get owner record (using admin to bypass any RLS, with email fallback)
   let { data: owner } = await supabaseAdmin
     .from('owners')
-    .select('id, free_tier_enabled')
+    .select('id')
     .eq('user_id', user.id)
     .maybeSingle()
 
   if (!owner && user.email) {
     const { data: matchedOwner } = await supabaseAdmin
       .from('owners')
-      .select('id, free_tier_enabled')
+      .select('id')
       .eq('email', user.email.toLowerCase().trim())
       .maybeSingle()
     if (matchedOwner) {
       owner = matchedOwner
-      await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      if (linkErr) {
+        console.warn('Could not link owner:', linkErr.message)
+      }
     }
   }
 
@@ -187,22 +190,17 @@ export async function createProperty(formData: FormData) {
     return { error: `Owner profile not found. Contact support. (uid: ${user.id})` }
   }
 
-  // 2.5 Strict Subscription Gate: Block unpaid owners from creating properties
+  // 2.5 Strict Subscription Gate: Superadmin or valid property creation flow
   const isSuperAdmin = isSuperAdminUser(user)
   if (!isSuperAdmin) {
-    let isPaid = (owner as any)?.free_tier_enabled === true
-    if (!isPaid) {
-      const { data: sub } = await supabaseAdmin
-        .from('owner_subscriptions')
-        .select('status, end_date')
-        .eq('owner_id', owner.id)
-        .eq('status', 'active')
-        .maybeSingle()
+    const { data: activeSubs } = await supabaseAdmin
+      .from('property_subscriptions')
+      .select('id')
+      .eq('owner_id', owner.id)
+      .eq('status', 'active')
+      .gt('end_date', new Date().toISOString())
 
-      if (sub && new Date(sub.end_date) > new Date()) {
-        isPaid = true
-      }
-    }
+    const isPaid = (activeSubs && activeSubs.length > 0)
 
     if (!isPaid) {
       return { error: 'Your subscription is inactive or unpaid. Please activate your subscription before adding new properties.' }
@@ -373,8 +371,15 @@ export async function createProperty(formData: FormData) {
     return { error: `DB Error (${insertError.code}): ${insertError.message}` }
   }
 
-  // Sync phone to owner profile
-  await supabaseAdmin.from('owners').update({ phone: helpdeskNumber }).eq('id', owner.id)
+  // Sync phone to auth user metadata (owners table does not have phone column)
+  if (user?.id && helpdeskNumber) {
+    const { error: userMetaError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...(user.user_metadata || {}), phone: helpdeskNumber }
+    })
+    if (userMetaError) {
+      console.warn('Could not sync phone to user metadata:', userMetaError.message)
+    }
+  }
 
   // 6. Create initial room(s)
   if (property?.id) {
@@ -445,54 +450,7 @@ export async function updatePassword(formData: FormData) {
 }
 
 export async function claimFreeTrial() {
-  try {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // 1. Verify session
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Session expired.' }
-
-    // 2. Get owner record
-    const { data: owner } = await supabaseAdmin
-      .from('owners')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!owner) return { error: 'Owner profile not found.' }
-
-    // 3. Verify they have NEVER had a subscription (including trials)
-    const { data: existingSub } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .select('id')
-      .eq('owner_id', owner.id)
-      .maybeSingle()
-
-    if (existingSub) {
-      return { error: 'You are not eligible for a free trial. Please pick a premium plan.' }
-    }
-
-    // 4. Create 7-day Trial
-    const expiryDate = new Date()
-    expiryDate.setDate(expiryDate.getDate() + 7)
-
-    const { error: subError } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .insert({
-        owner_id: owner.id,
-        plan_name: '7-Day Free Trial',
-        end_date: expiryDate.toISOString(),
-        status: 'active'
-      })
-
-    if (subError) return { error: 'Failed to activate trial.' }
-
-    revalidatePath('/dashboard/owner')
-    return { success: true }
-  } catch (err: any) {
-    return { error: err.message || 'Error claiming trial' }
-  }
+  return { error: 'Free trials have been retired. Subscriptions are billed per-property based on room count tiers.' }
 }
 
 export async function approveIdentity(identityId: string, manualName?: string, manualDocNumber?: string) {
@@ -646,7 +604,10 @@ export async function addPropertyRoom(propertyId: string, roomNumber: string) {
         const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
         if (matchedOwner) {
           owner = matchedOwner
-          await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+          const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+          if (linkErr) {
+            console.warn('Could not link owner:', linkErr.message)
+          }
         }
       }
       if (!owner) return { success: false, error: 'Owner profile not found' }
@@ -769,7 +730,10 @@ export async function deletePropertyRoom(roomId: string) {
         const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', email).maybeSingle()
         if (matchedOwner) {
           owner = matchedOwner
-          await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+          const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+          if (linkErr) {
+            console.warn('Could not link owner:', linkErr.message)
+          }
         }
       }
       if (!owner) return { success: false, error: 'Owner profile not found' }
@@ -993,7 +957,7 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
     if (ownerId) {
       const { data: o } = await supabaseAdmin
         .from('owners')
-        .select('id, name, free_tier_enabled, created_at, user_id')
+        .select('id, name, created_at, user_id')
         .eq('id', ownerId)
         .maybeSingle()
       owner = o
@@ -1030,7 +994,7 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
           ? supabaseAdmin.from('guest_checkins').select('*, properties(name), identities:guest_identity(*)').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(200)
           : Promise.resolve({ data: [] }),
       ownerId
-        ? supabaseAdmin.from('owner_subscriptions').select('status, end_date, plan_name').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee, amount').eq('owner_id', ownerId).order('end_date', { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       supabaseAdmin.from('property_rooms').select('*').limit(500),
       supabaseAdmin.from('influencer_promotion_requests').select('*').limit(50),
@@ -1046,9 +1010,22 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
           : Promise.resolve({ data: [] })
     ])
 
-    const sub = subRes?.data
+    let sub: any = subRes?.data
+    if (!sub && ownerId) {
+      const { data: legacySub } = await supabaseAdmin
+        .from('owner_subscriptions')
+        .select('status, end_date, plan_name')
+        .eq('owner_id', ownerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (legacySub) {
+        sub = legacySub
+      }
+    }
+
     const subscription = {
-      plan_name: sub?.plan_name || 'Pro',
+      plan_name: (sub as any)?.plan_name || 'FixyStays Partner',
       end_date: sub?.end_date || '',
       status: sub?.status || 'inactive',
       is_active: sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
@@ -1078,7 +1055,6 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
         subscription,
         owner: owner ? {
           id: owner.id,
-          free_tier_enabled: owner.free_tier_enabled ?? false,
           created_at: owner.created_at
         } : undefined
       }

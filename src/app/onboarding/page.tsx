@@ -1,639 +1,854 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { submitOnboarding, checkEmailAvailability } from './actions'
-import { createOwnerOrder, verifyAndUpgrade } from '../pricing/business/actions'
+import React, { useState, useEffect } from 'react'
+import {
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Building,
+  MapPin,
+  Camera,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  CreditCard,
+  ArrowRight,
+  ShieldCheck,
+  Building2,
+  BedDouble,
+  Users,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building, Lock, Mail, User, CheckCircle2, ArrowRight, Zap, ShieldCheck, Crown, Check, AlertCircle, MapPin, Loader2, Phone } from 'lucide-react'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import Script from 'next/script'
-import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
-import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
-import { SearchableCitySelect } from '@/components/SearchableCitySelect'
+import {
+  submitOnboarding,
+  uploadOnboardingPhoto,
+  OnboardingInput,
+} from './actions'
+import {
+  createPropertySubscriptionOrder,
+  verifyPropertyPayment,
+} from '@/app/pricing/business/actions'
 
-const SHARED_FEATURES = [
-  "List Unlimited Properties",
-  "Instant Lead Notifications",
-  "Virtual Wallet & Payouts",
-  "Verified Business Badge",
-  "Dedicated Support"
+const PROPERTY_TYPES = [
+  'Villa',
+  'Homestay',
+  'Hotel',
+  'Resort',
+  'Apartment',
+  'Farmhouse / Cottage',
+  'Guest House',
 ]
 
-const PLANS = [
-  { name: "3 Months", price: 300, discount: 0, bestValue: false, icon: Zap },
-  { name: "6 Months", price: 600, discount: 0, bestValue: true, icon: ShieldCheck },
-  { name: "12 Months", price: 1200, discount: 0, bestValue: false, icon: Crown }
+const MONTH_OPTIONS = [
+  { months: 1, label: '1 Month' },
+  { months: 3, label: '3 Months' },
+  { months: 6, label: '6 Months' },
+  { months: 12, label: '12 Months (1 Year)' },
 ]
 
-function OnboardingContent() {
-  const searchParams = useSearchParams()
-  const initialStep = searchParams.get('step') === 'payment' ? 2 : 1
-  const isUnpaidRedirect = searchParams.get('reason') === 'unpaid'
+export default function OnboardingPage() {
+  // Step 1: Form | Step 2: Payment Duration & Checkout
+  const [step, setStep] = useState<1 | 2>(1)
 
-  const [step, setStep] = useState(initialStep)
-  const [loading, setLoading] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [userEmail, setUserEmail] = useState('')
-  const [userName, setUserName] = useState('')
-  const [userPhone, setUserPhone] = useState('')
-  const [ownerId, setOwnerId] = useState<string | null>(null)
-  const [propertyInfo, setPropertyInfo] = useState<{
-    propertyName?: string | null
-    city?: string | null
-    cityArea?: string | null
-    pincode?: string | null
-    state?: string | null
-    phone?: string | null
-    helpdeskNumber?: string | null
-  } | null>(null)
-
-  // Property Location states
+  // Form Fields
+  const [ownerName, setOwnerName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
+  const [propertyName, setPropertyName] = useState('')
+  const [propertyType, setPropertyType] = useState('Villa')
+  const [fullAddress, setFullAddress] = useState('')
   const [pincode, setPincode] = useState('')
-  const [selectedCity, setSelectedCity] = useState('Alibag')
-  const [customCity, setCustomCity] = useState('')
-  const [selectedArea, setSelectedArea] = useState('')
-  const [customArea, setCustomArea] = useState('')
-  const [selectedState, setSelectedState] = useState('Maharashtra')
-  const [availableAreas, setAvailableAreas] = useState<string[]>([])
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
+  const [samePhoneForHelpdesk, setSamePhoneForHelpdesk] = useState(true)
+  const [helpdeskNumber, setHelpdeskNumber] = useState('')
+
+  // Rooms & Live Pricing
+  const [roomCount, setRoomCount] = useState<number>(5)
+  const [monthlyFee, setMonthlyFee] = useState<number>(100)
+  const [isOverLimit, setIsOverLimit] = useState<boolean>(false)
+
+  // Room Categories
+  const [roomCategories, setRoomCategories] = useState<
+    Array<{ name: string; basePrice: number; capacity: number }>
+  >([{ name: 'Standard Room', basePrice: 2500, capacity: 2 }])
+
+  // Photos
+  const [photos, setPhotos] = useState<string[]>([])
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  // Pincode auto-lookup
   const [isDetectingPin, setIsDetectingPin] = useState(false)
   const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
   const [pinError, setPinError] = useState<string | null>(null)
 
-  const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6)
-    setPincode(val)
+  // Form Submission State
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Step 2 State
+  const [createdProperty, setCreatedProperty] = useState<{
+    propertyId: string
+    propertyName: string
+    roomCount: number
+    monthlyFee: number
+    ownerEmail: string
+    ownerPhone: string
+  } | null>(null)
+  const [selectedMonths, setSelectedMonths] = useState<number>(1)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+
+  // Live Tier Fee Computation based on roomCount
+  useEffect(() => {
+    if (roomCount > 100) {
+      setIsOverLimit(true)
+      setMonthlyFee(0)
+      return
+    }
+    setIsOverLimit(false)
+
+    if (roomCount <= 6) setMonthlyFee(100)
+    else if (roomCount <= 12) setMonthlyFee(150)
+    else if (roomCount <= 20) setMonthlyFee(250)
+    else if (roomCount <= 30) setMonthlyFee(350)
+    else if (roomCount <= 50) setMonthlyFee(500)
+    else if (roomCount <= 75) setMonthlyFee(750)
+    else setMonthlyFee(1000)
+  }, [roomCount])
+
+  // Pincode auto-lookup
+  const handlePincodeChange = async (val: string) => {
+    const cleaned = val.replace(/\D/g, '').slice(0, 6)
+    setPincode(cleaned)
     setPinError(null)
 
-    if (val.length === 6) {
+    if (cleaned.length === 6) {
       setIsDetectingPin(true)
       try {
-        const res = await fetch(`/api/pincode/${val}`)
+        const res = await fetch(`/api/pincode/${cleaned}`)
         const data = await res.json()
         if (data.success) {
           setDetectedLocation(`${data.city}, ${data.state}`)
-          if (data.state) setSelectedState(data.state)
-
-          // Match city to our comprehensive city list if possible
-          const rawCity = (data.city || '').toLowerCase()
-          let matchedCity = data.city || ''
-
-          for (const [st, cities] of Object.entries(INDIAN_STATES_AND_CITIES)) {
-            const found = cities.find(c => 
-              c.toLowerCase() === rawCity ||
-              rawCity.includes(c.toLowerCase()) ||
-              c.toLowerCase().includes(rawCity)
-            )
-            if (found) {
-              matchedCity = found
-              setSelectedState(st)
-              break
-            }
-          }
-
-          setSelectedCity(matchedCity)
-
-          if (Array.isArray(data.areas) && data.areas.length > 0) {
-            setAvailableAreas(data.areas)
-            setSelectedArea(data.areas[0])
-          } else {
-            setAvailableAreas([])
-            setSelectedArea(data.city || '')
-          }
+          if (data.city) setCity(data.city)
+          if (data.state) setState(data.state)
         } else {
-          setPinError(data.error || 'Pincode not recognized')
+          setPinError('Pincode not recognized')
           setDetectedLocation(null)
         }
-      } catch (err) {
-        console.error('Failed to lookup pincode:', err)
+      } catch {
         setPinError('Could not verify pincode')
       } finally {
         setIsDetectingPin(false)
       }
     } else {
       setDetectedLocation(null)
-      if (val.length === 0) {
-        setAvailableAreas([])
-      }
     }
   }
 
-  const handleCityChange = (newCity: string) => {
-    setSelectedCity(newCity)
-    for (const [st, cities] of Object.entries(INDIAN_STATES_AND_CITIES)) {
-      if (cities.includes(newCity)) {
-        setSelectedState(st)
-        break
-      }
-    }
-  }
+  // Handle Photo Upload
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    setIsUploadingPhoto(true)
+    setPhotoError(null)
 
-  // If redirected with step=payment, fetch current session email
-  useEffect(() => {
-    const fetchCurrentSession = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.email) {
-        setUserEmail(user.email)
-        const { data: owner } = await supabase.from('owners').select('id, phone, name').eq('email', user.email.toLowerCase()).maybeSingle()
-        if (owner?.id) setOwnerId(owner.id)
-        if (owner?.phone) setUserPhone(owner.phone)
-        if (owner?.name) setUserName(owner.name)
-        if (searchParams.get('step') === 'payment') setStep(2)
-      }
-    }
-    fetchCurrentSession()
-  }, [searchParams])
-
-  const handleAccountCreation = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading('account')
-    setError(null)
-    
-    const formData = new FormData(e.currentTarget)
-    const email = (formData.get('email') as string)?.trim()
-    const name = formData.get('name') as string
-    const phone = ((formData.get('phone') as string) || '').trim()
-
-    const cleanPhone = phone.replace(/\D/g, '')
-    if (!phone || cleanPhone.length < 10) {
-      setError('A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.')
-      setLoading(null)
-      return
-    }
-
-    // 1. Check if email is already registered and has an active subscription
-    const checkRes = await checkEmailAvailability(email) as any
-    if (checkRes.error) {
-      setError(checkRes.error)
-      setLoading(null)
-      return
-    }
-
-    // 2. Register and create account in Supabase FIRST before proceeding to payment
     try {
-      const regRes = await submitOnboarding(formData)
-      if (regRes.error) {
-        setError(regRes.error)
-        setLoading(null)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await uploadOnboardingPhoto(formData)
+      if (res.error) {
+        setPhotoError(res.error)
+      } else if (res.url) {
+        setPhotos((prev) => [...prev, res.url])
+      }
+    } catch {
+      setPhotoError('Image upload failed. Please try again.')
+    } finally {
+      setIsUploadingPhoto(false)
+      e.target.value = ''
+    }
+  }
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Room category handlers
+  const addRoomCategory = () => {
+    setRoomCategories((prev) => [
+      ...prev,
+      { name: `Room Type ${prev.length + 1}`, basePrice: 3000, capacity: 2 },
+    ])
+  }
+
+  const updateCategory = (
+    index: number,
+    field: 'name' | 'basePrice' | 'capacity',
+    value: string | number
+  ) => {
+    setRoomCategories((prev) =>
+      prev.map((cat, i) => (i === index ? { ...cat, [field]: value } : cat))
+    )
+  }
+
+  const removeCategory = (index: number) => {
+    if (roomCategories.length === 1) return
+    setRoomCategories((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Form Submit Handler
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (photos.length < 3) {
+      setError('Please upload at least 3 photos of your property before proceeding.')
+      return
+    }
+
+    if (isOverLimit) {
+      setError('Properties with over 100 rooms require manual onboarding. Please contact support.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    const payload: OnboardingInput = {
+      ownerName,
+      phone,
+      email,
+      password,
+      propertyName,
+      propertyType,
+      fullAddress,
+      city,
+      state,
+      pincode,
+      roomCount: Number(roomCount),
+      roomCategories,
+      photos,
+      helpdeskNumber: samePhoneForHelpdesk ? phone : helpdeskNumber || phone,
+    }
+
+    try {
+      const res = await submitOnboarding(payload)
+      if (res.error) {
+        setError(res.error)
+        setIsSubmitting(false)
         return
       }
 
-      setUserEmail(email)
-      setUserName(name)
-      setUserPhone(phone)
-      if (regRes.ownerId) {
-        setOwnerId(regRes.ownerId)
+      if (res.success && res.propertyId) {
+        setCreatedProperty({
+          propertyId: res.propertyId,
+          propertyName: res.propertyName,
+          roomCount: res.roomCount,
+          monthlyFee: res.monthlyFee,
+          ownerEmail: res.email,
+          ownerPhone: res.phone,
+        })
+        setStep(2)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
       }
-      if (regRes.propertyData) {
-        setPropertyInfo(regRes.propertyData)
-      }
-      setStep(2)
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during account registration.')
+      setError(err.message || 'Onboarding failed. Please try again.')
     } finally {
-      setLoading(null)
+      setIsSubmitting(false)
     }
   }
 
-  const handlePayment = async (planName: string, amount: number) => {
-    setLoading(planName)
-    try {
-      const fullName = `Business ${planName}`
-      const propPayload = propertyInfo 
-        ? { ...propertyInfo, phone: userPhone, helpdeskNumber: userPhone }
-        : { phone: userPhone, helpdeskNumber: userPhone }
+  // Step 2: Handle Razorpay Payment
+  const handlePayment = async () => {
+    if (!createdProperty) return
+    setIsProcessingPayment(true)
+    setError(null)
 
-      const res = await createOwnerOrder(
-        fullName, 
-        amount, 
-        userEmail, 
-        ownerId || undefined,
-        propPayload
+    try {
+      const res = await createPropertySubscriptionOrder(
+        createdProperty.propertyId,
+        selectedMonths
       )
-      if (res.error) throw new Error(res.error)
+
+      if (res.error) {
+        setError(res.error)
+        setIsProcessingPayment(false)
+        return
+      }
 
       const options = {
         key: res.key,
         amount: res.amount,
-        currency: "INR",
-        name: "FixyStays Onboarding",
-        description: `Subscription: ${fullName} Plan`,
+        currency: 'INR',
+        name: 'FixyStays Onboarding',
+        description: `${createdProperty.propertyName} - ${selectedMonths} Month Subscription`,
         order_id: res.orderId,
-        prefill: { email: userEmail, contact: userPhone },
-        theme: { color: "#4F46E5" },
-        webview_intent: true,
-        config: {
-          display: {
-            blocks: {
-              upi: {
-                name: "Pay using UPI (Google Pay, PhonePe, Paytm, QR)",
-                instruments: [
-                  {
-                    method: "upi"
-                  }
-                ]
-              },
-              other: {
-                name: "Cards, Netbanking & Wallets",
-                instruments: [
-                  { method: "card" },
-                  { method: "netbanking" },
-                  { method: "wallet" },
-                  { method: "emi" }
-                ]
-              }
-            },
-            sequence: ["block.upi", "block.other"],
-            preferences: {
-              show_default_blocks: true
-            }
-          }
+        prefill: {
+          name: ownerName,
+          email: createdProperty.ownerEmail,
+          contact: createdProperty.ownerPhone,
         },
+        theme: { color: '#4F46E5' },
         handler: async function (response: any) {
-          setLoading('Processing...')
-          // Verify and activate subscription & create initial property upon payment
-          const verifyRes = await verifyAndUpgrade(response.razorpay_order_id, {
-            name: userName,
-            propertyDetails: propPayload
+          setIsProcessingPayment(true)
+          const verifyRes = await verifyPropertyPayment({
+            orderId: response.razorpay_order_id,
+            paymentId: response.razorpay_payment_id,
+            signature: response.razorpay_signature,
           })
+
           if (verifyRes.success) {
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           } else {
-            alert(`Payment Successful, updating dashboard access: ${verifyRes.error || 'Done'}`)
+            alert(`Payment recorded. Redirecting to confirmation: ${verifyRes.error || 'Done'}`)
             window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
           }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingPayment(false)
+          },
         },
       }
 
       const rzp = new (window as any).Razorpay(options)
       rzp.open()
     } catch (err: any) {
-      alert(`Payment failed: ${err.message}`)
-    } finally {
-      setLoading(null)
+      setError(err.message || 'Payment initiation failed')
+      setIsProcessingPayment(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden selection:bg-blue-500/30">
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
-      
-      <div className="w-full max-w-6xl px-6 py-12 md:py-24 z-10">
-        {step === 1 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Column - Sales Pitch */}
-            <div className="flex flex-col gap-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 border border-blue-200 w-fit text-sm text-blue-700 font-bold">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-                </span>
-                New Customer Onboarding
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900">
-                Grow your property <br/>
-                <span className="text-blue-600">
-                  revenue instantly.
-                </span>
-              </h1>
-              
-              <p className="text-gray-600 text-lg max-w-md leading-relaxed font-medium">
-                Join FixyStays to manage your properties, automate bookings, and access our exclusive influencer network.
-              </p>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
-              <div className="flex flex-col gap-4 mt-4">
-                {SHARED_FEATURES.slice(0, 4).map((feature, i) => (
-                  <div key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      <div className="w-full max-w-4xl z-10">
+        {/* Step Indicator Header */}
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-xs text-indigo-700 font-bold mb-3">
+            <ShieldCheck className="w-4 h-4" />
+            Verified Partner Onboarding
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">
+            {step === 1 ? 'Register Your Property' : 'Select Subscription & Activate'}
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {step === 1
+              ? 'Complete your property registration. All fields are mandatory.'
+              : 'Choose your subscription period. Subscriptions are billed per-property based on declared room count.'}
+          </p>
+        </div>
 
-            {/* Right Column - Form */}
-            <div className="bg-white border border-gray-200 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative">
-              <div className="relative z-10">
-                <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Create your account</h2>
-                  <p className="text-gray-500 font-medium">Fill in your details to create your owner account before selecting a plan.</p>
-                </div>
-
-                <form onSubmit={handleAccountCreation} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-gray-700 font-bold">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input 
-                        id="name"
-                        name="name" 
-                        placeholder="John Doe" 
-                        required 
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-700 font-bold">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input 
-                        id="email"
-                        name="email" 
-                        type="email"
-                        placeholder="john@example.com" 
-                        required 
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="phone" className="text-gray-700 font-bold">Phone / WhatsApp Number</Label>
-                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
-                    </div>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input 
-                        id="phone"
-                        name="phone" 
-                        type="tel"
-                        placeholder="9876543210" 
-                        required 
-                        minLength={10}
-                        maxLength={15}
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm font-medium tracking-wide"
-                      />
-                    </div>
-                    <p className="text-[11px] text-gray-500">Required for owner verification, stay booking notifications & WhatsApp support.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-gray-700 font-bold">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input 
-                        id="password"
-                        name="password" 
-                        type="password"
-                        placeholder="••••••••" 
-                        required 
-                        minLength={6}
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="propertyName" className="text-gray-700 font-bold">Property Name</Label>
-                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
-                    </div>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input 
-                        id="propertyName"
-                        name="propertyName" 
-                        placeholder="e.g. Sunset Villa, Ocean Breeze Resort" 
-                        required
-                        minLength={3}
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Property Location with Pincode Auto-detection */}
-                  <div className="pt-3 border-t border-gray-100 space-y-3.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-gray-900 font-bold text-sm flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-blue-600" />
-                        Property Location
-                      </Label>
-                      <span className="text-[11px] text-blue-600 font-bold bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
-                        All India
-                      </span>
-                    </div>
-
-                    {/* Area Pincode with Auto-detection status */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="pincode" className="text-gray-700 font-semibold text-xs">
-                          Area Pincode <span className="text-blue-600 font-bold">(Auto-detects City & Area)</span>
-                        </Label>
-                        {isDetectingPin && (
-                          <span className="text-[11px] text-blue-600 font-bold flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
-                          </span>
-                        )}
-                        {detectedLocation && (
-                          <span className="text-[11px] text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-green-200">
-                            <CheckCircle2 className="w-3 h-3 text-green-600" /> {detectedLocation}
-                          </span>
-                        )}
-                        {pinError && (
-                          <span className="text-[11px] text-amber-600 font-medium">
-                            {pinError}
-                          </span>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <Input
-                          id="pincode"
-                          name="pincode"
-                          type="text"
-                          maxLength={6}
-                          value={pincode}
-                          onChange={handlePincodeChange}
-                          placeholder="e.g. 402201, 403516, 560001, 110001"
-                          className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* City Dropdown & Area Selection */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* City Across India */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="city" className="text-gray-700 font-semibold text-xs">
-                          City / Destination
-                        </Label>
-                        <SearchableCitySelect
-                          id="city"
-                          name="city"
-                          value={selectedCity}
-                          onChange={(c, st) => {
-                            handleCityChange(c)
-                            if (st) setSelectedState(st)
-                          }}
-                          placeholder="Search or select city across India..."
-                        />
-                      </div>
-
-                      {/* Area / Sub-locality */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cityArea" className="text-gray-700 font-semibold text-xs">
-                          Area / Sub-locality
-                        </Label>
-                        {availableAreas.length > 0 ? (
-                          <select
-                            id="cityArea"
-                            name="cityArea"
-                            value={selectedArea}
-                            onChange={(e) => setSelectedArea(e.target.value)}
-                            className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                          >
-                            {availableAreas.map((a) => (
-                              <option key={a} value={a}>{a}</option>
-                            ))}
-                            <option value="custom">Other / Custom Locality...</option>
-                          </select>
-                        ) : (
-                          <Input
-                            id="cityArea"
-                            name="cityArea"
-                            value={selectedArea}
-                            onChange={(e) => setSelectedArea(e.target.value)}
-                            placeholder="e.g. Kihim, Calangute, Indiranagar"
-                            className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Custom City if 'Other' is chosen */}
-                    {selectedCity === 'Other' && (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="customCity" className="text-gray-700 font-semibold text-xs">Custom City Name</Label>
-                        <Input
-                          id="customCity"
-                          name="customCity"
-                          value={customCity}
-                          onChange={(e) => setCustomCity(e.target.value)}
-                          placeholder="Enter your city / district name"
-                          className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
-                        />
-                      </div>
-                    )}
-
-                    {/* Custom Area if 'custom' is chosen */}
-                    {selectedArea === 'custom' && (
-                      <div className="space-y-1.5">
-                        <Label htmlFor="customArea" className="text-gray-700 font-semibold text-xs">Custom Area Name</Label>
-                        <Input
-                          id="customArea"
-                          name="customArea"
-                          value={customArea}
-                          onChange={(e) => setCustomArea(e.target.value)}
-                          placeholder="Enter neighborhood / area name"
-                          className="bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-11 rounded-xl shadow-sm text-sm"
-                        />
-                      </div>
-                    )}
-
-                    {/* Hidden State Input */}
-                    <input type="hidden" name="state" value={selectedState} />
-                  </div>
-
-                  {error && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm">
-                      {error}
-                    </div>
-                  )}
-
-                  <Button 
-                    type="submit" 
-                    disabled={loading === 'account'}
-                    className="w-full h-12 mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg flex items-center justify-center gap-2 transition-all rounded-xl shadow-md"
-                  >
-                    {loading === 'account' ? 'Creating Account...' : 'Continue to Payment'}
-                    {loading !== 'account' && <ArrowRight className="w-5 h-5" />}
-                  </Button>
-                </form>
-              </div>
+        {/* Global Error Banner */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Error:</span> {error}
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            {isUnpaidRedirect && (
-              <div className="mb-8 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl max-w-xl text-sm font-semibold shadow-sm">
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                <span>Your account is registered! Please select a subscription plan below to activate your account and access the Owner Dashboard.</span>
-              </div>
-            )}
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4">Select Your Plan</h2>
-              <p className="text-gray-500 text-lg font-medium">Your account <span className="text-blue-600 font-bold">{userEmail}</span> is ready. Choose a subscription to activate it.</p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {PLANS.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`relative bg-white border-2 rounded-3xl p-8 flex flex-col transition-all hover:-translate-y-1 ${plan.bestValue ? 'border-blue-600 shadow-[0_8px_30px_rgb(37,99,235,0.12)]' : 'border-gray-200 shadow-sm hover:border-gray-300'}`}
-                >
-                  {plan.bestValue && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full bg-blue-600 shadow-lg">
-                      Most Popular
+        )}
+
+        {/* STEP 1: COMPREHENSIVE ONBOARDING FORM */}
+        {step === 1 && (
+          <form onSubmit={handleFormSubmit} className="space-y-8">
+            {/* 1. OWNER DETAILS */}
+            <Card className="border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gray-50/70 border-b border-gray-100 py-4">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-indigo-600" /> Owner Account Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Owner Full Name *</Label>
+                    <Input
+                      required
+                      placeholder="e.g. Rajesh Patil"
+                      value={ownerName}
+                      onChange={(e) => setOwnerName(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Phone / WhatsApp Number (10 digits) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">
+                        +91
+                      </span>
+                      <Input
+                        required
+                        type="tel"
+                        maxLength={10}
+                        placeholder="9876543210"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        className="pl-12 h-11 rounded-xl tracking-wider font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Email Address *</Label>
+                    <Input
+                      required
+                      type="email"
+                      placeholder="owner@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Account Password (min 6 characters) *</Label>
+                    <Input
+                      required
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 2. PROPERTY DETAILS & LOCATION */}
+            <Card className="border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gray-50/70 border-b border-gray-100 py-4">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Building className="w-5 h-5 text-indigo-600" /> Property Profile & Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Property Name *</Label>
+                    <Input
+                      required
+                      placeholder="e.g. Coconut Grove Villa"
+                      value={propertyName}
+                      onChange={(e) => setPropertyName(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">Property Type *</Label>
+                    <select
+                      value={propertyType}
+                      onChange={(e) => setPropertyType(e.target.value)}
+                      className="w-full h-11 px-3 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {PROPERTY_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-gray-700">Full Property Street Address *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. Survey No. 42, Near Nagaon Beach Road"
+                    value={fullAddress}
+                    onChange={(e) => setFullAddress(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-bold text-gray-700">Pincode *</Label>
+                      {isDetectingPin && <span className="text-[10px] text-indigo-600 font-bold">Checking...</span>}
+                      {detectedLocation && (
+                        <span className="text-[10px] text-green-700 font-bold">{detectedLocation}</span>
+                      )}
+                    </div>
+                    <Input
+                      required
+                      maxLength={6}
+                      placeholder="402201"
+                      value={pincode}
+                      onChange={(e) => handlePincodeChange(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                    {pinError && <p className="text-[10px] text-red-500">{pinError}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">City / Region *</Label>
+                    <Input
+                      required
+                      placeholder="e.g. Alibag"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-gray-700">State *</Label>
+                    <Input
+                      required
+                      placeholder="e.g. Maharashtra"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Helpdesk Number Option */}
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={samePhoneForHelpdesk}
+                      onChange={(e) => setSamePhoneForHelpdesk(e.target.checked)}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                    />
+                    <span>Property helpdesk / guest contact number is the same as owner mobile number</span>
+                  </label>
+                  {!samePhoneForHelpdesk && (
+                    <div className="space-y-1.5 max-w-sm">
+                      <Label className="text-xs font-bold text-gray-700">Separate Helpdesk Number *</Label>
+                      <Input
+                        type="tel"
+                        maxLength={10}
+                        placeholder="9876543210"
+                        value={helpdeskNumber}
+                        onChange={(e) => setHelpdeskNumber(e.target.value.replace(/\D/g, ''))}
+                        className="h-11 rounded-xl"
+                      />
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 bg-blue-50 text-blue-600">
-                    <plan.icon className="w-6 h-6" />
+            {/* 3. ROOMS & LIVE SUBSCRIPTION PRICING TIER */}
+            <Card className="border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gray-50/70 border-b border-gray-100 py-4">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <BedDouble className="w-5 h-5 text-indigo-600" /> Rentable Rooms & Live Tier Pricing
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                {/* Total Rentable Units */}
+                <div className="bg-indigo-50/70 border border-indigo-100 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <Label htmlFor="roomCount" className="text-sm font-bold text-indigo-950 block">
+                      TOTAL NUMBER OF RENTABLE ROOMS *
+                    </Label>
+                    <p className="text-xs text-indigo-800 mt-0.5">
+                      Enter the total physical rooms available to guests in this property (1–100).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="roomCount"
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={roomCount || ''}
+                      onChange={(e) => setRoomCount(parseInt(e.target.value) || 1)}
+                      className="w-28 h-12 text-center text-xl font-black rounded-xl border-indigo-300 bg-white"
+                    />
+                    <div className="text-right">
+                      {isOverLimit ? (
+                        <span className="text-xs font-bold text-red-600 bg-red-100 px-3 py-1.5 rounded-lg block">
+                          Over 100: Contact Us
+                        </span>
+                      ) : (
+                        <div className="bg-white border border-indigo-200 px-4 py-2 rounded-xl text-center">
+                          <span className="text-xs text-gray-500 block">Monthly Fee</span>
+                          <span className="text-lg font-black text-indigo-600">
+                            ₹{monthlyFee}
+                            <span className="text-xs font-normal text-gray-400">/mo</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isOverLimit && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                    Properties with greater than 100 rooms cannot complete self-serve checkout. Please reach out to <a href="mailto:support@fixystays.com" className="font-bold underline">support@fixystays.com</a> for enterprise setup.
+                  </div>
+                )}
+
+                {/* Room Category Configuration */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <Label className="text-xs font-bold text-gray-800">
+                        Room Categories & Nightly Pricing *
+                      </Label>
+                      <p className="text-[11px] text-gray-500">Configure at least 1 room category for guest search.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addRoomCategory}
+                      className="text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 rounded-lg flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Category
+                    </Button>
                   </div>
 
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-
-                  <div className="mb-8 font-black flex items-center gap-2">
-                    <span className="text-4xl text-gray-900">₹{plan.price}</span>
-                    {plan.discount > 0 && (
-                      <span className="px-2 py-0.5 rounded text-sm mb-auto bg-blue-50 text-blue-600">
-                        {plan.discount}% OFF
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-4 mb-10 text-left flex-grow">
-                    {SHARED_FEATURES.map(f => (
-                      <div key={f} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-gray-600 font-medium leading-tight">{f}</span>
+                  <div className="space-y-3">
+                    {roomCategories.map((cat, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl items-center"
+                      >
+                        <div className="sm:col-span-5 space-y-1">
+                          <span className="text-[10px] text-gray-500 block font-semibold">Category Name</span>
+                          <Input
+                            placeholder="e.g. Deluxe AC Room"
+                            value={cat.name}
+                            onChange={(e) => updateCategory(idx, 'name', e.target.value)}
+                            className="h-9 text-xs rounded-lg bg-white"
+                          />
+                        </div>
+                        <div className="sm:col-span-3 space-y-1">
+                          <span className="text-[10px] text-gray-500 block font-semibold">Base Price / Night (₹)</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="2500"
+                            value={cat.basePrice}
+                            onChange={(e) => updateCategory(idx, 'basePrice', parseInt(e.target.value) || 0)}
+                            className="h-9 text-xs rounded-lg bg-white"
+                          />
+                        </div>
+                        <div className="sm:col-span-3 space-y-1">
+                          <span className="text-[10px] text-gray-500 block font-semibold">Max Guests</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="2"
+                            value={cat.capacity}
+                            onChange={(e) => updateCategory(idx, 'capacity', parseInt(e.target.value) || 1)}
+                            className="h-9 text-xs rounded-lg bg-white"
+                          />
+                        </div>
+                        <div className="sm:col-span-1 text-center pt-4 sm:pt-0">
+                          {roomCategories.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeCategory(idx)}
+                              className="text-red-500 hover:text-red-700 p-1.5"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <Button
-                    onClick={() => handlePayment(plan.name, plan.price)}
-                    disabled={loading === plan.name || loading === 'Processing...'}
-                    className={`w-full py-6 rounded-2xl text-lg font-bold transition-all shadow-sm ${
-                      plan.bestValue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-100 text-gray-900 hover:bg-gray-200 border border-gray-200'
+            {/* 4. PROPERTY PHOTOS (MIN 3) */}
+            <Card className="border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gray-50/70 border-b border-gray-100 py-4">
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Camera className="w-5 h-5 text-indigo-600" /> Property Photos *
+                  </CardTitle>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                      photos.length >= 3
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : 'bg-amber-100 text-amber-800 border border-amber-200'
                     }`}
                   >
-                    {loading === plan.name || loading === 'Processing...' ? 'Processing...' : `Choose ${plan.name}`}
+                    {photos.length} / 3 Uploaded (min 3)
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                {/* Photo Previews */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {photos.map((url, i) => (
+                    <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 aspect-video bg-gray-100">
+                      <img src={url} alt={`Upload ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute top-1.5 right-1.5 bg-red-600 text-white p-1 rounded-full opacity-90 hover:opacity-100 shadow"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Upload Box */}
+                  <label className="border-2 border-dashed border-gray-300 hover:border-indigo-500 rounded-xl flex flex-col items-center justify-center p-4 cursor-pointer text-center bg-gray-50/50 hover:bg-indigo-50/30 transition-all aspect-video">
+                    {isUploadingPhoto ? (
+                      <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="w-6 h-6 text-gray-400 mb-1" />
+                        <span className="text-xs font-bold text-indigo-600">+ Upload Photo</span>
+                        <span className="text-[10px] text-gray-400">JPG, PNG (max 10MB)</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingPhoto}
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {photoError && <p className="text-xs text-red-600">{photoError}</p>}
+              </CardContent>
+            </Card>
+
+            {/* Submit Action */}
+            <Button
+              type="submit"
+              disabled={isSubmitting || isOverLimit}
+              className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Creating Account & Saving Draft...
+                </>
+              ) : (
+                <>
+                  Proceed to Payment Selection
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </Button>
+          </form>
+        )}
+
+        {/* STEP 2: DURATION SELECTION & RAZORPAY CHECKOUT */}
+        {step === 2 && createdProperty && (
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <Card className="border border-gray-200 shadow-md rounded-2xl overflow-hidden">
+              <CardHeader className="bg-indigo-600 text-white p-6 text-center">
+                <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-indigo-200" />
+                <CardTitle className="text-2xl font-bold">Account & Draft Created</CardTitle>
+                <p className="text-indigo-100 text-sm mt-1">
+                  {createdProperty.propertyName} ({createdProperty.roomCount} Rooms) &bull; Tier Fee: ₹
+                  {createdProperty.monthlyFee}/month
+                </p>
+              </CardHeader>
+
+              <CardContent className="p-8 space-y-6">
+                <div>
+                  <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-3">
+                    Choose Subscription Duration
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {MONTH_OPTIONS.map((opt) => {
+                      const isSelected = selectedMonths === opt.months
+                      const cost = createdProperty.monthlyFee * opt.months
+                      return (
+                        <button
+                          key={opt.months}
+                          type="button"
+                          onClick={() => setSelectedMonths(opt.months)}
+                          className={`p-4 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-950 font-bold shadow-sm'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          <div className="text-sm font-bold">{opt.label}</div>
+                          <div className="text-xl font-black text-gray-900 mt-1">₹{cost.toLocaleString('en-IN')}</div>
+                          <div className="text-[11px] text-gray-500 font-normal">
+                            ₹{createdProperty.monthlyFee}/mo &times; {opt.months} mo
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-gray-100 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Base Tier Rate</span>
+                    <span>₹{createdProperty.monthlyFee} / month</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Duration</span>
+                    <span>{selectedMonths} Month(s)</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>GST (18%)</span>
+                    <span>Included</span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2 flex justify-between font-extrabold text-base text-gray-900">
+                    <span>Total Payable</span>
+                    <span className="text-indigo-600">
+                      ₹{(createdProperty.monthlyFee * selectedMonths).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <Button
+                    onClick={handlePayment}
+                    disabled={isProcessingPayment}
+                    className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    {isProcessingPayment ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Launching Payment Gateway...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-5 h-5" />
+                        Pay ₹{(createdProperty.monthlyFee * selectedMonths).toLocaleString('en-IN')} & Submit for Approval
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    onClick={() => setStep(1)}
+                    disabled={isProcessingPayment}
+                    className="text-xs text-gray-500 hover:text-gray-800"
+                  >
+                    &larr; Back to Edit Details
                   </Button>
                 </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-export default function OnboardingPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-medium">
-        Loading...
-      </div>
-    }>
-      <OnboardingContent />
-    </Suspense>
   )
 }

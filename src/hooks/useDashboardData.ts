@@ -18,7 +18,7 @@ export type DashboardData = {
   }
   owner?: {
     id: string
-    free_tier_enabled: boolean
+    free_tier_enabled?: boolean
     created_at: string
   }
 }

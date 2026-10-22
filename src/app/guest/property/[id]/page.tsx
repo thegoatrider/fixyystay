@@ -110,6 +110,22 @@ export default async function PropertyDetailPage(
     redirect('/guest')
   }
 
+  if (process.env.ENFORCE_PUBLIC_SUBSCRIPTION === 'true' && !property.is_guest_hub_only) {
+    const nowIso = new Date().toISOString()
+    const { data: activeSub } = await supabase
+      .from('property_subscriptions')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('status', 'active')
+      .gt('end_date', nowIso)
+      .limit(1)
+      .maybeSingle()
+
+    if (!activeSub) {
+      redirect('/guest')
+    }
+  }
+
   // Calculate stay dates
   const stayDates = checkin && checkout 
     ? eachDayOfInterval({ 

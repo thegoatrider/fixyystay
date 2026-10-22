@@ -2,281 +2,376 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
-import { headers } from 'next/headers'
-import { Resend } from 'resend'
-import { getCityCode } from '@/lib/india-locations'
+import { ensureOwner } from '@/lib/ensure-owner'
 import { generatePropertyUid } from '@/app/dashboard/owner/actions'
+import { z } from 'zod'
 
-async function getAbsoluteOrigin() {
-  const reqHeaders = await headers()
-  let origin = reqHeaders.get('origin')
-  if (!origin) {
-    const host = reqHeaders.get('host') || 'www.fixystays.com'
-    const isLocal = 
-      host.includes('localhost') || 
-      host.includes('127.0.0.1') || 
-      host.includes('10.0.2.2') || 
-      host.includes(':') ||
-      host.startsWith('192.168.') || 
-      host.startsWith('10.') || 
-      host.startsWith('172.')
-    const protocol = isLocal ? 'http' : 'https'
-    origin = `${protocol}://${host}`
-  }
-  return origin
+// Domain typo list
+const COMMON_EMAIL_DOMAIN_TYPOS = [
+  'gmail.co',
+  'gmail.cm',
+  'gmai.com',
+  'gamil.com',
+  'gmial.com',
+  'yahoo.co',
+  'yaho.com',
+  'hotmial.com',
+  'outlok.com',
+  'iclod.com',
+]
+
+// Server-side Zod Validation Schema
+export const onboardingSchema = z.object({
+  ownerName: z
+    .string()
+    .trim()
+    .min(2, 'Owner full name must be at least 2 characters.'),
+  phone: z
+    .string()
+    .trim()
+    .refine((val) => {
+      const clean = val.replace(/\D/g, '')
+      const stripped = clean.startsWith('91') && clean.length === 12 ? clean.slice(2) : clean
+      return stripped.length === 10 && /^[6-9]\d{9}$/.test(stripped)
+    }, 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).'),
+  email: z
+    .string()
+    .trim()
+    .email('Please enter a valid email address.')
+    .refine((val) => {
+      const parts = val.toLowerCase().split('@')
+      if (parts.length !== 2) return false
+      const domain = parts[1]
+      return !COMMON_EMAIL_DOMAIN_TYPOS.includes(domain)
+    }, 'Email domain appears to have a typo (e.g. did you mean @gmail.com?).'),
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 characters.'),
+  propertyName: z
+    .string()
+    .trim()
+    .min(2, 'Property name must be at least 2 characters.'),
+  propertyType: z
+    .string()
+    .trim()
+    .min(1, 'Please select a property type.'),
+  fullAddress: z
+    .string()
+    .trim()
+    .min(5, 'Full property address is required (at least 5 characters).'),
+  city: z
+    .string()
+    .trim()
+    .min(2, 'City is required.'),
+  state: z
+    .string()
+    .trim()
+    .min(2, 'State is required.'),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Pincode must be exactly 6 digits.'),
+  roomCount: z
+    .number()
+    .int()
+    .min(1, 'Total number of rooms must be at least 1.')
+    .max(100, 'Online onboarding supports up to 100 rooms. For larger properties, contact us.'),
+  roomCategories: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, 'Room category name is required.'),
+        basePrice: z.number().min(1, 'Base price per night must be at least ₹1.'),
+        capacity: z.number().int().min(1, 'Capacity must be at least 1 guest.'),
+      })
+    )
+    .min(1, 'Please configure at least one room category.'),
+  photos: z
+    .array(z.string().url('Invalid image URL.'))
+    .min(3, 'Please upload at least 3 photos of your property.'),
+  helpdeskNumber: z.string().trim().optional(),
+})
+
+export type OnboardingInput = z.infer<typeof onboardingSchema>
+
+/**
+ * Normalizes Indian phone number to E.164 (+91XXXXXXXXXX)
+ */
+function normalizeIndianPhone(input: string): string {
+  const digits = input.replace(/\D/g, '')
+  const core10 = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits
+  return `+91${core10}`
 }
 
-export async function checkEmailAvailability(email: string) {
-  const supabaseAdmin = createAdminClient()
-  const normalizedEmail = email.toLowerCase().trim()
+/**
+ * Fetches the monthly fee from public.pricing_tiers for a given room count.
+ */
+export async function getMonthlyFeeForRooms(roomCount: number): Promise<{
+  monthlyFee: number | null
+  overLimit?: boolean
+  error?: string
+}> {
+  if (roomCount > 100) {
+    return { monthlyFee: null, overLimit: true }
+  }
+  if (roomCount < 1) {
+    return { monthlyFee: null, error: 'Room count must be at least 1' }
+  }
 
-  const { data: owner } = await supabaseAdmin
-    .from('owners')
-    .select('id, user_id')
-    .eq('email', normalizedEmail)
+  const supabaseAdmin = createAdminClient()
+  const { data: tier, error } = await supabaseAdmin
+    .from('pricing_tiers')
+    .select('monthly_fee_inr')
+    .eq('active', true)
+    .lte('min_rooms', roomCount)
+    .gte('max_rooms', roomCount)
     .maybeSingle()
 
-  if (owner) {
-    // Check if they actually have an active subscription
-    const { data: subscription } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .select('status, end_date')
-      .eq('owner_id', owner.id)
-      .maybeSingle()
-    
-    const isPaid = subscription?.status === 'active' && new Date(subscription.end_date) > new Date()
-    
-    if (isPaid) {
-      return { error: 'An owner account with this email already has an active subscription. Please log in to your dashboard.' }
-    }
-
-    // Account exists but has not paid yet - allow proceeding to payment!
-    return { success: true, unpaidExisting: true, ownerId: owner.id }
+  if (error || !tier) {
+    return { monthlyFee: null, error: 'No matching tier' }
   }
 
-  // Also check if user exists in auth.users directly
-  const authUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
-  if (authUser) {
-    return { success: true, unpaidExisting: true }
-  }
-
-  return { success: true }
+  return { monthlyFee: Number(tier.monthly_fee_inr) }
 }
 
-export async function submitOnboarding(formData: FormData) {
-  const supabase = await createClient()
+/**
+ * Uploads an onboarding photo directly to public bucket 'property_images'
+ */
+export async function uploadOnboardingPhoto(formData: FormData) {
+  try {
+    const file = formData.get('file') as File | null
+    if (!file || file.size === 0) {
+      return { error: 'No valid image file provided.' }
+    }
 
-  const name = formData.get('name') as string
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const phone = ((formData.get('phone') as string) || '').trim()
+    // Limit file size to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      return { error: 'Image size exceeds 10MB limit.' }
+    }
 
-  if (!name || !email || !password) {
-    return { error: 'Name, email, and password are required' }
+    const supabaseAdmin = createAdminClient()
+    const rawExt = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
+    const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
+    const fileName = `onboard-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('property_images')
+      .upload(fileName, file, {
+        contentType: file.type || 'image/jpeg',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('[uploadOnboardingPhoto] Storage upload error:', uploadError)
+      return { error: `Upload failed: ${uploadError.message}` }
+    }
+
+    const { data: urlData } = supabaseAdmin.storage.from('property_images').getPublicUrl(fileName)
+    return { success: true, url: urlData.publicUrl }
+  } catch (err: any) {
+    console.error('[uploadOnboardingPhoto] Exception:', err)
+    return { error: err.message || 'Image upload failed' }
   }
+}
 
-  const cleanPhone = phone.replace(/\D/g, '')
-  if (!phone || cleanPhone.length < 10) {
-    return { error: 'A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
-  }
+/**
+ * Submits the unified onboarding form:
+ * - Validates inputs via Zod
+ * - Creates/resumes Auth User (app_metadata role: 'owner')
+ * - Creates/links Owner row via ensureOwner()
+ * - Creates/resumes Property as 'draft' with room_count
+ * - Populates rooms table
+ * - Pre-computes monthly fee
+ */
+export async function submitOnboarding(data: OnboardingInput) {
+  try {
+    // 1. Zod Validation
+    const parsed = onboardingSchema.safeParse(data)
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]
+      return { error: `${firstIssue.path.join('.')}: ${firstIssue.message}` }
+    }
 
-  const normalizedEmail = email.toLowerCase().trim()
+    const val = parsed.data
+    const normalizedEmail = val.email.toLowerCase().trim()
+    const normalizedPhone = normalizeIndianPhone(val.phone)
+    const helpdeskPhone = val.helpdeskNumber ? normalizeIndianPhone(val.helpdeskNumber) : normalizedPhone
 
-  // 1. Create or update user as an owner with auto-confirmed email
-  const supabaseAdmin = createAdminClient()
-  let userId: string | null = null
+    const supabaseAdmin = createAdminClient()
 
-  const { data: adminAuthData, error: adminAuthError } = await supabaseAdmin.auth.admin.createUser({
-    email: normalizedEmail,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      name,
-      role: 'owner',
-      phone,
-    },
-  })
-
-  if (!adminAuthError && adminAuthData?.user) {
-    userId = adminAuthData.user.id
-  } else {
-    // If createUser returned an error (e.g. user already exists or already registered),
-    // find the user across all pages and update their credentials and metadata
+    // 2. Auth User: Create or Resume
+    let userId: string | null = null
     const existingUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
+
     if (existingUser) {
       userId = existingUser.id
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-        password,
+      // Resume existing user: update credentials and ensure owner role in app_metadata
+      const { error: updateAuthErr } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+        password: val.password,
         email_confirm: true,
         user_metadata: {
           ...(existingUser.user_metadata || {}),
-          name,
-          role: 'owner',
-          phone,
-        }
+          name: val.ownerName,
+          phone: normalizedPhone,
+        },
+        app_metadata: {
+          ...(existingUser.app_metadata || {}),
+          role: existingUser.app_metadata?.role || 'owner',
+        },
       })
-      if (updateError) {
-        console.error('Error updating existing auth user during onboarding:', updateError)
+
+      if (updateAuthErr) {
+        console.error('[submitOnboarding] Error updating existing auth user:', updateAuthErr)
       }
     } else {
-      console.error('Failed to create or find auth user:', adminAuthError)
-      return { error: adminAuthError?.message || 'Failed to create account. Please try again.' }
-    }
-  }
-
-  if (!userId) {
-    return { error: adminAuthError?.message || 'Failed to create account' }
-  }
-
-  // 2. Get or Insert into owners table (check both email and user_id to handle recreated/orphaned accounts)
-  const { data: existingOwner } = await supabaseAdmin
-    .from('owners')
-    .select('id, user_id')
-    .or(`email.eq.${normalizedEmail},user_id.eq.${userId}`)
-    .maybeSingle()
-  let ownerId = existingOwner?.id
-
-  if (!existingOwner) {
-    const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
-      {
-        user_id: userId,
-        name,
+      // Create fresh auth user
+      const { data: newAuthData, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
-        phone,
-      },
-    ]).select('id').single()
+        password: val.password,
+        email_confirm: true,
+        user_metadata: {
+          name: val.ownerName,
+          phone: normalizedPhone,
+        },
+        app_metadata: {
+          role: 'owner',
+        },
+      })
 
-    if (dbError) {
-      console.error('Failed to create owner record:', dbError)
-      // Retry lookup in case of parallel creation
-      const { data: retryOwner } = await supabaseAdmin
-        .from('owners')
-        .select('id')
-        .or(`email.eq.${normalizedEmail},user_id.eq.${userId}`)
-        .maybeSingle()
-      if (retryOwner) {
-        ownerId = retryOwner.id
+      if (createAuthErr || !newAuthData?.user) {
+        console.error('[submitOnboarding] Auth creation failed:', createAuthErr)
+        return { error: createAuthErr?.message || 'Failed to create owner account.' }
       }
-    } else if (newOwner) {
-      ownerId = newOwner.id
+      userId = newAuthData.user.id
     }
-  } else {
-    // If owner exists, ensure user_id and phone are up to date
-    const { error: updateError } = await supabaseAdmin
-      .from('owners')
-      .update({ user_id: userId, name, phone, email: normalizedEmail })
-      .eq('id', existingOwner.id)
-    
-    if (updateError) {
-      console.error('Failed to link existing owner record:', updateError)
+
+    if (!userId) {
+      return { error: 'Could not associate an authentication account.' }
     }
-  }
 
-  const propertyName = formData.get('propertyName') as string
-  const pincode = ((formData.get('pincode') as string) || '').trim()
-  const city = ((formData.get('city') as string) || '').trim()
-  const customCity = ((formData.get('customCity') as string) || '').trim()
-  const selectedArea = ((formData.get('cityArea') as string) || (formData.get('area') as string) || '').trim()
-  const customArea = ((formData.get('customArea') as string) || '').trim()
-  const finalCity = city === 'Other' && customCity ? customCity : (city || (pincode ? 'Detected Location' : 'Pending'))
-  const finalArea = selectedArea === 'custom' ? customArea : (selectedArea || customArea || null)
-  const state = ((formData.get('state') as string) || '').trim()
+    // 3. Ensure Owner record via single canonical helper
+    const { owner } = await ensureOwner(supabaseAdmin, {
+      userId,
+      email: normalizedEmail,
+      name: val.ownerName,
+      phone: normalizedPhone,
+    })
 
-  const finalPropName = (propertyName || `${name}'s Property`).trim()
-  const safeCity = finalCity && finalCity !== 'Pending' ? finalCity : 'Alibag'
-  let propertyId: string | null = null
+    const ownerId = owner.id
 
-  // Ensure property is safely persisted to Supabase immediately upon onboarding
-  if (ownerId) {
-    try {
-      const { data: existingProp } = await supabaseAdmin
+    // 4. Create or Resume Property as 'draft'
+    // Check if an existing draft property exists for this owner
+    const { data: existingDrafts } = await supabaseAdmin
+      .from('properties')
+      .select('id, uid')
+      .eq('owner_id', ownerId)
+      .eq('approval_status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    let propertyId: string | null = null
+    const safeCity = val.city || 'Alibag'
+
+    const propertyPayload = {
+      name: val.propertyName,
+      type: val.propertyType,
+      city: safeCity,
+      state: val.state,
+      pincode: val.pincode,
+      address: val.fullAddress,
+      room_count: val.roomCount,
+      helpdesk_number: helpdeskPhone,
+      image_url: val.photos[0],
+      images: val.photos,
+      room_categories: val.roomCategories,
+      approval_status: 'draft',
+      approved: false,
+    }
+
+    if (existingDrafts && existingDrafts.length > 0) {
+      // Resume existing draft
+      propertyId = existingDrafts[0].id
+      const { error: updatePropErr } = await supabaseAdmin
         .from('properties')
-        .select('id, uid')
-        .eq('owner_id', ownerId)
-        .ilike('name', finalPropName)
-        .maybeSingle()
+        .update(propertyPayload)
+        .eq('id', propertyId)
 
-      if (existingProp) {
-        propertyId = existingProp.id
-        await supabaseAdmin.from('properties').update({
-          city: safeCity,
-          city_area: finalArea,
-          area_name: finalArea,
-          pincode: pincode || null,
-          state: state || null,
-          helpdesk_number: phone,
-        }).eq('id', existingProp.id)
-      } else {
-        const uid = await generatePropertyUid(supabaseAdmin, safeCity)
-        const { data: newProp, error: insertError } = await supabaseAdmin
-          .from('properties')
-          .insert([
-            {
-              owner_id: ownerId,
-              name: finalPropName,
-              city: safeCity,
-              city_area: finalArea,
-              area_name: finalArea,
-              pincode: pincode || null,
-              state: state || null,
-              type: 'multi-room property',
-              uid,
-              helpdesk_number: phone,
-              approved: false,
-            }
-          ])
-          .select('id')
-          .single()
-
-        if (insertError) {
-          console.error('Failed to create onboarding property in properties table:', insertError)
-        } else if (newProp?.id) {
-          propertyId = newProp.id
-          try {
-            await supabaseAdmin.from('rooms').insert([
-              {
-                property_id: newProp.id,
-                name: 'Standard Room',
-                category: 'Standard',
-                base_price: 2500,
-                price_bucket: '₹2,500 - ₹5,000',
-              }
-            ])
-          } catch (_) {}
-        }
+      if (updatePropErr) {
+        console.error('[submitOnboarding] Error updating draft property:', updatePropErr)
+        return { error: `Failed to update property details: ${updatePropErr.message}` }
       }
-    } catch (propErr) {
-      console.error('Error persisting onboarding property:', propErr)
+    } else {
+      // Create new draft property
+      const uid = await generatePropertyUid(supabaseAdmin, safeCity)
+      const { data: newProp, error: insertPropErr } = await supabaseAdmin
+        .from('properties')
+        .insert([
+          {
+            owner_id: ownerId,
+            uid,
+            ...propertyPayload,
+          },
+        ])
+        .select('id')
+        .single()
+
+      if (insertPropErr || !newProp) {
+        console.error('[submitOnboarding] Error inserting property:', insertPropErr)
+        return { error: `Failed to create property: ${insertPropErr?.message}` }
+      }
+      propertyId = newProp.id
     }
-  }
 
-  // Capture property details to be passed along with the subscription order
-  const propertyData = {
-    propertyId,
-    propertyName: finalPropName,
-    city: safeCity,
-    cityArea: finalArea,
-    pincode: pincode || null,
-    state: state || null,
-    phone,
-    helpdeskNumber: phone,
-  }
+    // 5. Populate rooms table
+    if (propertyId) {
+      // Clean previous draft rooms if resuming
+      await supabaseAdmin.from('rooms').delete().eq('property_id', propertyId)
 
-  // Sign the user in so their session is active for subsequent steps
-  await supabase.auth.signInWithPassword({
-    email: normalizedEmail,
-    password,
-  })
+      const roomsToInsert = val.roomCategories.map((cat) => ({
+        property_id: propertyId,
+        name: cat.name,
+        category: cat.name,
+        base_price: cat.basePrice,
+        capacity: cat.capacity,
+        price_bucket:
+          cat.basePrice <= 2500
+            ? 'Under ₹2,500'
+            : cat.basePrice <= 5000
+            ? '₹2,500 - ₹5,000'
+            : '₹5,000+',
+      }))
 
-  return { 
-    success: true, 
-    ownerId, 
-    userId, 
-    email: normalizedEmail,
-    phone,
-    propertyData,
+      const { error: roomsErr } = await supabaseAdmin.from('rooms').insert(roomsToInsert)
+      if (roomsErr) {
+        console.warn('[submitOnboarding] Warning inserting room categories into rooms table:', roomsErr)
+      }
+    }
+
+    // 6. Look up Monthly Fee for the declared room count
+    const feeInfo = await getMonthlyFeeForRooms(val.roomCount)
+    if (!feeInfo.monthlyFee) {
+      return { error: feeInfo.error || 'Unable to determine pricing for declared rooms.' }
+    }
+
+    // 7. Auto-sign in session
+    const supabase = await createClient()
+    await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: val.password,
+    }).catch(() => {})
+
+    return {
+      success: true,
+      propertyId,
+      ownerId,
+      userId,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      propertyName: val.propertyName,
+      roomCount: val.roomCount,
+      monthlyFee: feeInfo.monthlyFee,
+    }
+  } catch (err: any) {
+    console.error('[submitOnboarding] Exception:', err)
+    return { error: err.message || 'Onboarding submission failed.' }
   }
 }
-
-export const registerOwnerAccount = submitOnboarding
-

@@ -16,49 +16,41 @@ export default async function OwnerDashboard() {
   const isSuperAdmin = isSuperAdminUser(user)
   
   // 2. Initial owner lookup (fast)
-  let { data: owner } = await supabase.from('owners').select('id, created_at, free_tier_enabled').eq('user_id', user?.id).maybeSingle()
+  let { data: owner } = await supabase.from('owners').select('id, created_at, name').eq('user_id', user?.id).maybeSingle()
   
   if (!owner && user?.email) {
     const supabaseAdmin = createAdminClient()
     const lowerEmail = user.email.toLowerCase()
     
-    // Self-healing step 1: try to link by email if row exists
-    const { data: updatedOwner } = await supabaseAdmin
+    // Link user_id by email if owner record was already created during onboarding
+    const { data: updatedOwner, error: linkError } = await supabaseAdmin
       .from('owners')
       .update({ user_id: user.id })
       .eq('email', lowerEmail)
-      .select('id, created_at, free_tier_enabled')
+      .select('id, created_at, name')
       .maybeSingle()
     
+    if (linkError) {
+      console.error('Error linking owner by email:', linkError)
+    }
+
     if (updatedOwner) {
       owner = updatedOwner
-    } else {
-      // Self-healing step 2: row doesn't exist at all, create it!
-      const { data: newOwner } = await supabaseAdmin
-        .from('owners')
-        .insert({
-          user_id: user.id,
-          email: lowerEmail,
-          name: user.user_metadata?.name || user.email.split('@')[0],
-          phone: user.user_metadata?.phone || ''
-        })
-        .select('id, created_at, free_tier_enabled')
-        .single()
-        
-      if (newOwner) owner = newOwner
     }
   }
 
   // 3. Strict Subscription & Payment Gating + Google Token in Parallel
   if (!isSuperAdmin && !owner) {
-    redirect('/onboarding?step=payment&reason=unpaid')
+    redirect('/renew')
   }
 
-  const isFreeTier = (owner as any)?.free_tier_enabled === true
   const supabaseAdmin = createAdminClient()
 
-  // Run subscription check and Google drive token lookup concurrently
-  const [subResult, googleTokenResult] = await Promise.all([
+  // Run property subscription check and Google drive token lookup concurrently
+  const [subResult, legacySubResult, googleTokenResult] = await Promise.all([
+    owner
+      ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee, amount').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null }),
     owner
       ? supabaseAdmin.from('owner_subscriptions').select('plan_name, status, end_date').eq('owner_id', owner.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -67,13 +59,13 @@ export default async function OwnerDashboard() {
       : Promise.resolve({ data: null })
   ])
 
-  if (!isSuperAdmin && owner && !isFreeTier) {
-    const sub = subResult.data
-    const isSubActive = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
+  const initialSubscription = subResult.data || legacySubResult.data
+
+  if (!isSuperAdmin && owner) {
+    const isSubActive = initialSubscription?.status === 'active' && !!initialSubscription?.end_date && new Date(initialSubscription.end_date) > new Date()
     
     if (!isSubActive) {
-      // Also allow owners who purchased standalone Guest Hub (₹20/room/month)
-      // Single query inner join through FK (guest_hub_settings.property_id -> properties.id)
+      // Also allow owners who purchased standalone Guest Hub
       const { data: activeHub } = await supabaseAdmin
         .from('guest_hub_settings')
         .select('id, properties!inner(id, owner_id)')
@@ -83,7 +75,7 @@ export default async function OwnerDashboard() {
         .maybeSingle()
 
       if (!activeHub) {
-        redirect('/onboarding?step=payment&reason=unpaid')
+        redirect('/renew')
       }
     }
   }
@@ -102,7 +94,7 @@ export default async function OwnerDashboard() {
         hasGoogleDrive={hasGoogleDrive}
         googleEmail={googleEmail}
         initialOwner={owner}
-        initialSubscription={subResult.data}
+        initialSubscription={initialSubscription}
       />
     </Suspense>
   )

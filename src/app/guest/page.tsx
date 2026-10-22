@@ -70,7 +70,20 @@ export default async function GuestBrowsePage(props: { searchParams: Promise<{ b
     hasAuthToken ? supabase.auth.getUser() : Promise.resolve({ data: { user: null }, error: null })
   ])
 
-  const { data: properties, error } = propertiesResult
+  let properties = propertiesResult.data || []
+  if (process.env.ENFORCE_PUBLIC_SUBSCRIPTION === 'true' && properties.length > 0) {
+    const propIds = properties.map((p: any) => p.id)
+    const nowIso = new Date().toISOString()
+    const { data: activeSubs } = await supabase
+      .from('property_subscriptions')
+      .select('property_id')
+      .in('property_id', propIds)
+      .eq('status', 'active')
+      .gt('end_date', nowIso)
+
+    const activeSet = new Set((activeSubs || []).map((s: any) => s.property_id))
+    properties = properties.filter((p: any) => activeSet.has(p.id) || p.is_guest_hub_only)
+  }
   const user = userResult.data?.user || null
   const isInfluencer = getEffectiveUserRole(user) === 'influencer'
 

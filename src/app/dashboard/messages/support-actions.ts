@@ -128,7 +128,7 @@ export async function getSupportOwners() {
     // Fetch all owners
     const { data: owners, error: ownersError } = await supabaseAdmin
       .from('owners')
-      .select('id, user_id, name, email, phone')
+      .select('id, user_id, name, email')
 
     if (ownersError) throw ownersError
 

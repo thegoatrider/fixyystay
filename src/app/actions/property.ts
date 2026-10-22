@@ -75,7 +75,10 @@ export async function updateProperty(propertyId: string, formData: FormData) {
         .maybeSingle()
       if (matchedOwner) {
         owner = matchedOwner
-        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        if (linkErr) {
+          console.warn('Could not link owner by email:', linkErr.message)
+        }
       }
     }
     if (!owner) return { error: 'Owner profile not found.' }
@@ -250,11 +253,7 @@ export async function updateProperty(propertyId: string, formData: FormData) {
     return { error: `Update failed: ${updateError.message}` }
   }
 
-  // Sync phone number to owner record
-  const ownerToSync = targetOwnerId || currentProp?.owner_id
-  if (ownerToSync) {
-    await supabaseAdmin.from('owners').update({ phone: helpdesk_number }).eq('id', ownerToSync)
-  }
+
 
   // 4.5 Handle initial room creation or villa sync
   const priceBucket = formData.get('priceBucket') as string

@@ -3,10 +3,16 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { getPropertyAccess } from '@/lib/access'
 
 export async function addRoom(propertyId: string, formData: FormData) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const access = await getPropertyAccess(propertyId, user)
+    if (!access.allowed) {
+      return { error: 'Active property subscription required to manage rooms. Please renew your subscription.' }
+    }
     const supabaseAdmin = createAdminClient()
 
     const name = formData.get('name') as string
@@ -222,6 +228,12 @@ export async function saveMultipleChanges(
 
 export async function updateRoomCategories(propertyId: string, categories: any[]) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const access = await getPropertyAccess(propertyId, user)
+    if (!access.allowed) {
+      return { error: 'Active property subscription required to modify room categories. Please renew.' }
+    }
     const supabaseAdmin = createAdminClient()
     const { error } = await supabaseAdmin
       .from('properties')

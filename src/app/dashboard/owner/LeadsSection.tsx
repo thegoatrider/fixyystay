@@ -973,7 +973,7 @@ function FreeTierOverlay() {
           <p className="text-gray-500 text-sm mt-2 font-medium">Upgrade your partner plan to view guest enquiries and manage lead data.</p>
         </div>
         <Button asChild className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-black rounded-xl shadow-lg shadow-blue-600/20 uppercase tracking-widest text-white">
-          <Link href="/pricing/starter">Upgrade to View</Link>
+          <Link href="/renew">Renew Subscription</Link>
         </Button>
       </div>
     </div>

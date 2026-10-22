@@ -99,47 +99,29 @@ export function CreatePartnerForm() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="plan" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Selected Plan</Label>
+            <Label htmlFor="roomCount" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Room Count (Rentable Units)</Label>
+            <Input id="roomCount" name="roomCount" type="number" min={1} defaultValue={5} required className="rounded-xl h-12 font-bold" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="plan" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Duration</Label>
             <select 
               name="plan" 
               id="plan" 
               required 
               defaultValue="6 Months"
-              onChange={(e) => {
-                const amountInput = document.getElementById('amount') as HTMLInputElement
-                const val = e.target.value
-                if (val === '7-Day Free Trial') {
-                  if (amountInput) amountInput.value = '0'
-                } else if (val === '3 Months' || val === 'Starter 3 Months') {
-                  if (amountInput) amountInput.value = '300'
-                } else if (val === '6 Months' || val === 'Starter 6 Months') {
-                  if (amountInput) amountInput.value = '600'
-                } else if (val === '12 Months' || val === 'Starter 12 Months') {
-                  if (amountInput) amountInput.value = '1200'
-                }
-              }}
               className="w-full h-12 rounded-xl border px-3 bg-gray-50 text-sm font-medium focus:ring-2 focus:ring-blue-500"
             >
-              <optgroup label="Free Access">
-                <option value="7-Day Free Trial">7-Day Free Trial - ₹0</option>
-              </optgroup>
-              <optgroup label="Standard Business Tiers">
-                <option value="3 Months">Business 3 Months - ₹300</option>
-                <option value="6 Months">Business 6 Months - ₹600</option>
-                <option value="12 Months">Business 12 Months - ₹1200</option>
-              </optgroup>
-              <optgroup label="Starter Partner Tiers">
-                <option value="Starter 3 Months">Starter 3 Months - ₹300</option>
-                <option value="Starter 6 Months">Starter 6 Months - ₹600</option>
-                <option value="Starter 12 Months">Starter 12 Months - ₹1200</option>
-              </optgroup>
+              <option value="1 Month">1 Month</option>
+              <option value="3 Months">3 Months</option>
+              <option value="6 Months">6 Months</option>
+              <option value="12 Months">12 Months (1 Year)</option>
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount Paid (₹)</Label>
-            <Input id="amount" name="amount" type="number" defaultValue="600" placeholder="300, 600, 1200, etc." required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
+            <Input id="amount" name="amount" type="number" defaultValue="600" placeholder="e.g. 600" required className="rounded-xl h-12 font-bold text-green-600 focus:bg-white" />
           </div>
         </div>
 

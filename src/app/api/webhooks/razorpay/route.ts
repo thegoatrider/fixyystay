@@ -9,64 +9,156 @@ export async function POST(req: NextRequest) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET
 
     if (!secret || !signature) {
+      console.warn('[RazorpayWebhook] Missing secret or signature header')
       return NextResponse.json({ error: 'Webhook secret or signature missing' }, { status: 400 })
     }
 
-    // 1. Verify Webhook Signature
+    // 1. Verify Raw Body HMAC Signature
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(body)
       .digest('hex')
 
     if (expectedSignature !== signature) {
-      console.error('Invalid Razorpay Webhook Signature')
+      console.error('[RazorpayWebhook] Invalid Webhook Signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
 
     const event = JSON.parse(body)
     const supabaseAdmin = createAdminClient()
 
-    console.log('Razorpay Webhook Event:', event.event)
+    const eventType = event.event
+    console.log('[RazorpayWebhook] Processing event:', eventType)
 
-    // 2. Handle Order Paid Event
-    if (event.event === 'order.paid') {
-      const { id: orderId, notes } = event.payload.order.entity
+    // Extract Order & Payment identifiers
+    const orderId: string | undefined =
+      event.payload?.order?.entity?.id ||
+      event.payload?.payment?.entity?.order_id
+    const paymentId: string | undefined = event.payload?.payment?.entity?.id
 
-      // Case A: Guest Booking
-      const { data: booking } = await supabaseAdmin
-        .from('bookings')
-        .select('id, payment_status')
-        .eq('razorpay_order_id', orderId)
-        .maybeSingle()
+    if (!orderId) {
+      console.warn('[RazorpayWebhook] Event missing order ID, ignoring:', eventType)
+      return NextResponse.json({ received: true, ignored: true })
+    }
 
-      if (booking && booking.payment_status !== 'paid') {
-        await supabaseAdmin
-          .from('bookings')
-          .update({ payment_status: 'paid', razorpay_payment_id: event.payload.payment.entity.id })
-          .eq('id', booking.id)
-        
-        console.log(`Booking ${booking.id} confirmed via Webhook`)
+    // -------------------------------------------------------------------------
+    // CASE A: Guest Booking Flow
+    // -------------------------------------------------------------------------
+    const { data: booking, error: bookingErr } = await supabaseAdmin
+      .from('bookings')
+      .select('id, payment_status')
+      .eq('razorpay_order_id', orderId)
+      .maybeSingle()
+
+    if (bookingErr) {
+      console.error('[RazorpayWebhook] Error querying bookings:', bookingErr)
+    }
+
+    if (booking) {
+      if (eventType === 'order.paid' || eventType === 'payment.captured') {
+        if (booking.payment_status !== 'paid') {
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              payment_status: 'paid',
+              razorpay_payment_id: paymentId || null,
+            })
+            .eq('id', booking.id)
+
+          console.log(`[RazorpayWebhook] Booking ${booking.id} confirmed via ${eventType}`)
+        }
+        return NextResponse.json({ received: true, booking_id: booking.id })
       }
 
-      // Case B: Owner Standalone Payment
-      // Differentiate by checking if `notes` contains `plan` and `email`
-      if (notes && notes.plan && notes.email) {
-        console.log(`Owner payment for ${notes.email} confirmed via Webhook`)
-
-        // IMPORT verifyAndUpgrade to execute the upgrade logic robustly from the webhook
-        const { verifyAndUpgrade } = await import('@/app/pricing/business/actions')
-        const upgradeResult = await verifyAndUpgrade(orderId)
-        if (upgradeResult.error) {
-          console.error('Webhook Upgrade Failed:', upgradeResult.error)
-        } else {
-          console.log(`Owner ${notes.email} upgraded successfully via Webhook!`)
+      if (eventType === 'payment.failed') {
+        if (booking.payment_status === 'pending') {
+          await supabaseAdmin
+            .from('bookings')
+            .update({ payment_status: 'failed' })
+            .eq('id', booking.id)
+          console.log(`[RazorpayWebhook] Booking ${booking.id} marked failed`)
         }
+        return NextResponse.json({ received: true, booking_id: booking.id, failed: true })
       }
     }
 
-    return NextResponse.json({ received: true })
+    // -------------------------------------------------------------------------
+    // CASE B: Property Subscription Payment Flow
+    // -------------------------------------------------------------------------
+    const { data: ownerPayment, error: payLookupErr } = await supabaseAdmin
+      .from('owner_payments')
+      .select('id, status, property_id, razorpay_order_id')
+      .eq('razorpay_order_id', orderId)
+      .maybeSingle()
+
+    if (payLookupErr) {
+      console.error('[RazorpayWebhook] Error querying owner_payments:', payLookupErr)
+    }
+
+    // Also check payment_ref for legacy orders
+    let targetPayment = ownerPayment
+    if (!targetPayment) {
+      const { data: fallback } = await supabaseAdmin
+        .from('owner_payments')
+        .select('id, status, property_id, razorpay_order_id')
+        .eq('payment_ref', orderId)
+        .maybeSingle()
+      targetPayment = fallback
+    }
+
+    if (targetPayment) {
+      // 1. Success events: order.paid or payment.captured
+      if (eventType === 'order.paid' || eventType === 'payment.captured') {
+        // Idempotency: if already paid, return 200 fast
+        if (targetPayment.status === 'paid') {
+          console.log(`[RazorpayWebhook] Order ${orderId} already paid; skipping.`)
+          return NextResponse.json({ received: true, already_processed: true })
+        }
+
+        // Atomic activation via DB function
+        const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc(
+          'activate_property_payment',
+          {
+            p_order_id: orderId,
+            p_payment_id: paymentId || null,
+          }
+        )
+
+        if (rpcErr) {
+          console.error('[RazorpayWebhook] Error in activate_property_payment:', rpcErr)
+          return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+        }
+
+        console.log(`[RazorpayWebhook] Order ${orderId} successfully activated:`, rpcRes)
+        return NextResponse.json({ received: true, activated: true, result: rpcRes })
+      }
+
+      // 2. Failure event: payment.failed
+      if (eventType === 'payment.failed') {
+        if (targetPayment.status === 'created') {
+          const { error: failErr } = await supabaseAdmin
+            .from('owner_payments')
+            .update({ status: 'failed', updated_at: new Date().toISOString() })
+            .eq('id', targetPayment.id)
+
+          if (failErr) {
+            console.error('[RazorpayWebhook] Failed to mark payment as failed:', failErr)
+          } else {
+            console.log(`[RazorpayWebhook] Order ${orderId} marked as failed.`)
+          }
+        }
+        return NextResponse.json({ received: true, failed_recorded: true })
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // UNRECOGNIZED ORDER
+    // -------------------------------------------------------------------------
+    console.warn('[RazorpayWebhook] Unknown order ID received:', orderId, 'event:', eventType)
+    // Return 200 so Razorpay does not retry unrecognized/external orders indefinitely
+    return NextResponse.json({ received: true, warning: 'Unknown order ignored' })
   } catch (err: any) {
-    console.error('Webhook Error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[RazorpayWebhook] Unhandled error:', err)
+    return NextResponse.json({ error: err.message || 'Webhook processing failed' }, { status: 500 })
   }
 }

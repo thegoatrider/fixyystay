@@ -17,10 +17,10 @@ export async function approveProperty(propertyId: string) {
 
     const supabaseAdmin = createAdminClient()
 
-    // Verify property and owner payment status
+    // Verify property and payment/subscription status
     const { data: propData } = await supabaseAdmin
       .from('properties')
-      .select('id, uid, owner_id, owners(id, free_tier_enabled)')
+      .select('id, uid, owner_id, is_guest_hub_only')
       .eq('id', propertyId)
       .maybeSingle()
 
@@ -28,40 +28,45 @@ export async function approveProperty(propertyId: string) {
       return { error: 'Property not found.' }
     }
 
-    const owner = Array.isArray(propData.owners) ? propData.owners[0] : propData.owners
-    let isOwnerPaid = owner?.free_tier_enabled === true
+    const nowIso = new Date().toISOString()
+    let isPropertyPaid = false
 
-    if (!isOwnerPaid && propData.owner_id) {
-      const { data: sub } = await supabaseAdmin
+    // Check active property_subscriptions
+    const { data: sub } = await supabaseAdmin
+      .from('property_subscriptions')
+      .select('id, status, end_date')
+      .eq('property_id', propertyId)
+      .eq('status', 'active')
+      .gt('end_date', nowIso)
+      .limit(1)
+      .maybeSingle()
+
+    if (sub) {
+      isPropertyPaid = true
+    } else if (propData.is_guest_hub_only) {
+      const { data: hub } = await supabaseAdmin
+        .from('guest_hub_settings')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('subscription_status', 'active')
+        .maybeSingle()
+
+      if (hub) isPropertyPaid = true
+    } else if (propData.owner_id) {
+      // Legacy fallback for old owner_subscriptions
+      const { data: legacySub } = await supabaseAdmin
         .from('owner_subscriptions')
         .select('status, end_date')
         .eq('owner_id', propData.owner_id)
         .eq('status', 'active')
+        .gt('end_date', nowIso)
         .maybeSingle()
 
-      if (sub && new Date(sub.end_date) > new Date()) {
-        isOwnerPaid = true
-      }
+      if (legacySub) isPropertyPaid = true
     }
 
-    if (!isOwnerPaid && propData.id) {
-      const { data: hub } = await supabaseAdmin
-        .from('guest_hub_settings')
-        .select('id')
-        .eq('property_id', propData.id)
-        .eq('subscription_status', 'active')
-        .maybeSingle()
-
-      if (hub) isOwnerPaid = true
-    }
-
-    // If owner has not paid online yet, admin approval automatically enables free tier / active access
-    // so the owner can access their dashboard and operate their approved property immediately
-    if (!isOwnerPaid && propData.owner_id) {
-      await supabaseAdmin
-        .from('owners')
-        .update({ free_tier_enabled: true })
-        .eq('id', propData.owner_id)
+    if (!isPropertyPaid) {
+      return { error: 'Cannot approve property: No active subscription found for this property.' }
     }
 
     // Keep existing UID if present, or generate a collision-safe identifier
@@ -87,7 +92,12 @@ export async function approveProperty(propertyId: string) {
 
     const { error } = await supabaseAdmin
       .from('properties')
-      .update({ approved: true, uid })
+      .update({ 
+        approved: true, 
+        approval_status: 'approved',
+        rejection_reason: null,
+        uid 
+      })
       .eq('id', propertyId)
 
     if (error) {
@@ -96,7 +106,48 @@ export async function approveProperty(propertyId: string) {
     }
 
     revalidatePath('/dashboard/admin')
+    revalidatePath(`/dashboard/admin/properties/${propertyId}`)
+    revalidatePath('/dashboard/owner')
     revalidatePath('/guest')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+export async function rejectProperty(propertyId: string, reason: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Verify admin role
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!isSuperAdminUser(user)) {
+      return { error: 'Unauthorized' }
+    }
+
+    if (!reason || !reason.trim()) {
+      return { error: 'A rejection reason is mandatory.' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+
+    const { error } = await supabaseAdmin
+      .from('properties')
+      .update({
+        approved: false,
+        approval_status: 'rejected',
+        rejection_reason: reason.trim()
+      })
+      .eq('id', propertyId)
+
+    if (error) {
+      console.error('Failed to reject property', error)
+      return { error: 'Failed to reject property' }
+    }
+
+    revalidatePath('/dashboard/admin')
+    revalidatePath(`/dashboard/admin/properties/${propertyId}`)
+    revalidatePath('/dashboard/owner')
     return { success: true }
   } catch (err: any) {
     return { error: err.message || 'An unexpected error occurred' }
@@ -349,26 +400,28 @@ export async function onboardPartner(formData: FormData) {
     }
 
     const name = formData.get('name') as string
-    const email = (formData.get('email') as string || '').toLowerCase()
+    const email = (formData.get('email') as string || '').toLowerCase().trim()
     const phone = ((formData.get('phone') as string) || '').trim()
-    const planName = formData.get('plan') as string
+    const planName = (formData.get('plan') as string) || '1 Month'
     const amount = parseFloat(formData.get('amount') as string) || 0
-    const paymentRef = formData.get('paymentRef') as string
-    const password = formData.get('password') as string || 'FixyOwner@2026'
+    const paymentRef = (formData.get('paymentRef') as string) || `ADMIN_MANUAL_${Date.now()}`
+    const password = (formData.get('password') as string) || 'FixyOwner@2026'
+    const roomCount = parseInt(formData.get('roomCount') as string) || 5
 
-    if (!name || !email || !planName) return { error: 'Name, Email and Plan are required.' }
+    if (!name || !email) return { error: 'Name and Email are required.' }
 
     const cleanPhone = phone.replace(/\D/g, '')
     if (!phone || cleanPhone.length < 10) {
       return { error: 'A valid contact/WhatsApp phone number (at least 10 digits) is mandatory.' }
     }
 
-    // 1. Create Auth User
+    // 1. Create Auth User with role 'owner' in app_metadata
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: 'owner', name: name, phone }
+      user_metadata: { role: 'owner', name: name, phone: cleanPhone },
+      app_metadata: { role: 'owner' }
     })
 
     if (authError) {
@@ -379,52 +432,135 @@ export async function onboardPartner(formData: FormData) {
     const userId = authData.user.id
 
     // 2. Create Owner Record
+    let ownerId: string
     const { data: owner, error: ownerError } = await supabaseAdmin
       .from('owners')
-      .insert({ user_id: userId, name, email, phone })
+      .insert({ user_id: userId, name, email, phone: cleanPhone })
       .select('id')
       .single()
 
     if (ownerError) {
-      // Roleback auth user? (Optional, but good for cleanup)
-      await supabaseAdmin.auth.admin.deleteUser(userId)
-      return { error: 'Failed to create owner record.' }
+      // Retry without phone column if not yet migrated
+      const { data: fallbackOwner, error: fallbackError } = await supabaseAdmin
+        .from('owners')
+        .insert({ user_id: userId, name, email })
+        .select('id')
+        .single()
+
+      if (fallbackError) {
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+        return { error: `Failed to create owner record: ${fallbackError.message}` }
+      }
+      ownerId = fallbackOwner.id
+    } else {
+      ownerId = owner.id
     }
 
-    // 3. Calculate Expiry Date
-    const expiryDate = new Date()
+    // 3. Calculate Months and Expiry Date
+    const now = new Date()
+    const expiryDate = new Date(now)
     let months = 1
-    if (planName.includes('3 Months') || planName.includes('Quarterly')) {
+    if (planName.includes('3 Month') || planName.includes('Quarterly')) {
       months = 3
-    } else if (planName.includes('6-Months') || planName.includes('6 Months')) {
+    } else if (planName.includes('6-Month') || planName.includes('6 Month')) {
       months = 6
-    } else if (planName.includes('12 Months') || planName.includes('Yearly')) {
+    } else if (planName.includes('12 Month') || planName.includes('Yearly')) {
       months = 12
-    } else if (planName === '7-Day Free Trial') {
-      expiryDate.setDate(expiryDate.getDate() + 7)
-      months = 0 // For payment record
+    }
+    expiryDate.setMonth(expiryDate.getMonth() + months)
+
+    // Compute monthly fee from pricing_tiers or fallback
+    let monthlyFee = Math.round(amount / months)
+    if (monthlyFee <= 0) {
+      const { data: tier } = await supabaseAdmin
+        .from('pricing_tiers')
+        .select('monthly_fee_inr')
+        .lte('min_rooms', roomCount)
+        .gte('max_rooms', roomCount)
+        .eq('active', true)
+        .maybeSingle()
+      if (tier) {
+        monthlyFee = tier.monthly_fee_inr
+      } else {
+        monthlyFee = 100
+      }
+    }
+    const finalAmount = amount > 0 ? amount : monthlyFee * months
+
+    // 4. Create Initial Property
+    let candidateUid = 'ALB-' + Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+
+    const { data: prop } = await supabaseAdmin
+      .from('properties')
+      .insert({
+        owner_id: ownerId,
+        name: `${name}'s Stay`,
+        type: 'multi-room property',
+        city: 'Alibag',
+        room_count: roomCount,
+        approval_status: 'approved',
+        approved: true,
+        uid: candidateUid,
+        helpdesk_number: cleanPhone
+      })
+      .select('id')
+      .single()
+
+    const propId = prop?.id
+
+    // 5. Create property_subscriptions and property_payments (with source: 'admin_manual')
+    if (propId) {
+      await supabaseAdmin
+        .from('property_subscriptions')
+        .insert({
+          property_id: propId,
+          owner_id: ownerId,
+          status: 'active',
+          start_date: now.toISOString(),
+          end_date: expiryDate.toISOString(),
+          room_count: roomCount,
+          monthly_fee: monthlyFee,
+          months,
+          amount: finalAmount,
+          razorpay_order_id: 'ADMIN_MANUAL',
+          razorpay_payment_id: paymentRef
+        })
+
+      await supabaseAdmin
+        .from('property_payments')
+        .insert({
+          property_id: propId,
+          owner_id: ownerId,
+          amount: finalAmount,
+          currency: 'INR',
+          status: 'paid',
+          payment_method: 'admin_manual',
+          razorpay_order_id: 'ADMIN_MANUAL',
+          razorpay_payment_id: paymentRef,
+          months,
+          room_count: roomCount,
+          monthly_fee: monthlyFee
+        })
     }
 
-    if (months > 0) {
-      expiryDate.setMonth(expiryDate.getMonth() + months)
-    }
-
-    // 4. Create Subscription
-    const { error: subError } = await supabaseAdmin
+    // Legacy backup records
+    await supabaseAdmin
       .from('owner_subscriptions')
       .insert({
-        owner_id: owner.id,
+        owner_id: ownerId,
         plan_name: planName,
         end_date: expiryDate.toISOString(),
         status: 'active'
       })
 
-    // 5. Create Payment Record
     await supabaseAdmin
       .from('owner_payments')
       .insert({
-        owner_id: owner.id,
-        amount,
+        owner_id: ownerId,
+        amount: finalAmount,
         payment_method: 'Manual/Admin',
         payment_ref: paymentRef,
         plan_duration_months: months
@@ -432,33 +568,6 @@ export async function onboardPartner(formData: FormData) {
 
     revalidatePath('/dashboard/admin')
     return { success: true, tempPassword: password }
-  } catch (err: any) {
-    return { error: err.message || 'An unexpected error occurred' }
-  }
-}
-
-export async function toggleFreeTier(ownerId: string, currentValue: boolean) {
-  try {
-    const supabase = await createClient()
-    
-    // Verify admin role
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!isSuperAdminUser(user)) {
-      return { error: 'Unauthorized' }
-    }
-
-    const { error } = await supabase
-      .from('owners')
-      .update({ free_tier_enabled: !currentValue })
-      .eq('id', ownerId)
-
-    if (error) {
-      console.error('Failed to toggle free tier', error)
-      return { error: 'Failed to update free tier status' }
-    }
-
-    revalidatePath('/dashboard/admin')
-    return { success: true }
   } catch (err: any) {
     return { error: err.message || 'An unexpected error occurred' }
   }

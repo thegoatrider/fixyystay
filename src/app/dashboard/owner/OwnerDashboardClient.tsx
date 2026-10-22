@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
-import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone, QrCode } from 'lucide-react'
+import { Home, MessageSquare, Users, Wallet, User, Zap, Megaphone, QrCode, CreditCard } from 'lucide-react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { PropertyCard } from '@/components/PropertyCard'
@@ -77,19 +77,10 @@ export default function OwnerDashboardClient({
 
   const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
-  // Comprehensive subscription and status calculation
+  // Subscription and status calculation (No free tier, no trial)
   const subscriptionInfo = useMemo(() => {
     const sub = (data as any)?.subscription || initialSubscription
-    const own = (data as any)?.owner || initialOwner
-    
-    const isFreeTierUser = own?.free_tier_enabled === true
     const isPaid = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
-    
-    // 7-day Trial Logic from Owner Creation Date
-    const ownerCreatedAt = own?.created_at ? new Date(own.created_at) : null
-    const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
-    const isTrialActive = !isPaid && !isFreeTierUser && !!trialEndDate && trialEndDate > new Date()
-    const isExpired = !isPaid && !isTrialActive && !isFreeTierUser
 
     let endDate: Date | null = null
     let daysRemaining = 0
@@ -99,18 +90,12 @@ export default function OwnerDashboardClient({
       endDate = new Date(sub.end_date)
       daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       planDisplayName = sub.plan_name ? sub.plan_name.toUpperCase() : 'ACTIVE SUBSCRIPTION'
-    } else if (isTrialActive && trialEndDate) {
-      endDate = trialEndDate
-      daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      planDisplayName = '7-DAY FREE TRIAL'
     } else if (sub?.end_date) {
       endDate = new Date(sub.end_date)
       daysRemaining = 0
-      planDisplayName = sub.plan_name ? `${sub.plan_name.toUpperCase()} (EXPIRED)` : 'EXPIRED SUBSCRIPTION'
-    } else if (isFreeTierUser) {
-      planDisplayName = 'COURTESY PARTNER ACCESS'
+      planDisplayName = 'EXPIRED SUBSCRIPTION'
     } else {
-      planDisplayName = 'FREE TIER (RESTRICTED)'
+      planDisplayName = 'SUBSCRIPTION REQUIRED'
     }
 
     const formattedEndDate = endDate
@@ -124,10 +109,8 @@ export default function OwnerDashboardClient({
     const isExpiringSoon = isPaid && daysRemaining <= 7
 
     return {
-      isFreeTier: isExpired,
+      isFreeTier: !isPaid,
       isPaid,
-      isTrialActive,
-      isFreeTierUser,
       planDisplayName,
       formattedEndDate,
       daysRemaining,
@@ -182,16 +165,29 @@ export default function OwnerDashboardClient({
           <p className="text-gray-500 font-medium">Manage your properties, guests, and leads in one dashboard</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {isFreeTier && (
-            <Link href="/pricing/starter" prefetch={false}>
-              <Button className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold border-none shadow-lg hover:shadow-orange-200/50 transition-all hover:scale-105 rounded-xl px-6">
-                <Zap className="w-4 h-4 mr-2 animate-pulse" />
-                Upgrade to Pro
+          {!subscriptionInfo.isPaid && (
+            <Link href="/renew" prefetch={false}>
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-5 shadow-sm">
+                <CreditCard className="w-4 h-4 mr-2" />
+                Renew Subscription
               </Button>
             </Link>
           )}
         </div>
       </div>
+
+      {/* Non-blocking Missing Phone Notification */}
+      {!(data as any)?.owner?.phone && !initialOwner?.phone && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-semibold shadow-sm">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Your owner WhatsApp number is missing. Please add it to your profile for guest check-in updates and instant support.</span>
+          </div>
+          <Link href="/dashboard/owner/profile" className="text-amber-700 underline font-bold uppercase shrink-0">
+            Update Profile &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* Tabs / Navigation (Only visible on Mobile, hidden on tablet/desktop mode) */}
       <div className="md:hidden flex flex-wrap border-b border-gray-100 w-full mb-2">
@@ -265,7 +261,7 @@ export default function OwnerDashboardClient({
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Your Property Portfolio</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 w-full">
                 {properties?.map((property: any) => {
-                  const room_count = property_rooms?.filter((r: any) => r.property_id === property.id).length || 0;
+                  const room_count = property.room_count || property_rooms?.filter((r: any) => r.property_id === property.id).length || 0;
                   return <PropertyCard key={property.id} prop={{ ...property, room_count }} />
                 })}
                 {properties?.length === 0 && (
@@ -327,19 +323,19 @@ export default function OwnerDashboardClient({
         )}
       </div>
 
-      {/* Subscription Banner for Free Tier (hidden when using standalone Guest Hub tab) */}
-      {isFreeTier && activeTab !== 'guest-hub' && (
+      {/* Renewal banner for expired subscriptions */}
+      {!subscriptionInfo.isPaid && activeTab !== 'guest-hub' && (
         <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 md:w-96 bg-gray-900 text-white p-6 rounded-3xl shadow-2xl border border-gray-800 animate-in slide-in-from-bottom-10 z-50">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <Zap className="w-6 h-6 text-amber-500" />
+            <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <CreditCard className="w-6 h-6 text-indigo-400" />
             </div>
             <div>
-              <h4 className="font-bold text-lg">Trial Expired</h4>
-              <p className="text-gray-400 text-sm mb-4">Your 7-day free trial has ended. Upgrade to Pro to unlock lead and guest details.</p>
-              <Link href="/pricing/starter" prefetch={false}>
-                <Button className="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold rounded-xl h-11">
-                  View Pricing Plans
+              <h4 className="font-bold text-lg">Subscription Expired</h4>
+              <p className="text-gray-400 text-sm mb-4">Your property subscription has expired. Renew to unlock guest check-ins, direct leads, and public listings.</p>
+              <Link href="/renew" prefetch={false}>
+                <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl h-11">
+                  Renew Subscription
                 </Button>
               </Link>
             </div>

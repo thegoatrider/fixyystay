@@ -118,7 +118,7 @@ export async function getOwnersWithProperties() {
     // Fetch directly from owners table to avoid auth.admin.listUsers() limits
     const { data: owners, error: ownersError } = await supabaseAdmin
       .from('owners')
-      .select('id, user_id, name, email, phone')
+      .select('id, user_id, name, email')
 
     if (ownersError) throw ownersError
     

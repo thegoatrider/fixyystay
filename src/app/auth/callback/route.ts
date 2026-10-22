@@ -155,7 +155,10 @@ export async function GET(request: Request) {
       const { data: influencer } = await supabaseAdmin.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
 
       if (owner && owner.user_id !== user.id) {
-        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+        const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+        if (linkErr) {
+          console.warn('Error linking owner user_id in auth callback:', linkErr.message)
+        }
       }
       if (influencer && influencer.user_id !== user.id) {
         await supabaseAdmin.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)

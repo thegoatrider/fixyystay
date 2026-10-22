@@ -1,390 +1,392 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import Razorpay from 'razorpay'
-import { addMonths, addYears } from 'date-fns'
-import { headers } from 'next/headers'
-import { Resend } from 'resend'
-import { getCityCode } from '@/lib/india-locations'
-import { generatePropertyUid } from '@/app/dashboard/owner/actions'
+import crypto from 'crypto'
 
-async function getAbsoluteOrigin() {
-  const reqHeaders = await headers()
-  let origin = reqHeaders.get('origin')
-  if (!origin) {
-    const host = reqHeaders.get('host') || 'www.fixystays.com'
-    const isLocal = 
-      host.includes('localhost') || 
-      host.includes('127.0.0.1') || 
-      host.includes('10.0.2.2') || 
-      host.includes(':') ||
-      host.startsWith('192.168.') || 
-      host.startsWith('10.') || 
-      host.startsWith('172.')
-    const protocol = isLocal ? 'http' : 'https'
-    origin = `${protocol}://${host}`
-  }
-  return origin
+export interface CreatePropertyOrderResult {
+  orderId?: string
+  amount?: number
+  currency?: string
+  key?: string
+  propertyId?: string
+  months?: number
+  roomCount?: number
+  monthlyFee?: number
+  totalAmount?: number
+  propertyName?: string
+  userEmail?: string
+  error?: string
+  contactUs?: boolean
 }
 
-export async function createOwnerOrder(
-  planName: string, 
-  amount: number, 
-  email: string, 
-  ownerId?: string,
-  propertyDetails?: {
-    propertyName?: string | null
-    city?: string | null
-    cityArea?: string | null
-    pincode?: string | null
-    state?: string | null
-    phone?: string | null
-    helpdeskNumber?: string | null
-  }
-) {
+/**
+ * Creates a Razorpay order for a property subscription based on effective room count & DB pricing tiers.
+ * Snapshot is persisted into public.owner_payments with status 'created'.
+ */
+export async function createPropertySubscriptionOrder(
+  propertyId: string,
+  months: number
+): Promise<CreatePropertyOrderResult> {
   try {
-    const normalizedEmail = email.toLowerCase()
-
-    // 0. Verify Keys
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.error('Razorpay keys are missing in environment variables.')
-      return { error: 'Payment system is currently unavailable. Please contact support.' }
+      console.error('[createPropertySubscriptionOrder] Razorpay API keys missing in environment')
+      return { error: 'Payment gateway is currently unavailable. Please contact support.' }
     }
 
+    const validMonths = [1, 3, 6, 12]
+    if (!validMonths.includes(months)) {
+      return { error: 'Invalid subscription duration. Please select 1, 3, 6, or 12 months.' }
+    }
+
+    const supabase = await createClient()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    if (authErr || !user) {
+      return { error: 'You must be logged in to initiate a subscription payment.' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch Property and verify ownership
+    const { data: property, error: propErr } = await supabaseAdmin
+      .from('properties')
+      .select('id, owner_id, name, room_count')
+      .eq('id', propertyId)
+      .maybeSingle()
+
+    if (propErr) {
+      console.error('[createPropertySubscriptionOrder] Property query error:', propErr)
+      return { error: `Database error: ${propErr.message}` }
+    }
+    if (!property) {
+      return { error: 'Property not found.' }
+    }
+
+    const { data: owner, error: ownerErr } = await supabaseAdmin
+      .from('owners')
+      .select('id, user_id, email, name')
+      .eq('id', property.owner_id)
+      .maybeSingle()
+
+    if (ownerErr) {
+      console.error('[createPropertySubscriptionOrder] Owner query error:', ownerErr)
+      return { error: `Database error: ${ownerErr.message}` }
+    }
+
+    const isAdmin = isSuperAdminUser(user) || user.app_metadata?.role === 'admin'
+    if (!isAdmin && owner?.user_id !== user.id) {
+      return { error: 'Unauthorized: You do not own this property.' }
+    }
+
+    // 2. Compute Effective Room Count: greatest(properties.room_count, count of property_rooms)
+    const { count: physicalRoomsCount, error: roomsCountErr } = await supabaseAdmin
+      .from('property_rooms')
+      .select('*', { count: 'exact', head: true })
+      .eq('property_id', propertyId)
+
+    if (roomsCountErr) {
+      console.error('[createPropertySubscriptionOrder] Room count query error:', roomsCountErr)
+    }
+
+    const declaredRooms = property.room_count || 0
+    const physicalRooms = physicalRoomsCount || 0
+    const effectiveRooms = Math.max(declaredRooms, physicalRooms)
+
+    if (effectiveRooms < 1) {
+      return {
+        error: 'Please declare the number of rentable rooms for this property before renewing.',
+      }
+    }
+
+    if (effectiveRooms > 100) {
+      return {
+        error: 'Properties with more than 100 rooms require manual onboarding. Please contact support.',
+        contactUs: true,
+      }
+    }
+
+    // 3. Look up server-side pricing from pricing_tiers
+    const { data: tier, error: tierErr } = await supabaseAdmin
+      .from('pricing_tiers')
+      .select('monthly_fee_inr')
+      .eq('active', true)
+      .lte('min_rooms', effectiveRooms)
+      .gte('max_rooms', effectiveRooms)
+      .maybeSingle()
+
+    if (tierErr || !tier) {
+      console.error('[createPropertySubscriptionOrder] Tier lookup error:', tierErr)
+      return { error: 'Unable to determine pricing tier for this room count. Please contact support.' }
+    }
+
+    const monthlyFee = Number(tier.monthly_fee_inr)
+    const totalAmount = monthlyFee * months // Prices are INCLUSIVE of GST; server computes amount
+
+    // 4. Create Order in Razorpay
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     })
 
-    // 1. Create Razorpay Order
-    const notes: Record<string, string> = {
-      plan: planName,
-      email: normalizedEmail
-    }
-    if (ownerId) {
-      notes.owner_id = ownerId
-    }
-    if (propertyDetails?.propertyName) {
-      notes.property_name = propertyDetails.propertyName.slice(0, 40)
-    }
-    if (propertyDetails?.city) {
-      notes.city = propertyDetails.city.slice(0, 40)
-    }
-    if (propertyDetails?.cityArea) {
-      notes.city_area = propertyDetails.cityArea.slice(0, 40)
-    }
-    if (propertyDetails?.pincode) {
-      notes.pincode = propertyDetails.pincode.slice(0, 10)
-    }
-    if (propertyDetails?.state) {
-      notes.state = propertyDetails.state.slice(0, 40)
-    }
-    const phoneToPass = propertyDetails?.phone || propertyDetails?.helpdeskNumber
-    if (phoneToPass) {
-      notes.phone = phoneToPass.slice(0, 20)
-    }
-
     const options = {
-      amount: amount * 100, // Razorpay works in paise
-      currency: "INR",
-      receipt: `receipt_owner_${Date.now()}`,
-      notes
+      amount: Math.round(totalAmount * 100), // Razorpay requires paise
+      currency: 'INR',
+      receipt: `prop_${propertyId.slice(0, 8)}_${Date.now()}`.slice(0, 40),
+      notes: {
+        property_id: propertyId,
+        owner_id: property.owner_id,
+        months: String(months),
+        room_count: String(effectiveRooms),
+        monthly_fee: String(monthlyFee),
+        type: 'property_subscription',
+      },
     }
 
     const order = await razorpay.orders.create(options)
 
-    return { 
-      orderId: order.id, 
-      amount: order.amount, 
-      key: process.env.RAZORPAY_KEY_ID 
+    // 5. Persist snapshot into owner_payments with status 'created'
+    const { error: paymentErr } = await supabaseAdmin.from('owner_payments').insert({
+      owner_id: property.owner_id,
+      property_id: propertyId,
+      amount: totalAmount,
+      months: months,
+      room_count: effectiveRooms,
+      monthly_fee: monthlyFee,
+      payment_method: 'Razorpay',
+      payment_ref: order.id,
+      razorpay_order_id: order.id,
+      status: 'created',
+      plan_duration_months: months,
+    })
+
+    if (paymentErr) {
+      console.error('[createPropertySubscriptionOrder] Payment snapshot insertion failed:', paymentErr)
+      return { error: `Failed to initialize payment record: ${paymentErr.message}` }
     }
 
+    return {
+      orderId: order.id,
+      amount: order.amount as number,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+      propertyId,
+      months,
+      roomCount: effectiveRooms,
+      monthlyFee,
+      totalAmount,
+      propertyName: property.name,
+      userEmail: owner?.email || user.email,
+    }
   } catch (err: any) {
-    console.error('Razorpay Error:', err)
-    return { error: err.message || 'Failed to create payment order' }
+    console.error('[createPropertySubscriptionOrder] Unexpected error:', err)
+    return { error: err.message || 'Failed to initialize subscription payment' }
   }
 }
 
-export async function verifyAndUpgrade(
-  razorpayOrderId: string,
-  signupData?: { 
-    name?: string
-    password?: string
-    propertyName?: string
-    propertyDetails?: {
-      propertyName?: string | null
-      city?: string | null
-      cityArea?: string | null
-      pincode?: string | null
-      state?: string | null
-      phone?: string | null
-      helpdeskNumber?: string | null
+/**
+ * Verifies property payment and executes atomic activation via activate_property_payment SQL function.
+ * May ONLY call activate_property_payment; never creates users, owners, properties, or rooms.
+ */
+export async function verifyPropertyPayment(params: {
+  orderId: string
+  paymentId?: string
+  signature?: string
+}) {
+  try {
+    const { orderId, paymentId, signature } = params
+    if (!orderId) {
+      return { error: 'Order ID is required' }
     }
+
+    const secret = process.env.RAZORPAY_KEY_SECRET
+    if (signature && paymentId && secret) {
+      const generatedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${orderId}|${paymentId}`)
+        .digest('hex')
+
+      if (generatedSignature !== signature) {
+        console.error('[verifyPropertyPayment] Signature mismatch:', { orderId, paymentId })
+        return { error: 'Invalid payment signature from payment gateway.' }
+      }
+    }
+
+    const supabaseAdmin = createAdminClient()
+
+    // Call the atomic SECURITY DEFINER DB function
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc(
+      'activate_property_payment',
+      {
+        p_order_id: orderId,
+        p_payment_id: paymentId || null,
+      }
+    )
+
+    if (rpcError) {
+      console.error('[verifyPropertyPayment] activate_property_payment RPC error:', rpcError)
+      return { error: `Payment activation failed: ${rpcError.message}` }
+    }
+
+    if (!rpcResult?.success) {
+      console.warn('[verifyPropertyPayment] activate_property_payment returned failure:', rpcResult)
+      return { error: rpcResult?.error || 'Payment verification could not activate subscription.' }
+    }
+
+    return {
+      success: true,
+      alreadyProcessed: Boolean(rpcResult.already_processed),
+      propertyId: rpcResult.property_id,
+      newEndDate: rpcResult.new_end_date,
+    }
+  } catch (err: any) {
+    console.error('[verifyPropertyPayment] Exception:', err)
+    return { error: err.message || 'Payment verification failed' }
   }
+}
+
+/**
+ * Checks the database state for a given Razorpay order ID.
+ * Used by /onboarding/success to poll for genuine DB activation without trusting browser callbacks.
+ */
+export async function checkPaymentActivation(orderId: string) {
+  try {
+    if (!orderId) return { status: 'not_found' }
+
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch payment row
+    const { data: payment, error: payErr } = await supabaseAdmin
+      .from('owner_payments')
+      .select('id, status, property_id, amount, months')
+      .eq('razorpay_order_id', orderId)
+      .maybeSingle()
+
+    if (payErr) {
+      console.error('[checkPaymentActivation] DB error querying payment:', payErr)
+      return { status: 'error', message: payErr.message }
+    }
+
+    // Fallback: check by payment_ref for legacy orders
+    let targetPayment = payment
+    if (!targetPayment) {
+      const { data: fallback } = await supabaseAdmin
+        .from('owner_payments')
+        .select('id, status, property_id, amount, months')
+        .eq('payment_ref', orderId)
+        .maybeSingle()
+      targetPayment = fallback
+    }
+
+    if (!targetPayment) {
+      return { status: 'not_found' }
+    }
+
+    if (targetPayment.status === 'failed') {
+      return { status: 'failed', propertyId: targetPayment.property_id }
+    }
+
+    // 2. Check property subscription status
+    if (targetPayment.property_id) {
+      const { data: sub, error: subErr } = await supabaseAdmin
+        .from('property_subscriptions')
+        .select('status, end_date')
+        .eq('property_id', targetPayment.property_id)
+        .maybeSingle()
+
+      if (!subErr && sub && sub.status === 'active' && new Date(sub.end_date) > new Date()) {
+        return {
+          status: 'active',
+          propertyId: targetPayment.property_id,
+          endDate: sub.end_date,
+        }
+      }
+    }
+
+    // If payment row marked paid but sub not yet populated
+    if (targetPayment.status === 'paid') {
+      return { status: 'paid_activating', propertyId: targetPayment.property_id }
+    }
+
+    return { status: 'pending', propertyId: targetPayment.property_id }
+  } catch (err: any) {
+    console.error('[checkPaymentActivation] Exception:', err)
+    return { status: 'error', message: err.message }
+  }
+}
+
+/**
+ * Deprecated backward-compatible bridge for existing onboarding flow until Phase 3 rewrite.
+ * Strictly calls activate_property_payment; never creates users, owners, properties, or rooms.
+ */
+export async function verifyAndUpgrade(orderId: string, _legacyData?: any) {
+  return verifyPropertyPayment({ orderId })
+}
+
+/**
+ * Deprecated backward-compatible bridge for existing onboarding form until Phase 3 rewrite.
+ */
+export async function createOwnerOrder(
+  planName: string,
+  amount: number,
+  email: string,
+  ownerId?: string,
+  propertyDetails?: any
 ) {
   try {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-    
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return { error: 'Payment system keys missing.' }
+      return { error: 'Payment gateway unavailable' }
     }
 
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     })
-    
-    // 1. Fetch Order from Razorpay (Source of Truth)
-    const order = await razorpay.orders.fetch(razorpayOrderId)
-    if (!order) {
-       return { error: 'Razorpay order not found.' }
-    }
-    
-    const planName = (order.notes as any)?.plan as string
-    const email = (order.notes as any)?.email as string
-    const amount = (order.amount as number) / 100
-    
-    if (!planName || !email) {
-       return { error: 'Order notes missing plan or email.' }
-    }
-    
-    const normalizedEmail = email.toLowerCase()
-    const ownerIdFromNotes = (order.notes as any)?.owner_id as string | undefined
-    
-    // 2. Get owner by ID from notes OR email
-    let ownerId: string | null = null
-    let ownerName = signupData?.name || ''
-    
-    let { data: owner } = ownerIdFromNotes 
-      ? await supabaseAdmin.from('owners').select('id, user_id, name').eq('id', ownerIdFromNotes).maybeSingle()
-      : { data: null }
 
-    if (!owner) {
-      const { data: ownerByEmail } = await supabaseAdmin
-        .from('owners')
-        .select('id, user_id, name')
-        .eq('email', normalizedEmail)
-        .maybeSingle()
-      owner = ownerByEmail
+    const propId = propertyDetails?.propertyId || null
+    let months = 1
+    if (planName.includes('3 Month')) months = 3
+    else if (planName.includes('6 Month')) months = 6
+    else if (planName.includes('12 Month')) months = 12
+
+    const options = {
+      amount: Math.round(amount * 100),
+      currency: 'INR',
+      receipt: `onboard_${Date.now()}`.slice(0, 40),
+      notes: {
+        plan: planName,
+        email: email.toLowerCase(),
+        owner_id: ownerId || '',
+        property_id: propId || '',
+        months: String(months),
+      },
     }
 
-    // If owner exists, check if user_id needs linking
-    if (owner) {
-      ownerId = owner.id
-      ownerName = owner.name || ownerName
-      if (!owner.user_id) {
-        // Auto-link to existing auth user if present
-        const match = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
-        if (match) {
-          await supabaseAdmin.from('owners').update({ user_id: match.id }).eq('id', owner.id)
-        }
-      }
-    } else {
-      // Owner does not exist yet: check if auth user exists first
-      let existingUser = await findAuthUserByEmail(supabaseAdmin, normalizedEmail)
-      let userId = existingUser?.id || null
+    const order = await razorpay.orders.create(options)
 
-      if (!userId) {
-        // Create user in Supabase auth
-        const defaultPassword = signupData?.password || 'fixystays123'
-        const displayName = signupData?.name || normalizedEmail.split('@')[0]
-        const { data: adminAuthData, error: adminAuthError } = await supabaseAdmin.auth.admin.createUser({
-          email: normalizedEmail,
-          password: defaultPassword,
-          email_confirm: true,
-          user_metadata: {
-            name: displayName,
-            role: 'owner',
-          },
-        })
-
-        if (!adminAuthError && adminAuthData?.user) {
-          userId = adminAuthData.user.id
-          ownerName = displayName
-        } else {
-          console.error('Failed to create auth user in verifyAndUpgrade:', adminAuthError)
-        }
-      }
-
-      // Create owner record tied to the user
-      const displayName = ownerName || signupData?.name || normalizedEmail.split('@')[0]
-      const { data: newOwner, error: dbError } = await supabaseAdmin.from('owners').insert([
-        {
-          user_id: userId,
-          name: displayName,
-          email: normalizedEmail,
-        },
-      ]).select('id').single()
-
-      if (dbError || !newOwner) {
-        console.error('Failed to create owner record:', dbError)
-        return { error: 'Failed to create owner profile during payment verification.' }
-      }
-      ownerId = newOwner.id
-      ownerName = displayName
-    }
-
-    if (!ownerId) {
-      return { error: 'Could not associate payment with an owner account.' }
-    }
-
-    // Ensure initial property is created for this owner upon verified payment
-    const { data: existingProperties } = await supabaseAdmin
-      .from('properties')
-      .select('id')
-      .eq('owner_id', ownerId)
-      .limit(1)
-
-    const orderNotes = (order.notes || {}) as Record<string, any>
-    const phone = orderNotes.phone || signupData?.propertyDetails?.phone || signupData?.propertyDetails?.helpdeskNumber || null
-
-    if (phone && ownerId) {
-      await supabaseAdmin.from('owners').update({ phone }).eq('id', ownerId)
-    }
-
-    if (existingProperties && existingProperties.length > 0) {
-      if (phone) {
-        await supabaseAdmin.from('properties').update({ helpdesk_number: phone }).eq('id', existingProperties[0].id)
-      }
-    } else {
-      const propName = 
-        orderNotes.property_name || 
-        signupData?.propertyName || 
-        signupData?.propertyDetails?.propertyName || 
-        `${ownerName || 'Partner'}'s Property`
-      const finalCity = orderNotes.city || signupData?.propertyDetails?.city || 'Raigad'
-      const finalArea = orderNotes.city_area || signupData?.propertyDetails?.cityArea || null
-      const pincode = orderNotes.pincode || signupData?.propertyDetails?.pincode || null
-      const state = orderNotes.state || signupData?.propertyDetails?.state || null
-
-      const uid = await generatePropertyUid(supabaseAdmin, finalCity)
-
-      const { data: newProp } = await supabaseAdmin.from('properties').insert([
-        {
-          owner_id: ownerId,
-          name: propName,
-          city: finalCity,
-          city_area: finalArea,
-          area_name: finalArea,
-          pincode: pincode || null,
-          state: state || null,
-          type: 'multi-room property',
-          uid,
-          helpdesk_number: phone,
-          approved: false,
-        }
-      ]).select('id').single()
-
-      if (newProp?.id) {
-        try {
-          await supabaseAdmin.from('rooms').insert([
-            {
-              property_id: newProp.id,
-              name: 'Standard Room',
-              category: 'Standard',
-              base_price: 2500,
-              price_bucket: '₹2,500 - ₹5,000',
-            }
-          ])
-        } catch (_) {}
-      }
-    }
-
-    // Auto-sign in if password was provided and in browser context
-    if (signupData?.password) {
-      await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: signupData.password,
-      }).catch(() => {})
-    }
-
-    // Send welcome email via Resend
-    const apiKey = process.env.RESEND_API_KEY
-    if (apiKey && apiKey !== 're_xxxxxxxxx') {
-      const resend = new Resend(apiKey)
-      try {
-        await resend.emails.send({
-          from: 'FixStay Onboarding <onboarding@resend.dev>',
-          to: normalizedEmail,
-          subject: 'Welcome to FixyStays! Your Owner Account is Activated',
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-              <h1 style="color: #4F46E5;">Welcome to FixyStays, ${ownerName || 'Partner'}!</h1>
-              <p>Your subscription is active and your property owner dashboard is now fully unlocked.</p>
-              <p>Here is what you need to know:</p>
-              <ul>
-                <li><strong>Dashboard Access:</strong> You can log in at any time to manage properties, bookings, and view earnings.</li>
-                <li><strong>Support:</strong> If you need any help setting up, please contact us.</li>
-              </ul>
-              <p>Thank you for partnering with us!</p>
-              <br />
-              <p>Best regards,<br/>The FixyStays Team</p>
-            </div>
-          `
-        })
-      } catch (e) {
-        console.error('Failed to send welcome email:', e)
-      }
-    }
-    
-    // 3. Calculate Expiry (with bulletproof early renewal preservation)
-    const { data: existingSub } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .select('status, end_date')
-      .eq('owner_id', ownerId)
-      .maybeSingle()
-
-    let baseDate = new Date()
-    if (existingSub && existingSub.status === 'active' && new Date(existingSub.end_date) > new Date()) {
-      baseDate = new Date(existingSub.end_date)
-    }
-
-    let monthsToAdd = 0
-    if (planName.includes('3 Months') || planName.includes('Quarterly')) monthsToAdd = 3
-    else if (planName.includes('6 Months')) monthsToAdd = 6
-    else if (planName.includes('12 Months') || planName.includes('Yearly')) monthsToAdd = 12
-    
-    const end_date = monthsToAdd > 0 ? addMonths(baseDate, monthsToAdd).toISOString() : addYears(baseDate, 99).toISOString()
-
-    
-    // 4. Log Payment in DB (Matching exact production schema)
-    const { data: existingPayment } = await supabaseAdmin
-      .from('owner_payments')
-      .select('id')
-      .eq('payment_ref', razorpayOrderId)
-      .maybeSingle()
-      
-    if (!existingPayment) {
-       await supabaseAdmin.from('owner_payments').insert({
-         owner_id: ownerId,
-         amount: amount,
-         payment_method: 'Razorpay',
-         payment_ref: razorpayOrderId,
-         plan_duration_months: monthsToAdd || 1
-       })
-    }
-      
-    // 5. Upsert Subscription
-    const { error: subError } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .upsert({
+    if (ownerId) {
+      const supabaseAdmin = createAdminClient()
+      await supabaseAdmin.from('owner_payments').insert({
         owner_id: ownerId,
-        plan_name: planName,
-        status: 'active',
-        end_date: end_date,
-        start_date: new Date().toISOString()
-      }, { onConflict: 'owner_id' })
-      
-    if (subError) {
-      console.error('Subscription update failed:', subError)
-      return { error: `Failed to update subscription: ${subError.message}` }
+        property_id: propId,
+        amount: amount,
+        months: months,
+        payment_method: 'Razorpay',
+        payment_ref: order.id,
+        razorpay_order_id: order.id,
+        status: 'created',
+        plan_duration_months: months,
+      })
     }
-    
-    return { success: true }
+
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      key: process.env.RAZORPAY_KEY_ID,
+    }
   } catch (err: any) {
-    console.error('Verify upgrade error:', err)
-    return { error: err.message || 'Verification failed' }
+    console.error('[createOwnerOrder] Deprecated fallback error:', err)
+    return { error: err.message || 'Failed to create order' }
   }
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
+import { getOwnerAccess } from '@/lib/access'
 import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/DashboardHeader'
 import SupportWidget from '@/components/SupportWidget'
@@ -20,6 +21,18 @@ export default async function OwnerLayout({
 
   if (!user || (role !== 'owner' && !isSuperAdmin)) {
     redirect('/')
+  }
+
+  // Enforce access: If owner has zero active properties, redirect to /renew
+  if (!isSuperAdmin) {
+    const access = await getOwnerAccess(user)
+    if (!access.hasAccess) {
+      if (access.properties.length > 0) {
+        redirect('/renew')
+      } else {
+        redirect('/onboarding')
+      }
+    }
   }
 
   return (

@@ -18,15 +18,21 @@ export interface SubscriptionCheckResult {
 async function isReminderAlreadyLogged(
   supabaseAdmin: any,
   ownerId: string,
-  reminderType: string
+  reminderType: string,
+  propertySubscriptionId?: string
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('subscription_reminder_logs')
       .select('id')
       .eq('owner_id', ownerId)
       .eq('reminder_type', reminderType)
-      .maybeSingle()
+
+    if (propertySubscriptionId) {
+      query = query.eq('property_subscription_id', propertySubscriptionId)
+    }
+
+    const { data, error } = await query.maybeSingle()
 
     if (error) {
       return false
@@ -42,21 +48,29 @@ async function logReminder(
   payload: {
     owner_id: string
     subscription_id?: string
+    property_subscription_id?: string
     reminder_type: string
     channel?: string
     details?: any
   }
 ) {
   try {
+    const insertData: any = {
+      owner_id: payload.owner_id,
+      reminder_type: payload.reminder_type,
+      channel: payload.channel || 'push',
+      details: payload.details || {},
+    }
+    if (payload.property_subscription_id) {
+      insertData.property_subscription_id = payload.property_subscription_id
+    }
+    if (payload.subscription_id) {
+      insertData.subscription_id = payload.subscription_id
+    }
+
     const { error } = await supabaseAdmin
       .from('subscription_reminder_logs')
-      .insert({
-        owner_id: payload.owner_id,
-        subscription_id: payload.subscription_id,
-        reminder_type: payload.reminder_type,
-        channel: payload.channel || 'push',
-        details: payload.details || {},
-      })
+      .insert(insertData)
     if (error) {
       console.warn('[SubscriptionReminders] Could not log reminder:', error.message)
     }
@@ -78,177 +92,245 @@ export async function executeSubscriptionRemindersCheck(): Promise<SubscriptionC
     logs: [] as Array<{ owner: string; event: string }>,
   }
 
-  // 1. Fetch active subscriptions joined with owner details
-  const { data: subscriptions, error: subError } = await supabaseAdmin
-    .from('owner_subscriptions')
-    .select('id, owner_id, plan_name, status, end_date, owners ( id, user_id, name, email )')
-    .eq('status', 'active')
-
-  if (subError) {
-    console.error('[SubscriptionCheck] Failed to fetch subscriptions:', subError)
-    return {
-      success: false,
-      timestamp: now.toISOString(),
-      summary: results,
-      error: subError.message,
-    }
-  }
-
-  results.totalActive = subscriptions?.length || 0
-
-  for (const sub of subscriptions || []) {
-    const rawOwner = (sub as any).owners
-    let owner = Array.isArray(rawOwner) ? rawOwner[0] : rawOwner
-
-    // Fallback: fetch owner directly if relation didn't populate user_id
-    if ((!owner || !owner.user_id) && sub.owner_id) {
-      const { data: directOwner } = await supabaseAdmin
-        .from('owners')
-        .select('id, user_id, name, email')
-        .eq('id', sub.owner_id)
-        .maybeSingle()
-      if (directOwner) owner = directOwner
-    }
-
-    if (!owner || !owner.user_id) continue
-
-    const endDate = new Date(sub.end_date)
-    const diffMs = endDate.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-
-    // Check if already expired
-    if (diffMs <= 0) {
-      await supabaseAdmin
-        .from('owner_subscriptions')
-        .update({ status: 'expired' })
-        .eq('id', sub.id)
-
-      results.expiredMarked++
-
-      const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expired')
-      if (!alreadyLogged) {
-        await sendPushNotificationToUser(owner.user_id, {
-          title: '🔒 FixyStays Subscription Expired',
-          body: 'Your partner plan has expired. Lead & guest details are now restricted. Tap to renew.',
-          data: {
-            url: '/pricing/starter',
-            type: 'subscription_expired',
-          },
-        })
-
-        await logReminder(supabaseAdmin, {
-          owner_id: owner.id,
-          subscription_id: sub.id,
-          reminder_type: 'expired',
-          channel: 'push',
-          details: { endDate: sub.end_date, planName: sub.plan_name },
-        })
-
-        results.logs.push({ owner: owner.email, event: 'expired_push_sent' })
-      }
-      continue
-    }
-
-    // Check 1-Day Expiry Reminder
-    if (diffDays <= 1) {
-      const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_1_day')
-      if (!alreadyLogged) {
-        await sendPushNotificationToUser(owner.user_id, {
-          title: '🚨 Final Reminder: Plan Expires Tomorrow',
-          body: `Your FixyStays ${sub.plan_name || 'Partner'} subscription ends tomorrow. Tap to recharge and avoid interruptions.`,
-          data: {
-            url: '/pricing/starter',
-            type: 'expiring_in_1_day',
-          },
-        })
-
-        await logReminder(supabaseAdmin, {
-          owner_id: owner.id,
-          subscription_id: sub.id,
-          reminder_type: 'expiring_in_1_day',
-          channel: 'push',
-          details: { endDate: sub.end_date, planName: sub.plan_name, diffDays },
-        })
-
-        results.reminders1DaySent++
-        results.logs.push({ owner: owner.email, event: '1_day_reminder_push_sent' })
-      }
-      continue
-    }
-
-    // Check 3-Days Expiry Reminder
-    if (diffDays <= 3) {
-      const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_3_days')
-      if (!alreadyLogged) {
-        await sendPushNotificationToUser(owner.user_id, {
-          title: '⏳ Subscription Expiring in 3 Days',
-          body: `Your FixyStays subscription expires in ${diffDays} days. Tap here to renew early without losing active time.`,
-          data: {
-            url: '/pricing/starter',
-            type: 'expiring_in_3_days',
-          },
-        })
-
-        await logReminder(supabaseAdmin, {
-          owner_id: owner.id,
-          subscription_id: sub.id,
-          reminder_type: 'expiring_in_3_days',
-          channel: 'push',
-          details: { endDate: sub.end_date, planName: sub.plan_name, diffDays },
-        })
-
-        results.reminders3DaySent++
-        results.logs.push({ owner: owner.email, event: '3_day_reminder_push_sent' })
-      }
-    }
-  }
-
-  // 2. Check 7-Day Free Trial owners who haven't subscribed
-  const { data: trialOwners } = await supabaseAdmin
-    .from('owners')
-    .select('id, user_id, name, email, created_at')
-    .not('user_id', 'is', null)
-
-  for (const owner of trialOwners || []) {
-    if (!owner.created_at || !owner.user_id) continue
-
-    // Check if they have an active paid subscription
-    const { data: hasPaidSub } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .select('id')
-      .eq('owner_id', owner.id)
+  // 1. Process active property_subscriptions
+  try {
+    const { data: propSubs, error: propSubError } = await supabaseAdmin
+      .from('property_subscriptions')
+      .select('id, property_id, owner_id, status, end_date, properties ( id, name ), owners ( id, user_id, name, email )')
       .eq('status', 'active')
-      .maybeSingle()
 
-    if (hasPaidSub) continue
+    if (propSubError) {
+      console.error('[SubscriptionCheck] Failed to fetch property_subscriptions:', propSubError)
+    } else if (propSubs) {
+      results.totalActive += propSubs.length
 
-    const createdAt = new Date(owner.created_at)
-    const trialEndDate = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
-    const trialDiffDays = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      for (const sub of propSubs) {
+        const rawOwner = (sub as any).owners
+        let owner = Array.isArray(rawOwner) ? rawOwner[0] : rawOwner
+        const rawProp = (sub as any).properties
+        const property = Array.isArray(rawProp) ? rawProp[0] : rawProp
+        const propName = property?.name || 'Your property'
 
-    if (trialDiffDays <= 1 && trialDiffDays >= 0) {
-      const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'trial_ending_soon')
-      if (!alreadyLogged) {
-        await sendPushNotificationToUser(owner.user_id, {
-          title: '⚡ Your 7-Day Free Trial Ends Soon',
-          body: 'Upgrade to a Partner plan to keep viewing direct leads, guest check-ins, and analytics.',
-          data: {
-            url: '/pricing/starter',
-            type: 'trial_ending_soon',
-          },
-        })
+        if ((!owner || !owner.user_id) && sub.owner_id) {
+          const { data: directOwner } = await supabaseAdmin
+            .from('owners')
+            .select('id, user_id, name, email')
+            .eq('id', sub.owner_id)
+            .maybeSingle()
+          if (directOwner) owner = directOwner
+        }
 
-        await logReminder(supabaseAdmin, {
-          owner_id: owner.id,
-          reminder_type: 'trial_ending_soon',
-          channel: 'push',
-          details: { trialEndDate: trialEndDate.toISOString(), trialDiffDays },
-        })
+        if (!owner || !owner.user_id) continue
 
-        results.trialRemindersSent++
-        results.logs.push({ owner: owner.email, event: 'trial_ending_push_sent' })
+        const endDate = new Date(sub.end_date)
+        const diffMs = endDate.getTime() - now.getTime()
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+        if (diffMs <= 0) {
+          await supabaseAdmin
+            .from('property_subscriptions')
+            .update({ status: 'expired' })
+            .eq('id', sub.id)
+
+          results.expiredMarked++
+
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expired', sub.id)
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: `🔒 Subscription Expired: ${propName}`,
+              body: `Your FixyStays subscription for ${propName} has expired. Tap to renew and keep guest check-ins and direct leads active.`,
+              data: {
+                url: '/renew',
+                type: 'subscription_expired',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              property_subscription_id: sub.id,
+              reminder_type: 'expired',
+              channel: 'push',
+              details: { endDate: sub.end_date, propertyId: sub.property_id, propertyName: propName },
+            })
+
+            results.logs.push({ owner: owner.email, event: `prop_expired_${propName}` })
+          }
+          continue
+        }
+
+        if (diffDays <= 1) {
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_1_day', sub.id)
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: `🚨 Final Reminder: ${propName} Subscription Expires Tomorrow`,
+              body: `Your FixyStays subscription for ${propName} ends tomorrow. Tap to renew now.`,
+              data: {
+                url: '/renew',
+                type: 'expiring_in_1_day',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              property_subscription_id: sub.id,
+              reminder_type: 'expiring_in_1_day',
+              channel: 'push',
+              details: { endDate: sub.end_date, propertyId: sub.property_id, propertyName: propName, diffDays },
+            })
+
+            results.reminders1DaySent++
+            results.logs.push({ owner: owner.email, event: `prop_1_day_${propName}` })
+          }
+          continue
+        }
+
+        if (diffDays <= 3) {
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_3_days', sub.id)
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: `⏳ Subscription Expiring in 3 Days: ${propName}`,
+              body: `Your FixyStays subscription for ${propName} expires in ${diffDays} days. Tap here to renew early.`,
+              data: {
+                url: '/renew',
+                type: 'expiring_in_3_days',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              property_subscription_id: sub.id,
+              reminder_type: 'expiring_in_3_days',
+              channel: 'push',
+              details: { endDate: sub.end_date, propertyId: sub.property_id, propertyName: propName, diffDays },
+            })
+
+            results.reminders3DaySent++
+            results.logs.push({ owner: owner.email, event: `prop_3_day_${propName}` })
+          }
+        }
       }
     }
+  } catch (err: any) {
+    console.error('[SubscriptionCheck] Error checking property_subscriptions:', err)
+  }
+
+  // 2. Process legacy owner_subscriptions
+  try {
+    const { data: subscriptions, error: subError } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('id, owner_id, plan_name, status, end_date, owners ( id, user_id, name, email )')
+      .eq('status', 'active')
+
+    if (subError) {
+      console.warn('[SubscriptionCheck] Legacy owner_subscriptions fetch:', subError.message)
+    } else if (subscriptions) {
+      results.totalActive += subscriptions.length
+
+      for (const sub of subscriptions) {
+        const rawOwner = (sub as any).owners
+        let owner = Array.isArray(rawOwner) ? rawOwner[0] : rawOwner
+
+        if ((!owner || !owner.user_id) && sub.owner_id) {
+          const { data: directOwner } = await supabaseAdmin
+            .from('owners')
+            .select('id, user_id, name, email')
+            .eq('id', sub.owner_id)
+            .maybeSingle()
+          if (directOwner) owner = directOwner
+        }
+
+        if (!owner || !owner.user_id) continue
+
+        const endDate = new Date(sub.end_date)
+        const diffMs = endDate.getTime() - now.getTime()
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+        if (diffMs <= 0) {
+          await supabaseAdmin
+            .from('owner_subscriptions')
+            .update({ status: 'expired' })
+            .eq('id', sub.id)
+
+          results.expiredMarked++
+
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expired')
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: '🔒 FixyStays Subscription Expired',
+              body: 'Your partner plan has expired. Tap to renew and restore access.',
+              data: {
+                url: '/renew',
+                type: 'subscription_expired',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              subscription_id: sub.id,
+              reminder_type: 'expired',
+              channel: 'push',
+              details: { endDate: sub.end_date, planName: sub.plan_name },
+            })
+
+            results.logs.push({ owner: owner.email, event: 'legacy_expired_push_sent' })
+          }
+          continue
+        }
+
+        if (diffDays <= 1) {
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_1_day')
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: '🚨 Final Reminder: Plan Expires Tomorrow',
+              body: `Your FixyStays subscription ends tomorrow. Tap to renew and avoid interruptions.`,
+              data: {
+                url: '/renew',
+                type: 'expiring_in_1_day',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              subscription_id: sub.id,
+              reminder_type: 'expiring_in_1_day',
+              channel: 'push',
+              details: { endDate: sub.end_date, planName: sub.plan_name, diffDays },
+            })
+
+            results.reminders1DaySent++
+            results.logs.push({ owner: owner.email, event: 'legacy_1_day_reminder' })
+          }
+          continue
+        }
+
+        if (diffDays <= 3) {
+          const alreadyLogged = await isReminderAlreadyLogged(supabaseAdmin, owner.id, 'expiring_in_3_days')
+          if (!alreadyLogged) {
+            await sendPushNotificationToUser(owner.user_id, {
+              title: '⏳ Subscription Expiring in 3 Days',
+              body: `Your FixyStays subscription expires in ${diffDays} days. Tap here to renew early.`,
+              data: {
+                url: '/renew',
+                type: 'expiring_in_3_days',
+              },
+            })
+
+            await logReminder(supabaseAdmin, {
+              owner_id: owner.id,
+              subscription_id: sub.id,
+              reminder_type: 'expiring_in_3_days',
+              channel: 'push',
+              details: { endDate: sub.end_date, planName: sub.plan_name, diffDays },
+            })
+
+            results.reminders3DaySent++
+            results.logs.push({ owner: owner.email, event: 'legacy_3_day_reminder' })
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[SubscriptionCheck] Error checking legacy owner_subscriptions:', err)
   }
 
   return {

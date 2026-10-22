@@ -1,27 +1,13 @@
-import PricingClient from './PricingClient'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 
-import { Metadata } from 'next'
+export default async function BusinessPricingPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-export const metadata: Metadata = {
-  title: 'Business Pricing for Property Owners | Fixy Stays',
-  description: 'Professional business plans for property owners in Alibag. Unlock advanced analytics, premium placements, and dedicated account management with Fixy Stays.',
-  keywords: ['hotel business management', 'villa business Alibag', 'B2B property management Alibag', 'Fixy Stays business plan', 'premium property listing'],
-  openGraph: {
-    title: 'Business Pricing for Property Owners | Fixy Stays',
-    description: 'Professional business plans for property owners in Alibag. Unlock advanced analytics, premium placements, and dedicated account management with Fixy Stays.',
-    url: 'https://www.fixystays.com/pricing/business',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Business Pricing for Property Owners | Fixy Stays',
-    description: 'Professional business plans for property owners in Alibag. Unlock advanced analytics and premium placements.',
-  },
-  alternates: {
-    canonical: 'https://www.fixystays.com/pricing/business',
+  if (user) {
+    redirect('/renew')
+  } else {
+    redirect('/onboarding')
   }
-}
-
-export default function BusinessPricingPage() {
-  return <PricingClient />
 }

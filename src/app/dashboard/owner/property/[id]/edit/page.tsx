@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
+import { getPropertyAccess } from '@/lib/access'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -17,8 +18,17 @@ export default async function EditPropertyPage(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const email = user.email?.toLowerCase().trim() || ''
   const isAdmin = isSuperAdminUser(user)
+
+  // 1b. Gating: Require active property subscription
+  if (!isAdmin) {
+    const access = await getPropertyAccess(propertyId, user)
+    if (!access.allowed) {
+      redirect('/renew')
+    }
+  }
+
+  const email = user.email?.toLowerCase().trim() || ''
 
   const supabaseAdmin = createAdminClient()
 
@@ -50,7 +60,10 @@ export default async function EditPropertyPage(
         .maybeSingle()
       if (matchedOwner) {
         owner = matchedOwner
-        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        const { error: linkErr } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+        if (linkErr) {
+          console.warn('Could not link owner user_id:', linkErr.message)
+        }
       }
     }
 

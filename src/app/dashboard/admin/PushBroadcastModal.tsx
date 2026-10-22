@@ -138,7 +138,7 @@ export default function PushBroadcastModal() {
                   </label>
                   <input
                     type="text"
-                    placeholder="/guest or /pricing/starter"
+                    placeholder="/guest or /renew"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium focus:outline-none focus:border-blue-500"

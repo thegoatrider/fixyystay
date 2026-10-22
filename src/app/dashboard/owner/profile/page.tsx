@@ -24,26 +24,36 @@ export default async function OwnerProfilePage() {
   // 1. Fetch owner record with self-healing email fallback
   let { data: owner } = await supabaseAdmin
     .from('owners')
-    .select('id, name, email, phone, created_at, free_tier_enabled')
+    .select('id, name, email, created_at, phone')
     .eq('user_id', user.id)
     .maybeSingle()
 
   if (!owner && user.email) {
     const { data: matchedOwner } = await supabaseAdmin
       .from('owners')
-      .select('id, name, email, phone, created_at, free_tier_enabled')
+      .select('id, name, email, created_at, phone')
       .eq('email', user.email.toLowerCase().trim())
       .maybeSingle()
 
     if (matchedOwner) {
       owner = matchedOwner
-      await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      const { error: linkError } = await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      if (linkError) {
+        console.warn('Error linking owner user_id:', linkError.message)
+      }
     }
   }
 
-  if (!owner) redirect('/guest')
+  if (!owner) redirect('/onboarding')
 
-  // 2. Fetch subscription using supabaseAdmin with exact database schema columns
+  // 2. Fetch property subscriptions
+  const { data: propSubs } = await supabaseAdmin
+    .from('property_subscriptions')
+    .select('id, property_id, plan_name, status, start_date, end_date, room_count, monthly_fee, properties(name)')
+    .eq('owner_id', owner.id)
+    .order('created_at', { ascending: false })
+
+  // Legacy fallback
   const { data: subscription } = await supabaseAdmin
     .from('owner_subscriptions')
     .select('id, owner_id, plan_name, status, start_date, end_date')
@@ -70,9 +80,9 @@ export default async function OwnerProfilePage() {
   // 4. Fetch payment history with exact database schema columns
   const { data: payments } = await supabaseAdmin
     .from('owner_payments')
-    .select('id, owner_id, amount, payment_date, payment_method, payment_ref, plan_duration_months')
+    .select('id, owner_id, amount, payment_date, payment_method, payment_ref, plan_duration_months, status, room_count, monthly_fee')
     .eq('owner_id', owner.id)
-    .order('payment_date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   const { count: propertiesCount } = await supabaseAdmin.from('properties').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
   const { count: leadsCount } = await supabaseAdmin.from('leads').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
@@ -81,15 +91,11 @@ export default async function OwnerProfilePage() {
   const { data: earningsData } = await supabaseAdmin.from('wallet_transactions').select('amount').eq('user_id', user.id).eq('transaction_type', 'earning')
   const earnings = earningsData?.reduce((acc, t) => acc + Number(t.amount), 0) || 0
 
-  const isPaid = subscription?.status === 'active' && !!subscription?.end_date && new Date(subscription.end_date) > new Date()
-  const isFreeTier = (owner as any)?.free_tier_enabled === true
+  const hasActivePropSub = (propSubs || []).some(
+    (s: any) => s.status === 'active' && new Date(s.end_date) > new Date()
+  )
+  const isPaid = hasActivePropSub || (subscription?.status === 'active' && !!subscription?.end_date && new Date(subscription.end_date) > new Date())
   const isHubActive = !isPaid && !!activeHub?.subscription_end_date && new Date(activeHub.subscription_end_date) > new Date()
-  
-  // 7-day Trial Logic from Owner Creation Date
-  const ownerCreatedAt = owner?.created_at ? new Date(owner.created_at) : null
-  const trialEndDate = ownerCreatedAt ? new Date(ownerCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000) : null
-  const isTrial = !isPaid && !isFreeTier && !isHubActive && trialEndDate ? trialEndDate > new Date() : false
-  const isExpired = !isPaid && !isFreeTier && !isHubActive && trialEndDate ? trialEndDate <= new Date() : false
 
   return (
     <main className="min-h-screen bg-gray-50/50 pb-12">
@@ -153,18 +159,18 @@ export default async function OwnerProfilePage() {
           {/* Left: Subscription Status */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white border-2 border-white ring-1 ring-gray-100 rounded-[32px] p-8 shadow-xl shadow-blue-900/5 relative overflow-hidden">
-               {(isPaid || isTrial) && <div className="absolute top-0 right-0 p-8 opacity-5"><Zap className="w-32 h-32 text-blue-600" /></div>}
+               {isPaid && <div className="absolute top-0 right-0 p-8 opacity-5"><Zap className="w-32 h-32 text-blue-600" /></div>}
                
                 <div className="flex items-center gap-4 mb-8">
-                  <div className={cn("p-4 rounded-2xl", (isPaid || isFreeTier || isHubActive) ? "bg-green-100 text-green-600" : isTrial ? "bg-yellow-100 text-yellow-600" : "bg-blue-100 text-blue-600")}>
-                    {isTrial ? <History className="w-6 h-6 border-2 rounded-full p-0.5" /> : (isPaid || isFreeTier || isHubActive) ? <Zap className="w-6 h-6 font-black" /> : <Zap className="w-6 h-6" />}
+                  <div className={cn("p-4 rounded-2xl", (isPaid || isHubActive) ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600")}>
+                    {(isPaid || isHubActive) ? <Zap className="w-6 h-6 font-black" /> : <Zap className="w-6 h-6" />}
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-gray-900 tracking-tight">
-                      {isPaid ? 'Active Subscription' : isFreeTier ? 'Partner Courtesy Access' : isHubActive ? 'Active Guest Hub Plan' : isTrial ? 'Free Trial Active' : 'Free Tier'}
+                      {isPaid ? 'Active Subscription' : isHubActive ? 'Active Guest Hub Plan' : 'Subscription Expired'}
                     </h3>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                      {isPaid ? (subscription?.plan_name || 'Premium Plan') : isFreeTier ? 'Lifetime Access Enabled by Admin' : isHubActive ? 'Standalone Guest Hub Active' : isTrial ? '7-Day Free Trial' : subscription?.end_date ? `${subscription?.plan_name || 'Partner Plan'} (Expired)` : 'Trial Expired / Restricted'}
+                      {isPaid ? (subscription?.plan_name || 'FixyStays Partner') : isHubActive ? 'Standalone Guest Hub Active' : subscription?.end_date ? 'Plan Expired' : 'Renewal Required'}
                     </p>
                   </div>
                </div>
@@ -190,24 +196,7 @@ export default async function OwnerProfilePage() {
                          <p className="text-xs text-blue-100 mt-1">Full premium partner access to leads, bookings, guests, and marketing.</p>
                        </div>
                        <Button asChild variant="secondary" className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          <Link href="/pricing/starter">Upgrade / Renew</Link>
-                       </Button>
-                    </div>
-                 </div>
-               ) : isFreeTier ? (
-                 <div className="grid sm:grid-cols-2 gap-6">
-                    <div className="p-6 bg-green-50 rounded-2xl border border-green-100">
-                       <p className="text-[10px] font-black uppercase text-green-700 tracking-widest mb-2 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Plan Status</p>
-                       <p className="text-2xl font-black text-green-950">Lifetime Access</p>
-                       <p className="text-xs font-bold mt-1 text-green-700">Courtesy partner tier enabled by FixyStays admin</p>
-                    </div>
-                    <div className="p-6 bg-gradient-to-br from-green-600 to-emerald-700 text-white rounded-2xl border border-green-500 shadow-lg shadow-green-600/20 flex flex-col justify-between">
-                       <div>
-                         <p className="text-[10px] font-black uppercase text-green-200 tracking-widest mb-1">Status</p>
-                         <p className="text-xl font-black italic uppercase">All Features Active</p>
-                       </div>
-                       <Button asChild className="w-full mt-4 bg-white text-green-800 hover:bg-green-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          <Link href="/dashboard/owner">Go To Dashboard</Link>
+                          <Link href="/renew">Manage / Renew</Link>
                        </Button>
                     </div>
                  </div>
@@ -226,29 +215,10 @@ export default async function OwnerProfilePage() {
                          <p className="text-xl font-black italic uppercase">Guest Hub Plan</p>
                        </div>
                        <Button asChild className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          <Link href="/pricing/starter">Upgrade To Full Pro</Link>
+                          <Link href="/renew">Manage Subscriptions</Link>
                        </Button>
                     </div>
                  </div>
-               ) : isTrial ? (
-                <div className="grid sm:grid-cols-2 gap-6">
-                   <div className="p-6 bg-yellow-50 rounded-2xl border border-yellow-100">
-                      <p className="text-[10px] font-black uppercase text-yellow-600 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Trial Ends &amp; Time</p>
-                      <p className="text-2xl font-black text-gray-900">{trialEndDate ? format(trialEndDate, "MMMM dd, yyyy 'at' hh:mm a") : 'N/A'}</p>
-                      <p className="text-xs font-bold mt-1 text-yellow-600">
-                         Ends in {trialEndDate ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0} days
-                      </p>
-                   </div>
-                   <div className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl border border-blue-500 shadow-lg shadow-blue-600/20 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-1">Current Status</p>
-                        <p className="text-xl font-black italic uppercase">Enjoy All Features</p>
-                      </div>
-                      <Button asChild className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                         <Link href="/pricing/starter">Upgrade Now</Link>
-                      </Button>
-                   </div>
-                </div>
                ) : (
                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="p-6 bg-red-50/60 rounded-2xl border border-red-100">
@@ -259,21 +229,21 @@ export default async function OwnerProfilePage() {
                        <p className="text-xl sm:text-2xl font-black text-gray-900">
                          {subscription?.end_date 
                            ? format(new Date(subscription.end_date), "MMMM dd, yyyy 'at' hh:mm a") 
-                           : 'LIMITED FREE ACCESS'}
+                           : 'SUBSCRIPTION EXPIRED'}
                        </p>
                        <p className="text-xs font-semibold text-red-600 mt-1">
                          {subscription?.end_date 
-                           ? `Subscription ended on ${format(new Date(subscription.end_date), "MMM dd, yyyy")}. Upgrade to renew access.` 
-                           : 'Trial Expired. Upgrade To View Leads & Guests.'}
+                           ? `Subscription ended on ${format(new Date(subscription.end_date), "MMM dd, yyyy")}. Renew to keep access active.` 
+                           : 'Subscription required to view full lead and guest details.'}
                        </p>
                     </div>
                     <div className="p-6 bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-2xl border border-indigo-500 shadow-lg shadow-indigo-600/20 flex flex-col justify-between">
                        <div>
-                         <p className="text-[10px] font-black uppercase text-indigo-200 tracking-widest mb-1">Standard Option</p>
-                         <p className="text-xl font-black italic uppercase">Renew / Upgrade</p>
+                         <p className="text-[10px] font-black uppercase text-indigo-200 tracking-widest mb-1">Status</p>
+                         <p className="text-xl font-black italic uppercase">Renewal Required</p>
                        </div>
-                       <Button asChild className="w-full mt-4 bg-yellow-400 text-indigo-900 hover:bg-yellow-300 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          <Link href="/pricing/starter">Unlock Everything</Link>
+                       <Button asChild className="w-full mt-4 bg-white text-indigo-600 hover:bg-indigo-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
+                          <Link href="/renew">Renew Property Access</Link>
                        </Button>
                     </div>
                  </div>
@@ -329,7 +299,7 @@ export default async function OwnerProfilePage() {
           <div className="space-y-8">
             <div className="space-y-4">
               <h3 className="text-xl font-black text-gray-900 tracking-tight">Property Management</h3>
-              <CreatePropertyForm initialPhone={owner?.phone || ""} />
+              <CreatePropertyForm initialPhone={user.user_metadata?.phone || ""} />
             </div>
 
             <ChangePasswordForm />

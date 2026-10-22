@@ -15,7 +15,6 @@ import { CreateAgentForm } from './CreateAgentForm'
 import { CreatePoliceForm } from './CreatePoliceForm'
 import WebsiteQR from '@/components/WebsiteQR'
 import GrowthHubWrapper from '@/components/GrowthHubWrapper'
-import FreeTierToggle from './FreeTierToggle'
 import OrganizationsManagement from './OrganizationsManagement'
 import SubscriptionCheckButton from './SubscriptionCheckButton'
 import PushBroadcastModal from './PushBroadcastModal'
@@ -44,202 +43,92 @@ export default async function AdminDashboard() {
     console.warn('Could not list auth users:', err)
   }
 
-  // Remove non-Mayekar unapproved properties from the pending approval section as instructed
-  try {
-    const { data: unwantedProps } = await supabaseAdmin
-      .from('properties')
-      .select('id, name')
-      .eq('approved', false)
-      .not('name', 'ilike', '%mayekar%')
 
-    if (unwantedProps && unwantedProps.length > 0) {
-      const idsToDelete = unwantedProps.map(p => p.id)
-      console.log(`[Admin] Purging ${idsToDelete.length} unapproved non-Mayekar properties`)
-      await supabaseAdmin.from('properties').delete().in('id', idsToDelete)
-    }
-  } catch (e) {
-    console.warn('Non-Mayekar property cleanup notice:', e)
-  }
 
-  // 1. Pending Approvals: Fetch all unapproved properties
-  let rawPendingProperties: any[] = []
+  // 1. Pending Approvals: Fetch all properties with approval_status = 'pending'
+  let pendingProperties: any[] = []
   try {
     const { data, error } = await supabaseAdmin
       .from('properties')
-      .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
-      .eq('approved', false)
+      .select(`
+        *,
+        owners ( id, user_id, name, email, phone ),
+        rooms ( id, price_bucket ),
+        property_rooms ( id ),
+        property_subscriptions ( id, status, end_date, months, monthly_fee, amount, razorpay_payment_id, created_at )
+      `)
+      .eq('approval_status', 'pending')
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.warn('Pending properties fetch error (retrying without rooms):', error)
-      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+      console.warn('Pending properties relation fetch error, falling back:', error.message)
+      const { data: fallbackData } = await supabaseAdmin
         .from('properties')
-        .select('*, owners(id, user_id, name, email, phone, free_tier_enabled)')
-        .eq('approved', false)
+        .select('*, owners ( id, user_id, name, email, phone )')
+        .eq('approval_status', 'pending')
         .order('created_at', { ascending: false })
-
-      if (fallbackError) {
-        console.error('Pending properties fallback fetch error (retrying basic properties select):', fallbackError)
-        const { data: basicData } = await supabaseAdmin
-          .from('properties')
-          .select('*')
-          .eq('approved', false)
-          .order('created_at', { ascending: false })
-        rawPendingProperties = basicData || []
-      } else {
-        rawPendingProperties = fallbackData || []
-      }
+      pendingProperties = fallbackData || []
     } else {
-      rawPendingProperties = data || []
+      pendingProperties = data || []
     }
   } catch (e) {
     console.error('Failed to load pending properties:', e)
   }
 
-  // Ensure Mayekar wadi homestay is loaded if it was previously created or approved
-  const mayekarInRaw = rawPendingProperties.find(p => (p.name || '').toLowerCase().includes('mayekar'))
-  if (!mayekarInRaw) {
-    const { data: existingMayekar } = await supabaseAdmin
-      .from('properties')
-      .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
-      .ilike('name', '%mayekar%')
-      .maybeSingle()
+  // Hydrate missing owners, rooms count, subscriptions, and phone numbers
+  const pendingPropIds = pendingProperties.map(p => p.id)
+  if (pendingPropIds.length > 0) {
+    const [roomsRes, subsRes] = await Promise.all([
+      supabaseAdmin
+        .from('property_rooms')
+        .select('id, property_id')
+        .in('property_id', pendingPropIds),
+      supabaseAdmin
+        .from('property_subscriptions')
+        .select('*')
+        .in('property_id', pendingPropIds)
+        .order('created_at', { ascending: false })
+    ])
 
-    if (existingMayekar) {
-      if (existingMayekar.approved !== false) {
-        await supabaseAdmin.from('properties').update({ approved: false }).eq('id', existingMayekar.id)
-        existingMayekar.approved = false
+    const roomCounts = new Map<string, number>()
+    ;(roomsRes.data || []).forEach(r => {
+      roomCounts.set(r.property_id, (roomCounts.get(r.property_id) || 0) + 1)
+    })
+
+    const latestSubs = new Map<string, any>()
+    ;(subsRes.data || []).forEach(s => {
+      if (!latestSubs.has(s.property_id)) {
+        latestSubs.set(s.property_id, s)
       }
-      rawPendingProperties.push(existingMayekar)
-    } else {
-      // Check if Mayekar owner exists in owners table or auth
-      const { data: mayekarOwner } = await supabaseAdmin
-        .from('owners')
-        .select('id, user_id, name, email, phone')
-        .or('name.ilike.%mayekar%,email.ilike.%mayekar%')
-        .maybeSingle()
+    })
 
-      if (mayekarOwner) {
-        const authUser = mayekarOwner.user_id ? authUsersMap.get(mayekarOwner.user_id) : (mayekarOwner.email ? authUsersByEmail.get(mayekarOwner.email.toLowerCase()) : null)
-        const phone = mayekarOwner.phone || authUser?.phone || authUser?.user_metadata?.phone || null
-        const { data: newMayekarProp } = await supabaseAdmin
-          .from('properties')
-          .insert({
-            owner_id: mayekarOwner.id,
-            name: 'Mayekar Wadi Homestay',
-            type: 'multi-room property',
-            city: 'Alibag',
-            approved: false,
-            helpdesk_number: phone,
-          })
-          .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
-          .single()
+    for (const prop of pendingProperties) {
+      const physicalCount = roomCounts.get(prop.id) ?? prop.property_rooms?.length ?? 0
+      prop.physical_room_count = physicalCount
+      prop.latest_subscription = latestSubs.get(prop.id) ?? (Array.isArray(prop.property_subscriptions) ? prop.property_subscriptions[0] : null)
 
-        if (newMayekarProp) rawPendingProperties.push(newMayekarProp)
-      }
-    }
-  }
+      const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+      const ownerEmail = (owner?.email || '').toLowerCase().trim()
+      const authUser = (owner?.user_id && authUsersMap.get(owner.user_id))
+        || (ownerEmail && authUsersByEmail.get(ownerEmail))
+        || null
 
-  // Hydrate missing owners if any
-  const missingOwnerIds = Array.from(new Set(
-    rawPendingProperties
-      .filter(p => !p.owners && p.owner_id)
-      .map(p => p.owner_id)
-  ))
-  if (missingOwnerIds.length > 0) {
-    const { data: fetchedOwners } = await supabaseAdmin
-      .from('owners')
-      .select('id, user_id, name, email, phone, free_tier_enabled')
-      .in('id', missingOwnerIds)
-    if (fetchedOwners) {
-      const ownerMap = new Map(fetchedOwners.map(o => [o.id, o]))
-      rawPendingProperties.forEach(p => {
-        if (!p.owners && p.owner_id && ownerMap.has(p.owner_id)) {
-          p.owners = ownerMap.get(p.owner_id)
-        }
-      })
-    }
-  }
+      const phone = prop.helpdesk_number 
+        || owner?.phone 
+        || authUser?.phone 
+        || authUser?.user_metadata?.phone 
+        || null
 
-  // Resolve and heal phone numbers across all pending properties (especially Mayekar wadi homestay)
-  for (const prop of rawPendingProperties) {
-    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
-    const ownerEmail = (owner?.email || '').toLowerCase().trim()
-    const ownerName = owner?.name || ''
-    const authUser = (owner?.user_id && authUsersMap.get(owner.user_id))
-      || (ownerEmail && authUsersByEmail.get(ownerEmail))
-      || null
-
-    let phone = prop.helpdesk_number 
-      || owner?.phone 
-      || authUser?.phone 
-      || authUser?.user_metadata?.phone 
-      || authUser?.raw_user_meta_data?.phone
-      || null
-
-    // Exhaustive fallback: if still not found and property is Mayekar, search across all auth users
-    if (!phone && prop.name?.toLowerCase().includes('mayekar')) {
-      for (const u of authUsersRes?.users || []) {
-        const uStr = JSON.stringify(u).toLowerCase()
-        if (uStr.includes('mayekar')) {
-          phone = u.phone || u.user_metadata?.phone || u.raw_user_meta_data?.phone || null
-          if (phone) break
-        }
-      }
-    }
-
-    if (phone) {
-      prop.helpdesk_number = phone
+      prop.resolved_phone = phone
       if (owner) owner.phone = phone
-      // Auto-heal DB records immediately so they are permanently stored
-      await supabaseAdmin.from('properties').update({ helpdesk_number: phone }).eq('id', prop.id)
-      if (owner?.id) {
-        await supabaseAdmin.from('owners').update({ phone }).eq('id', owner.id)
-      }
     }
   }
-
-  // Active subscriptions for owners
-  const { data: activeSubs } = await supabaseAdmin
-    .from('owner_subscriptions')
-    .select('owner_id, end_date, status')
-    .eq('status', 'active')
-
-  // Active standalone guest hub settings
-  const { data: activeGuestHubs } = await supabaseAdmin
-    .from('guest_hub_settings')
-    .select('property_id')
-    .eq('subscription_status', 'active')
-
-  const now = new Date()
-  const activeSubOwnerIds = new Set(
-    (activeSubs || [])
-      .filter(s => s.end_date && new Date(s.end_date) > now)
-      .map(s => s.owner_id)
-  )
-  const activeHubPropertyIds = new Set(
-    (activeGuestHubs || []).map(g => g.property_id)
-  )
-
-  const isOwnerPaid = (prop: any) => {
-    if (!prop) return false
-    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
-    if (owner?.free_tier_enabled === true) return true
-    if (prop.owner_id && activeSubOwnerIds.has(prop.owner_id)) return true
-    if (activeHubPropertyIds.has(prop.id)) return true
-    return false
-  }
-
-  // Strictly keep ONLY Mayekar wadi homestay in the Pending Property Approvals section as requested
-  const pendingProperties = (rawPendingProperties || []).filter(prop => {
-    return (prop.name || '').toLowerCase().includes('mayekar')
-  })
   const unpaidDrafts: any[] = []
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(id, name, email, free_tier_enabled)')
+    .select('*, owners(id, name, email, phone)')
     .eq('approved', true)
     .order('created_at', { ascending: false })
 
@@ -297,7 +186,7 @@ export default async function AdminDashboard() {
     walletTransactions = wt || []
     const { data: pr } = await supabase
       .from('payout_requests')
-      .select('id, user_id, amount, status, upi_id, created_at')
+      .select('id, user_id, amount, status, bank_details, created_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
     pendingPayoutsRaw = pr || []
@@ -389,6 +278,64 @@ export default async function AdminDashboard() {
     console.warn('Organizations table not found.')
   }
 
+  // 10. All Payments (Full visibility for admin across property_payments and legacy owner_payments)
+  let recentPayments: any[] = []
+  try {
+    const { data: propPayments, error: propPayErr } = await supabaseAdmin
+      .from('property_payments')
+      .select(`
+        id,
+        amount,
+        currency,
+        status,
+        payment_method,
+        razorpay_order_id,
+        razorpay_payment_id,
+        months,
+        room_count,
+        monthly_fee,
+        created_at,
+        properties ( id, name, uid ),
+        owners ( id, name, email, phone )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (!propPayErr && propPayments && propPayments.length > 0) {
+      recentPayments = propPayments
+    } else {
+      // Fallback to legacy owner_payments
+      const { data: legacyPayments } = await supabaseAdmin
+        .from('owner_payments')
+        .select(`
+          id,
+          amount,
+          payment_method,
+          payment_ref,
+          plan_duration_months,
+          created_at,
+          owners ( id, name, email, phone )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      recentPayments = (legacyPayments || []).map((lp: any) => ({
+        id: lp.id,
+        amount: lp.amount,
+        currency: 'INR',
+        status: 'paid',
+        payment_method: lp.payment_method,
+        razorpay_payment_id: lp.payment_ref,
+        months: lp.plan_duration_months,
+        created_at: lp.created_at,
+        owners: lp.owners,
+        properties: null
+      }))
+    }
+  } catch (err) {
+    console.warn('Could not load recent payments:', err)
+  }
+
   return (
     <div className="flex flex-col gap-10">
 
@@ -413,6 +360,125 @@ export default async function AdminDashboard() {
             <p className="text-3xl font-black relative z-10">₹{platformCommission.toLocaleString()}</p>
           </div>
         </div>
+      </section>
+
+      {/* SECTION: Recent Subscription Payments (Full Transparency) */}
+      <section className="bg-white border rounded-2xl p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900">
+              <CreditCard className="text-green-600 w-5 h-5" /> Recent Subscription Payments
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Live audit trail of all owner onboarding and renewal payments processed via Razorpay or Admin.
+            </p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded-full w-fit">
+            ● Live Payment Feed ({recentPayments.length})
+          </span>
+        </div>
+
+        {recentPayments && recentPayments.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Owner / Partner</th>
+                  <th className="px-4 py-3">Property</th>
+                  <th className="px-4 py-3">Plan / Rooms</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Gateway Ref</th>
+                  <th className="px-4 py-3 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentPayments.map((pay: any) => {
+                  const owner = Array.isArray(pay.owners) ? pay.owners[0] : pay.owners
+                  const property = Array.isArray(pay.properties) ? pay.properties[0] : pay.properties
+                  const phone = owner?.phone
+                  const cleanPhone = phone ? phone.replace(/\D/g, '') : null
+
+                  return (
+                    <tr key={pay.id} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {new Date(pay.created_at).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-gray-900 leading-snug">{owner?.name || 'Owner'}</div>
+                        <div className="text-xs text-gray-400 font-mono">{owner?.email}</div>
+                        {phone && (
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px]">
+                            <a href={`tel:${phone}`} className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> {phone}
+                            </a>
+                            {cleanPhone && (
+                              <a
+                                href={`https://wa.me/${cleanPhone}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded"
+                              >
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {property ? (
+                          <div>
+                            <span className="font-semibold text-gray-800">{property.name}</span>
+                            {property.uid && (
+                              <span className="ml-1.5 text-[10px] font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-600">
+                                {property.uid}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Partner Account</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className="font-bold text-gray-900">{pay.months || 1} Month{pay.months > 1 ? 's' : ''}</span>
+                        {pay.room_count ? (
+                          <span className="text-gray-500 block text-[11px]">{pay.room_count} units • ₹{pay.monthly_fee}/mo</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-black text-green-700 text-sm">₹{Number(pay.amount).toLocaleString('en-IN')}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-600">
+                        {pay.razorpay_payment_id || pay.razorpay_order_id || 'Admin/Manual'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          pay.status === 'paid' || pay.status === 'captured'
+                            ? 'bg-green-100 text-green-800 border border-green-200'
+                            : pay.status === 'failed'
+                              ? 'bg-red-100 text-red-800 border border-red-200'
+                              : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                        }`}>
+                          {pay.status || 'paid'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-gray-400 border-2 border-dashed rounded-xl text-sm">
+            No payments recorded yet. Payments completed via Razorpay or Admin Onboarding will automatically appear here.
+          </div>
+        )}
       </section>
 
       {/* SECTION: GUEST HUB PLATFORM BACK END */}
@@ -757,9 +823,13 @@ export default async function AdminDashboard() {
             {pendingProperties.map((prop) => {
               const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
               const ownerName = owner?.name || 'Unknown'
-              const phone = prop.helpdesk_number || owner?.phone
+              const phone = prop.resolved_phone || prop.helpdesk_number || owner?.phone
               const cleanPhone = phone ? phone.replace(/\D/g, '') : null
               const priceBucket = prop.rooms?.[0]?.price_bucket || prop.room_categories?.[0]?.price_bucket || 'N/A'
+              const declaredRooms = prop.room_count || 1
+              const physicalRooms = prop.physical_room_count || 0
+              const hasRoomMismatch = physicalRooms > declaredRooms
+              const sub = prop.latest_subscription
 
               return (
                 <div key={prop.id} className="border border-green-200/80 bg-white rounded-xl p-5 shadow-sm flex flex-col gap-3">
@@ -802,6 +872,38 @@ export default async function AdminDashboard() {
                         ⚠️ No phone number set
                       </div>
                     )}
+
+                    {/* Declared vs Physical Room Count */}
+                    <div className="flex items-center justify-between text-xs font-semibold py-1.5 px-2.5 bg-gray-50 rounded-lg border border-gray-200 mt-2">
+                      <span>Declared Rooms: <strong className="text-gray-900">{declaredRooms}</strong></span>
+                      <span>Physical Rooms: <strong className="text-gray-900">{physicalRooms}</strong></span>
+                    </div>
+                    {hasRoomMismatch && (
+                      <div className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg mt-1.5 leading-snug">
+                        ⚠️ Mismatch: {physicalRooms} physical rooms configured, exceeding {declaredRooms} declared/paid rooms!
+                      </div>
+                    )}
+
+                    {/* Subscription Snapshot */}
+                    {sub && (
+                      <div className="mt-2 p-2.5 bg-blue-50/40 border border-blue-100 rounded-lg text-xs space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-blue-950">Payment Snapshot:</span>
+                          <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                            {sub.months} Mo Plan
+                          </span>
+                        </div>
+                        <div className="text-gray-600 flex justify-between">
+                          <span>Fee: ₹{sub.monthly_fee}/mo</span>
+                          <span className="font-bold text-gray-900">Total: ₹{sub.amount}</span>
+                        </div>
+                        {sub.razorpay_payment_id && (
+                          <div className="text-[10px] text-gray-500 font-mono truncate">
+                            Ref: {sub.razorpay_payment_id}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="mt-2 text-sm text-gray-600">
                       <p><span className="font-semibold">City:</span> {prop.city || 'Location Pending'}</p>
@@ -818,8 +920,8 @@ export default async function AdminDashboard() {
                       Review Details & Images
                     </Link>
                     <div className="flex gap-2">
-                      <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/3" />
-                      <div className="w-2/3">
+                      <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="w-1/4" />
+                      <div className="w-3/4">
                         <PropertyApprovalActions propertyId={prop.id} />
                       </div>
                     </div>
@@ -986,8 +1088,10 @@ export default async function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {allOwnersDetailed?.map((owner: any) => {
-                  const sub = owner.owner_subscriptions?.[0]
+                {(() => {
+                  const now = new Date()
+                  return allOwnersDetailed?.map((owner: any) => {
+                    const sub = owner.owner_subscriptions?.[0]
                   const isActive = sub?.status === 'active' && new Date(sub.end_date) > now
                   const daysLeft = sub?.end_date ? Math.ceil((new Date(sub.end_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
                   const isExpiringSoon = isActive && daysLeft <= 7
@@ -1059,7 +1163,8 @@ export default async function AdminDashboard() {
                       </td>
                     </tr>
                   )
-                })}
+                })
+              })()}
               </tbody>
             </table>
           </div>

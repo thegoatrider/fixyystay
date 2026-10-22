@@ -15,7 +15,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
 
   const { data: property, error } = await supabaseAdmin
     .from('properties')
-    .select('*, owners(id, name, email, free_tier_enabled)')
+    .select('*, owners(id, name, email, phone)')
     .eq('id', propertyId)
     .single()
 
@@ -24,32 +24,41 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
     redirect('/dashboard/admin')
   }
 
-  // Check if owner has completed payment
+  // Check if property has active subscription
   const owner = (Array.isArray(property.owners) ? property.owners[0] : property.owners) as any
-  let isOwnerPaid = owner?.free_tier_enabled === true
+  let isOwnerPaid = false
+  const now = new Date()
 
-  if (!isOwnerPaid && property.owner_id) {
-    const { data: sub } = await supabaseAdmin
-      .from('owner_subscriptions')
-      .select('status, end_date')
-      .eq('owner_id', property.owner_id)
-      .eq('status', 'active')
-      .maybeSingle()
+  const { data: propSub } = await supabaseAdmin
+    .from('property_subscriptions')
+    .select('id, status, end_date')
+    .eq('property_id', propertyId)
+    .eq('status', 'active')
+    .gt('end_date', now.toISOString())
+    .limit(1)
+    .maybeSingle()
 
-    if (sub && new Date(sub.end_date) > new Date()) {
-      isOwnerPaid = true
-    }
-  }
-
-  if (!isOwnerPaid && property.id) {
+  if (propSub) {
+    isOwnerPaid = true
+  } else if (property.is_guest_hub_only) {
     const { data: hub } = await supabaseAdmin
       .from('guest_hub_settings')
       .select('id')
-      .eq('property_id', property.id)
+      .eq('property_id', propertyId)
       .eq('subscription_status', 'active')
       .maybeSingle()
 
     if (hub) isOwnerPaid = true
+  } else if (property.owner_id) {
+    const { data: legacySub } = await supabaseAdmin
+      .from('owner_subscriptions')
+      .select('status, end_date')
+      .eq('owner_id', property.owner_id)
+      .eq('status', 'active')
+      .gt('end_date', now.toISOString())
+      .maybeSingle()
+
+    if (legacySub) isOwnerPaid = true
   }
 
   const { data: rooms } = await supabaseAdmin
@@ -93,7 +102,7 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
               <p className="text-sm opacity-85 mt-0.5">
                 {isOwnerPaid 
                   ? 'Review the images and details below before approving.' 
-                  : 'Notice: Property owner has not completed online subscription payment. Approving will activate the property and grant dashboard access.'}
+                  : 'Notice: Property owner does not have an active subscription. An active subscription is required before approval.'}
               </p>
               {ownerPhone ? (
                 <div className="flex items-center gap-3 mt-2 text-sm">

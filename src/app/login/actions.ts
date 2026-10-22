@@ -66,7 +66,10 @@ export async function login(formData: FormData) {
     const { data: influencer } = await supabase.from('influencers').select('id, user_id').eq('email', normalizedEmail).maybeSingle()
 
     if (owner && owner.user_id !== user.id) {
-      await supabase.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+      const { error: updateErr } = await supabase.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+      if (updateErr) {
+        console.warn('Could not sync owner user_id on login:', updateErr.message)
+      }
     }
     if (influencer && influencer.user_id !== user.id) {
       await supabase.from('influencers').update({ user_id: user.id }).eq('id', influencer.id)
@@ -105,18 +108,6 @@ export async function login(formData: FormData) {
       if (isSuperAdmin || role === 'admin') return redirect('/dashboard/admin')
       if (role === 'police') return redirect('/dashboard/police')
       if (role === 'owner') {
-        if (!isSuperAdmin && owner) {
-          const { data: sub } = await supabase
-            .from('owner_subscriptions')
-            .select('status, end_date')
-            .eq('owner_id', owner.id)
-            .maybeSingle()
-          const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > new Date()
-          const isFreeTier = (owner as any)?.free_tier_enabled === true
-          if (!isSubActive && !isFreeTier) {
-            return redirect('/onboarding?step=payment&reason=unpaid')
-          }
-        }
         return redirect('/dashboard/owner')
       }
       if (role === 'influencer') return redirect('/dashboard/influencer')
