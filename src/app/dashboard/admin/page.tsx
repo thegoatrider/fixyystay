@@ -114,8 +114,9 @@ export default async function AdminDashboard() {
     return false
   }
 
-  // ALL unapproved properties are pending approval!
-  const pendingProperties = rawPendingProperties || []
+  // Strict Gating: ONLY properties that have completed payment / active subscriptions enter the Approval Queue
+  const pendingProperties = (rawPendingProperties || []).filter(prop => isOwnerPaid(prop))
+  const unpaidDrafts = (rawPendingProperties || []).filter(prop => !isOwnerPaid(prop))
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabaseAdmin
@@ -631,15 +632,22 @@ export default async function AdminDashboard() {
         </div>
       </section>
 
-      {/* SECTION 1: Pending Approvals */}
+      {/* SECTION 1: Pending Approvals (Strictly Paid Properties Only) */}
       <section>
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <CheckCircle className="text-orange-500" /> Pending Property Approvals ({pendingProperties.length})
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <CheckCircle className="text-orange-500" /> Pending Property Approvals ({pendingProperties.length})
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Verified, paid properties ready for admin review and go-live approval.
+            </p>
+          </div>
+        </div>
+
         {pendingProperties && pendingProperties.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {pendingProperties.map((prop) => {
-              const isPaid = isOwnerPaid(prop)
               const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
               const ownerName = owner?.name || 'Unknown'
               const phone = prop.helpdesk_number || owner?.phone
@@ -647,24 +655,18 @@ export default async function AdminDashboard() {
               const priceBucket = prop.rooms?.[0]?.price_bucket || prop.room_categories?.[0]?.price_bucket || 'N/A'
 
               return (
-                <div key={prop.id} className="border bg-white rounded-lg p-5 shadow-sm flex flex-col gap-3">
+                <div key={prop.id} className="border border-green-200/80 bg-white rounded-xl p-5 shadow-sm flex flex-col gap-3">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg leading-tight">{prop.name}</h3>
+                        <h3 className="font-semibold text-lg leading-tight text-gray-900">{prop.name}</h3>
                         <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">
                           {prop.uid || 'NO-ID'}
                         </span>
                       </div>
-                      {isPaid ? (
-                        <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">
-                          ✓ Subscription Active
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
-                          ⏳ Payment Pending / Offline
-                        </span>
-                      )}
+                      <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">
+                        ✓ Paid & Verified
+                      </span>
                     </div>
 
                     <p className="text-sm text-gray-500">
@@ -672,7 +674,7 @@ export default async function AdminDashboard() {
                     </p>
 
                     {phone ? (
-                      <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50/60 border border-blue-100 rounded-lg text-xs">
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50/70 border border-blue-100 rounded-lg text-xs">
                         <a href={`tel:${phone}`} className="font-bold text-blue-700 hover:underline flex items-center gap-1.5">
                           <Phone className="w-3.5 h-3.5 text-blue-600" />
                           {phone}
@@ -721,10 +723,86 @@ export default async function AdminDashboard() {
           </div>
         ) : (
           <div className="p-8 border-2 border-dashed rounded-lg text-center text-gray-500">
-            No properties pending approval.
+            No properties pending approval. All paid onboarding listings have been reviewed.
           </div>
         )}
       </section>
+
+      {/* SECTION 1A: Incomplete Onboarding Leads (Unpaid - Sales Outreach Only) */}
+      {unpaidDrafts && unpaidDrafts.length > 0 && (
+        <section className="bg-amber-50/60 border border-amber-200 rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-amber-950 flex items-center gap-2">
+                <Clock className="text-amber-600 w-5 h-5" /> Incomplete Onboarding Leads ({unpaidDrafts.length})
+              </h2>
+              <p className="text-xs text-amber-700 mt-0.5">
+                These properties were registered during onboarding but the owner dropped off without completing payment. They are <strong>blocked from the approval queue</strong> until paid. Use the Call / WhatsApp buttons to follow up and assist them.
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {unpaidDrafts.map((prop) => {
+              const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+              const ownerName = owner?.name || 'Unknown'
+              const phone = prop.helpdesk_number || owner?.phone
+              const cleanPhone = phone ? phone.replace(/\D/g, '') : null
+
+              return (
+                <div key={prop.id} className="border border-amber-200/80 bg-white rounded-xl p-4 shadow-sm flex flex-col gap-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <h3 className="font-semibold text-base leading-tight text-gray-900">{prop.name}</h3>
+                      <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                        {prop.uid || 'NO-ID'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                      {prop.type} • Owner: <span className="font-semibold text-gray-800">{ownerName}</span>
+                    </p>
+
+                    {phone ? (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50/70 border border-amber-100 rounded-lg text-xs">
+                        <a href={`tel:${phone}`} className="font-bold text-amber-900 hover:underline flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-amber-700" />
+                          {phone}
+                        </a>
+                        {cleanPhone && (
+                          <a 
+                            href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(ownerName)},%20following%20up%20on%20your%20FixyStays%20registration%20for%20${encodeURIComponent(prop.name)}.%20Do%20you%20need%20any%20help%20completing%20your%20subscription%20payment?`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded hover:bg-green-100 ml-auto"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        ⚠️ No phone number set
+                      </div>
+                    )}
+                    
+                    <div className="mt-2 text-xs">
+                      <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded text-[11px]">
+                        ❌ Payment Not Completed
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-gray-400 font-medium">Approval Blocked</span>
+                    <DeletePropertyButton propertyId={prop.id} propertyName={prop.name} className="h-8 text-xs" />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* SECTION 1B: Pending Influencers */}
       <section>

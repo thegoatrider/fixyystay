@@ -390,14 +390,19 @@ function OnboardingContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="propertyName" className="text-gray-700 font-bold">Property Name (Optional)</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="propertyName" className="text-gray-700 font-bold">Property Name</Label>
+                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">Mandatory</span>
+                    </div>
                     <div className="relative">
                       <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input 
                         id="propertyName"
                         name="propertyName" 
-                        placeholder="Sunset Villa" 
-                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm"
+                        placeholder="e.g. Sunset Villa, Ocean Breeze Resort" 
+                        required
+                        minLength={3}
+                        className="pl-10 bg-white border-gray-200 focus:border-blue-600 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl shadow-sm font-medium"
                       />
                     </div>
                   </div>
