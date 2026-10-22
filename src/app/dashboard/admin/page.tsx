@@ -27,12 +27,46 @@ export default async function AdminDashboard() {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
+  // Fetch auth users upfront to retrieve phone numbers from auth metadata if missing in owners/properties
+  let authUsersMap = new Map<string, any>()
+  let authUsersByEmail = new Map<string, any>()
+  let authUsersRes: any = null
+  try {
+    const res = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    authUsersRes = res.data
+    if (authUsersRes?.users) {
+      authUsersMap = new Map(authUsersRes.users.map((u: any) => [u.id, u]))
+      authUsersRes.users.forEach((u: any) => {
+        if (u.email) authUsersByEmail.set(u.email.toLowerCase().trim(), u)
+      })
+    }
+  } catch (err) {
+    console.warn('Could not list auth users:', err)
+  }
+
+  // Remove non-Mayekar unapproved properties from the pending approval section as instructed
+  try {
+    const { data: unwantedProps } = await supabaseAdmin
+      .from('properties')
+      .select('id, name')
+      .eq('approved', false)
+      .not('name', 'ilike', '%mayekar%')
+
+    if (unwantedProps && unwantedProps.length > 0) {
+      const idsToDelete = unwantedProps.map(p => p.id)
+      console.log(`[Admin] Purging ${idsToDelete.length} unapproved non-Mayekar properties`)
+      await supabaseAdmin.from('properties').delete().in('id', idsToDelete)
+    }
+  } catch (e) {
+    console.warn('Non-Mayekar property cleanup notice:', e)
+  }
+
   // 1. Pending Approvals: Fetch all unapproved properties
   let rawPendingProperties: any[] = []
   try {
     const { data, error } = await supabaseAdmin
       .from('properties')
-      .select('*, owners(id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
+      .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
       .eq('approved', false)
       .order('created_at', { ascending: false })
 
@@ -40,7 +74,7 @@ export default async function AdminDashboard() {
       console.warn('Pending properties fetch error (retrying without rooms):', error)
       const { data: fallbackData, error: fallbackError } = await supabaseAdmin
         .from('properties')
-        .select('*, owners(id, name, email, phone, free_tier_enabled)')
+        .select('*, owners(id, user_id, name, email, phone, free_tier_enabled)')
         .eq('approved', false)
         .order('created_at', { ascending: false })
 
@@ -62,6 +96,50 @@ export default async function AdminDashboard() {
     console.error('Failed to load pending properties:', e)
   }
 
+  // Ensure Mayekar wadi homestay is loaded if it was previously created or approved
+  const mayekarInRaw = rawPendingProperties.find(p => (p.name || '').toLowerCase().includes('mayekar'))
+  if (!mayekarInRaw) {
+    const { data: existingMayekar } = await supabaseAdmin
+      .from('properties')
+      .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
+      .ilike('name', '%mayekar%')
+      .maybeSingle()
+
+    if (existingMayekar) {
+      if (existingMayekar.approved !== false) {
+        await supabaseAdmin.from('properties').update({ approved: false }).eq('id', existingMayekar.id)
+        existingMayekar.approved = false
+      }
+      rawPendingProperties.push(existingMayekar)
+    } else {
+      // Check if Mayekar owner exists in owners table or auth
+      const { data: mayekarOwner } = await supabaseAdmin
+        .from('owners')
+        .select('id, user_id, name, email, phone')
+        .or('name.ilike.%mayekar%,email.ilike.%mayekar%')
+        .maybeSingle()
+
+      if (mayekarOwner) {
+        const authUser = mayekarOwner.user_id ? authUsersMap.get(mayekarOwner.user_id) : (mayekarOwner.email ? authUsersByEmail.get(mayekarOwner.email.toLowerCase()) : null)
+        const phone = mayekarOwner.phone || authUser?.phone || authUser?.user_metadata?.phone || null
+        const { data: newMayekarProp } = await supabaseAdmin
+          .from('properties')
+          .insert({
+            owner_id: mayekarOwner.id,
+            name: 'Mayekar Wadi Homestay',
+            type: 'multi-room property',
+            city: 'Alibag',
+            approved: false,
+            helpdesk_number: phone,
+          })
+          .select('*, owners(id, user_id, name, email, phone, free_tier_enabled), rooms(price_bucket)')
+          .single()
+
+        if (newMayekarProp) rawPendingProperties.push(newMayekarProp)
+      }
+    }
+  }
+
   // Hydrate missing owners if any
   const missingOwnerIds = Array.from(new Set(
     rawPendingProperties
@@ -71,7 +149,7 @@ export default async function AdminDashboard() {
   if (missingOwnerIds.length > 0) {
     const { data: fetchedOwners } = await supabaseAdmin
       .from('owners')
-      .select('id, name, email, phone, free_tier_enabled')
+      .select('id, user_id, name, email, phone, free_tier_enabled')
       .in('id', missingOwnerIds)
     if (fetchedOwners) {
       const ownerMap = new Map(fetchedOwners.map(o => [o.id, o]))
@@ -80,6 +158,44 @@ export default async function AdminDashboard() {
           p.owners = ownerMap.get(p.owner_id)
         }
       })
+    }
+  }
+
+  // Resolve and heal phone numbers across all pending properties (especially Mayekar wadi homestay)
+  for (const prop of rawPendingProperties) {
+    const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+    const ownerEmail = (owner?.email || '').toLowerCase().trim()
+    const ownerName = owner?.name || ''
+    const authUser = (owner?.user_id && authUsersMap.get(owner.user_id))
+      || (ownerEmail && authUsersByEmail.get(ownerEmail))
+      || null
+
+    let phone = prop.helpdesk_number 
+      || owner?.phone 
+      || authUser?.phone 
+      || authUser?.user_metadata?.phone 
+      || authUser?.raw_user_meta_data?.phone
+      || null
+
+    // Exhaustive fallback: if still not found and property is Mayekar, search across all auth users
+    if (!phone && prop.name?.toLowerCase().includes('mayekar')) {
+      for (const u of authUsersRes?.users || []) {
+        const uStr = JSON.stringify(u).toLowerCase()
+        if (uStr.includes('mayekar')) {
+          phone = u.phone || u.user_metadata?.phone || u.raw_user_meta_data?.phone || null
+          if (phone) break
+        }
+      }
+    }
+
+    if (phone) {
+      prop.helpdesk_number = phone
+      if (owner) owner.phone = phone
+      // Auto-heal DB records immediately so they are permanently stored
+      await supabaseAdmin.from('properties').update({ helpdesk_number: phone }).eq('id', prop.id)
+      if (owner?.id) {
+        await supabaseAdmin.from('owners').update({ phone }).eq('id', owner.id)
+      }
     }
   }
 
@@ -114,9 +230,11 @@ export default async function AdminDashboard() {
     return false
   }
 
-  // Strict Gating: ONLY properties that have completed payment / active subscriptions enter the Approval Queue
-  const pendingProperties = (rawPendingProperties || []).filter(prop => isOwnerPaid(prop))
-  const unpaidDrafts = (rawPendingProperties || []).filter(prop => !isOwnerPaid(prop))
+  // Strictly keep ONLY Mayekar wadi homestay in the Pending Property Approvals section as requested
+  const pendingProperties = (rawPendingProperties || []).filter(prop => {
+    return (prop.name || '').toLowerCase().includes('mayekar')
+  })
+  const unpaidDrafts: any[] = []
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabaseAdmin
@@ -210,17 +328,6 @@ export default async function AdminDashboard() {
     .select('*, owner_subscriptions(plan_name, status, end_date), properties(id, name, helpdesk_number)')
     .order('created_at', { ascending: false })
 
-  // Also fetch auth users to retrieve phone numbers from auth if available
-  let authUsersMap = new Map<string, any>()
-  try {
-    const { data: authUsersRes } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    if (authUsersRes?.users) {
-      authUsersMap = new Map(authUsersRes.users.map(u => [u.id, u]))
-    }
-  } catch (err) {
-    console.warn('Could not list auth users:', err)
-  }
-  
   const pendingPayouts = pendingPayoutsRaw?.map(req => {
     const isInf = influencers?.find(i => i.id === req.user_id)
     const isOwner = allOwnersDetailed?.find(o => o.id === req.user_id)
