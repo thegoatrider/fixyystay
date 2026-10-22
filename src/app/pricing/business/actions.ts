@@ -7,6 +7,7 @@ import { addMonths, addYears } from 'date-fns'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 import { getCityCode } from '@/lib/india-locations'
+import { generatePropertyUid } from '@/app/dashboard/owner/actions'
 
 async function getAbsoluteOrigin() {
   const reqHeaders = await headers()
@@ -243,7 +244,11 @@ export async function verifyAndUpgrade(
       await supabaseAdmin.from('owners').update({ phone }).eq('id', ownerId)
     }
 
-    if (!existingProperties || existingProperties.length === 0) {
+    if (existingProperties && existingProperties.length > 0) {
+      if (phone) {
+        await supabaseAdmin.from('properties').update({ helpdesk_number: phone }).eq('id', existingProperties[0].id)
+      }
+    } else {
       const propName = 
         orderNotes.property_name || 
         signupData?.propertyName || 
@@ -254,24 +259,9 @@ export async function verifyAndUpgrade(
       const pincode = orderNotes.pincode || signupData?.propertyDetails?.pincode || null
       const state = orderNotes.state || signupData?.propertyDetails?.state || null
 
-      const prefix = getCityCode(finalCity)
-      const { data: properties } = await supabaseAdmin
-        .from('properties')
-        .select('uid')
-        .like('uid', `${prefix}%`)
-        .order('uid', { ascending: false })
-        .limit(1)
+      const uid = await generatePropertyUid(supabaseAdmin, finalCity)
 
-      let nextNum = 1
-      if (properties && properties.length > 0 && properties[0].uid) {
-        const match = properties[0].uid.match(/\d+$/)
-        if (match) {
-          nextNum = parseInt(match[0], 10) + 1
-        }
-      }
-      const uid = `${prefix}${nextNum.toString().padStart(3, '0')}`
-
-      await supabaseAdmin.from('properties').insert([
+      const { data: newProp } = await supabaseAdmin.from('properties').insert([
         {
           owner_id: ownerId,
           name: propName,
@@ -285,7 +275,21 @@ export async function verifyAndUpgrade(
           helpdesk_number: phone,
           approved: false,
         }
-      ])
+      ]).select('id').single()
+
+      if (newProp?.id) {
+        try {
+          await supabaseAdmin.from('rooms').insert([
+            {
+              property_id: newProp.id,
+              name: 'Standard Room',
+              category: 'Standard',
+              base_price: 2500,
+              price_bucket: '₹2,500 - ₹5,000',
+            }
+          ])
+        } catch (_) {}
+      }
     }
 
     // Auto-sign in if password was provided and in browser context

@@ -5,6 +5,7 @@ import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { headers } from 'next/headers'
 import { Resend } from 'resend'
 import { getCityCode } from '@/lib/india-locations'
+import { generatePropertyUid } from '@/app/dashboard/owner/actions'
 
 async function getAbsoluteOrigin() {
   const reqHeaders = await headers()
@@ -181,12 +182,79 @@ export async function submitOnboarding(formData: FormData) {
   const finalArea = selectedArea === 'custom' ? customArea : (selectedArea || customArea || null)
   const state = ((formData.get('state') as string) || '').trim()
 
-  // Capture property details to be passed along with the subscription order.
-  // NOTE: Property is created ONLY upon verified payment (or manual admin activation)
-  // to avoid unpaid properties from entering the approval queue before completing payment.
+  const finalPropName = (propertyName || `${name}'s Property`).trim()
+  const safeCity = finalCity && finalCity !== 'Pending' ? finalCity : 'Alibag'
+  let propertyId: string | null = null
+
+  // Ensure property is safely persisted to Supabase immediately upon onboarding
+  if (ownerId) {
+    try {
+      const { data: existingProp } = await supabaseAdmin
+        .from('properties')
+        .select('id, uid')
+        .eq('owner_id', ownerId)
+        .ilike('name', finalPropName)
+        .maybeSingle()
+
+      if (existingProp) {
+        propertyId = existingProp.id
+        await supabaseAdmin.from('properties').update({
+          city: safeCity,
+          city_area: finalArea,
+          area_name: finalArea,
+          pincode: pincode || null,
+          state: state || null,
+          helpdesk_number: phone,
+        }).eq('id', existingProp.id)
+      } else {
+        const uid = await generatePropertyUid(supabaseAdmin, safeCity)
+        const { data: newProp, error: insertError } = await supabaseAdmin
+          .from('properties')
+          .insert([
+            {
+              owner_id: ownerId,
+              name: finalPropName,
+              city: safeCity,
+              city_area: finalArea,
+              area_name: finalArea,
+              pincode: pincode || null,
+              state: state || null,
+              type: 'multi-room property',
+              uid,
+              helpdesk_number: phone,
+              approved: false,
+            }
+          ])
+          .select('id')
+          .single()
+
+        if (insertError) {
+          console.error('Failed to create onboarding property in properties table:', insertError)
+        } else if (newProp?.id) {
+          propertyId = newProp.id
+          try {
+            await supabaseAdmin.from('rooms').insert([
+              {
+                property_id: newProp.id,
+                name: 'Standard Room',
+                category: 'Standard',
+                base_price: 2500,
+                price_bucket: '₹2,500 - ₹5,000',
+              }
+            ])
+          } catch (_) {}
+        }
+      }
+    } catch (propErr) {
+      console.error('Error persisting onboarding property:', propErr)
+    }
+  }
+
+  // Capture property details to be passed along with the subscription order
   const propertyData = {
-    propertyName: propertyName || `${name}'s Property`,
-    city: finalCity,
+    propertyId,
+    propertyName: finalPropName,
+    city: safeCity,
     cityArea: finalArea,
     pincode: pincode || null,
     state: state || null,

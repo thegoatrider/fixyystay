@@ -71,27 +71,47 @@ function mapConfidenceToNumeric(overall: string | null | undefined): number {
   return 0.50
 }
 
-async function generatePropertyUid(supabaseAdmin: any, city: string) {
+export async function generatePropertyUid(supabaseAdmin: any, city: string) {
   const prefix = getCityCode(city)
   
-  // Find properties with this prefix and get the highest number
+  // Find properties with this prefix and extract true numeric maximum (not string sorting)
   const { data: properties } = await supabaseAdmin
     .from('properties')
     .select('uid')
     .like('uid', `${prefix}%`)
-    .order('uid', { ascending: false })
-    .limit(1)
+    .limit(500)
     
-  let nextNum = 1
-  if (properties && properties.length > 0 && properties[0].uid) {
-    const lastUid = properties[0].uid
-    const match = lastUid.match(/\d+$/)
-    if (match) {
-      nextNum = parseInt(match[0], 10) + 1
+  let maxNum = 0
+  if (properties && properties.length > 0) {
+    for (const p of properties) {
+      if (p.uid) {
+        const match = p.uid.match(/\d+$/)
+        if (match) {
+          const n = parseInt(match[0], 10)
+          if (!isNaN(n) && n > maxNum) maxNum = n
+        }
+      }
     }
   }
   
-  return `${prefix}${nextNum.toString().padStart(3, '0')}`
+  let candidateNum = maxNum + 1
+  let uid = `${prefix}${candidateNum.toString().padStart(3, '0')}`
+
+  // Guard against any collision in database
+  let attempts = 0
+  while (attempts < 10) {
+    const { data: existing } = await supabaseAdmin
+      .from('properties')
+      .select('id')
+      .eq('uid', uid)
+      .maybeSingle()
+    if (!existing) break
+    candidateNum++
+    uid = `${prefix}${candidateNum.toString().padStart(3, '0')}`
+    attempts++
+  }
+  
+  return uid
 }
 
 async function geocodeAddress(address: string) {
@@ -198,18 +218,19 @@ export async function createProperty(formData: FormData) {
     return { error: 'Property name is required.' }
   }
 
-  // 3.5 Check for duplicate properties by name (case-insensitive)
+  // 3.5 Check for duplicate properties by name for this owner (case-insensitive)
   const { data: existingProperties } = await supabaseAdmin
     .from('properties')
     .select('id, approved')
+    .eq('owner_id', owner.id)
     .ilike('name', name.trim())
     .limit(1)
 
   if (existingProperties && existingProperties.length > 0) {
     if (existingProperties[0].approved) {
-      return { error: 'Property is already listed' }
+      return { error: 'You have already listed a property with this name.' }
     } else {
-      return { error: 'Property already sent for approval' }
+      return { error: 'You have already submitted this property for approval.' }
     }
   }
   const houseRules = formData.get('houseRules') as string // Added houseRules extraction

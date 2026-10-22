@@ -28,7 +28,7 @@ export async function approveProperty(propertyId: string) {
       return { error: 'Property not found.' }
     }
 
-    const owner = propData.owners as any
+    const owner = Array.isArray(propData.owners) ? propData.owners[0] : propData.owners
     let isOwnerPaid = owner?.free_tier_enabled === true
 
     if (!isOwnerPaid && propData.owner_id) {
@@ -55,8 +55,13 @@ export async function approveProperty(propertyId: string) {
       if (hub) isOwnerPaid = true
     }
 
-    if (!isOwnerPaid) {
-      return { error: 'Cannot approve property: Property owner has not completed payment or does not have an active subscription.' }
+    // If owner has not paid online yet, admin approval automatically enables free tier / active access
+    // so the owner can access their dashboard and operate their approved property immediately
+    if (!isOwnerPaid && propData.owner_id) {
+      await supabaseAdmin
+        .from('owners')
+        .update({ free_tier_enabled: true })
+        .eq('id', propData.owner_id)
     }
 
     // Keep existing UID if present, or generate a collision-safe identifier

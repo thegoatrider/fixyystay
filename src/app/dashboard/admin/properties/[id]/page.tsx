@@ -76,73 +76,52 @@ export default async function ManagePropertyPage({ params }: { params: Promise<{
       </div>
 
       {!property.approved && (
-        isOwnerPaid ? (
-          <div className="bg-orange-50 border border-orange-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
-            <div className="flex items-center gap-4 text-orange-800">
-              <AlertCircle className="w-8 h-8 text-orange-500 flex-shrink-0" />
-              <div>
+        <div className={`border rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm ${
+          isOwnerPaid ? 'bg-orange-50 border-orange-200 text-orange-950' : 'bg-amber-50 border-amber-200 text-amber-950'
+        }`}>
+          <div className="flex items-center gap-4">
+            <AlertCircle className={`w-8 h-8 flex-shrink-0 ${isOwnerPaid ? 'text-orange-500' : 'text-amber-600'}`} />
+            <div>
+              <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold">This property is pending approval</h2>
-                <p className="text-sm opacity-80">Review the images and details below before approving.</p>
-                {ownerPhone ? (
-                  <div className="flex items-center gap-3 mt-2 text-sm">
-                    <a href={`tel:${ownerPhone}`} className="font-bold text-orange-950 hover:underline flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-orange-600" />
-                      {ownerPhone}
-                    </a>
-                    {cleanPhone && (
-                      <a 
-                        href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20reviewing%20your%20property%20listing%20${encodeURIComponent(property.name)}.`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-xs font-bold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded shadow-sm hover:bg-green-50"
-                      >
-                        WhatsApp Owner
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs font-semibold text-red-600 mt-1">⚠️ No phone number provided</p>
-                )}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isOwnerPaid ? 'text-green-700 bg-green-100 border border-green-200' : 'text-amber-700 bg-amber-100 border border-amber-200'
+                }`}>
+                  {isOwnerPaid ? '✓ Subscription Active' : '⏳ Payment Pending / Offline'}
+                </span>
               </div>
-            </div>
-            <div className="w-full sm:w-auto min-w-[200px]">
-              <PropertyApprovalActions propertyId={property.id} />
+              <p className="text-sm opacity-85 mt-0.5">
+                {isOwnerPaid 
+                  ? 'Review the images and details below before approving.' 
+                  : 'Notice: Property owner has not completed online subscription payment. Approving will activate the property and grant dashboard access.'}
+              </p>
+              {ownerPhone ? (
+                <div className="flex items-center gap-3 mt-2 text-sm">
+                  <a href={`tel:${ownerPhone}`} className="font-bold hover:underline flex items-center gap-1.5">
+                    <Phone className="w-4 h-4 text-orange-600" />
+                    {ownerPhone}
+                  </a>
+                  {cleanPhone && (
+                    <a 
+                      href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20reviewing%20your%20property%20listing%20${encodeURIComponent(property.name)}.`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-xs font-bold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded shadow-sm hover:bg-green-50"
+                    >
+                      WhatsApp Owner
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs font-semibold text-red-600 mt-1">⚠️ No phone number provided</p>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex flex-col sm:flex-row gap-6 justify-between items-center shadow-sm">
-            <div className="flex items-center gap-4 text-amber-900">
-              <AlertCircle className="w-8 h-8 text-amber-600 flex-shrink-0" />
-              <div>
-                <h2 className="text-lg font-bold">Payment Incomplete / Unpaid Account</h2>
-                <p className="text-sm opacity-90">
-                  The property owner ({property.owners?.name || 'Owner'}) has not completed payment for their subscription. This property is blocked from approval until their subscription is active.
-                </p>
-                {ownerPhone && (
-                  <div className="flex items-center gap-3 mt-2 text-sm">
-                    <a href={`tel:${ownerPhone}`} className="font-bold text-amber-950 hover:underline flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-amber-700" />
-                      {ownerPhone}
-                    </a>
-                    {cleanPhone && (
-                      <a 
-                        href={`https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(property.owners?.name || 'Owner')},%20following%20up%20on%20your%20FixyStays%20listing%20${encodeURIComponent(property.name)}.`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-xs font-bold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded shadow-sm hover:bg-green-50"
-                      >
-                        WhatsApp Owner
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="w-full sm:w-auto min-w-[160px] flex justify-end">
-              <DeletePropertyButton propertyId={property.id} propertyName={property.name} />
-            </div>
+          <div className="w-full sm:w-auto min-w-[200px] flex gap-2">
+            <DeletePropertyButton propertyId={property.id} propertyName={property.name} />
+            <PropertyApprovalActions propertyId={property.id} />
           </div>
-        )
+        </div>
       )}
 
       <div className="grid lg:grid-cols-3 gap-8">
