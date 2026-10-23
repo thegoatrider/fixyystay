@@ -257,15 +257,26 @@ ALTER TABLE public.owner_payments ADD COLUMN IF NOT EXISTS razorpay_order_id TEX
 ALTER TABLE public.owner_payments ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 ALTER TABLE public.owner_payments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
+-- Relax legacy NOT NULL columns so per-property records never fail
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_owner_payments_status'
-  ) THEN
-    ALTER TABLE public.owner_payments ADD CONSTRAINT chk_owner_payments_status 
-    CHECK (status IN ('created', 'paid', 'failed', 'refunded'));
-  END IF;
+  ALTER TABLE public.owner_payments ALTER COLUMN email DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE public.owner_payments ALTER COLUMN plan_name DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Drop legacy constraint variations cleanly
+ALTER TABLE public.owner_payments DROP CONSTRAINT IF EXISTS chk_owner_payments_status;
+ALTER TABLE public.owner_payments DROP CONSTRAINT IF EXISTS owner_payments_status_check;
+
+-- Add unified check constraint allowing all valid workflow statuses
+ALTER TABLE public.owner_payments ADD CONSTRAINT chk_owner_payments_status 
+CHECK (status IN ('pending', 'created', 'paid', 'failed', 'refunded'));
 
 -- Backfill existing rows: status = 'paid'
 UPDATE public.owner_payments SET status = 'paid' WHERE status IS NULL;

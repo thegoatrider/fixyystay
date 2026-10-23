@@ -213,7 +213,7 @@ export async function createPropertySubscriptionOrder(
 
     const order = await razorpay.orders.create(options)
 
-    // 5. Persist snapshot into owner_payments with status 'created'
+    // 5. Persist snapshot into owner_payments with status 'pending' (backwards & forwards compatible)
     const { error: paymentErr } = await supabaseAdmin.from('owner_payments').insert({
       owner_id: property.owner_id,
       property_id: propertyId,
@@ -224,8 +224,10 @@ export async function createPropertySubscriptionOrder(
       payment_method: 'Razorpay',
       payment_ref: order.id,
       razorpay_order_id: order.id,
-      status: 'created',
+      status: 'pending',
       plan_duration_months: months,
+      email: owner?.email || user.email || '',
+      plan_name: `${months} Months Plan`,
     })
 
     if (paymentErr) {
@@ -384,7 +386,7 @@ export async function createBulkPropertySubscriptionOrder(
 
     const order = await razorpay.orders.create(options)
 
-    // 4. Persist Master Payment snapshot in owner_payments
+    // 4. Persist Master Payment snapshot in owner_payments with status 'pending'
     const { error: paymentErr } = await supabaseAdmin.from('owner_payments').insert({
       owner_id: owner.id,
       property_id: items[0].propertyId,
@@ -395,8 +397,10 @@ export async function createBulkPropertySubscriptionOrder(
       payment_method: 'Razorpay',
       payment_ref: order.id,
       razorpay_order_id: order.id,
-      status: 'created',
+      status: 'pending',
       plan_duration_months: items[0].months,
+      email: owner.email || user.email || '',
+      plan_name: `${items[0].months} Months Bulk Plan`,
     })
 
     if (paymentErr) {
@@ -768,8 +772,10 @@ export async function createOwnerOrder(
         payment_method: 'Razorpay',
         payment_ref: order.id,
         razorpay_order_id: order.id,
-        status: 'created',
+        status: 'pending',
         plan_duration_months: months,
+        email: email.toLowerCase(),
+        plan_name: planName,
       })
     }
 

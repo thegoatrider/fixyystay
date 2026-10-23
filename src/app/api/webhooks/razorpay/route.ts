@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
 
       // 2. Failure event: payment.failed
       if (eventType === 'payment.failed') {
-        if (targetPayment.status === 'created') {
+        if (targetPayment.status === 'created' || targetPayment.status === 'pending') {
           const { error: failErr } = await supabaseAdmin
             .from('owner_payments')
             .update({ status: 'failed', updated_at: new Date().toISOString() })
