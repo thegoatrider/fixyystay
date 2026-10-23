@@ -2,20 +2,28 @@
 
 import { useState } from 'react'
 import NextImage from 'next/image'
+import Script from 'next/script'
+import { Capacitor } from '@capacitor/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProperty } from './actions'
 import { uploadPropertyImage } from '@/app/actions/property'
+import { createPropertySubscriptionOrder, verifyPropertyPayment } from '@/app/pricing/business/actions'
+import { calculateMonthlyFee } from '@/lib/pricing'
 import { useRouter } from 'next/navigation'
 import { CollapsibleTile } from '@/components/CollapsibleTile'
-import { PlusCircle, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
+import { PlusCircle, MapPin, Loader2, CheckCircle2, ShieldCheck, CreditCard, AlertTriangle, ArrowRight } from 'lucide-react'
 import { INDIAN_STATES_AND_CITIES } from '@/lib/india-locations'
 import { SearchableCitySelect } from '@/components/SearchableCitySelect'
 
 export default function CreatePropertyForm({ initialPhone }: { initialPhone?: string } = {}) {
   const [propertyType, setPropertyType] = useState('villa')
   const [isLoading, setIsLoading] = useState(false)
+  const [roomCount, setRoomCount] = useState<number>(5)
+  const [selectedMonths, setSelectedMonths] = useState<number>(1)
+  const [unpaidDraft, setUnpaidDraft] = useState<{ id: string; name: string; amount: number; months: number } | null>(null)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [coverImage, setCoverImage] = useState<File | null>(null)
@@ -27,6 +35,22 @@ export default function CreatePropertyForm({ initialPhone }: { initialPhone?: st
   const [availableAreas, setAvailableAreas] = useState<string[]>([])
   const [selectedArea, setSelectedArea] = useState('')
   const router = useRouter()
+
+  const DURATION_OPTIONS = [
+    { months: 1, label: '1 Month' },
+    { months: 3, label: '3 Months' },
+    { months: 6, label: '6 Months' },
+    { months: 12, label: '12 Months (1 Year)' },
+  ]
+
+  const safeRooms = Math.min(100, Math.max(1, roomCount || 1))
+  const feeRes = calculateMonthlyFee({
+    roomCount: safeRooms,
+    city,
+    pincode,
+  })
+  const monthlyFee = feeRes.monthlyFee ?? 100
+  const totalAmount = monthlyFee * selectedMonths
 
   const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -184,16 +208,147 @@ export default function CreatePropertyForm({ initialPhone }: { initialPhone?: st
         formData.append('uploadedGalleryUrls', JSON.stringify(uploadedGalleryUrls))
       }
 
+      formData.set('roomCount', String(safeRooms))
+      setPaymentError(null)
+
       const result = await createProperty(formData)
       if (result?.error) {
         alert(result.error)
         setIsLoading(false)
-      } else if (result?.success) {
-        router.push(`/dashboard/owner/property/${result.id}`)
+        return
+      }
+
+      if (result?.success && result.id) {
+        // Native app mode: no web payment gateway inside native wrapper
+        if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+          alert('Property draft created successfully! In-app purchases are managed through our web portal. Please visit www.fixystays.com/renew in your mobile browser to activate your subscription.')
+          router.push('/dashboard/owner')
+          setIsLoading(false)
+          return
+        }
+
+        // Web mode: initiate pay-first subscription checkout
+        try {
+          const orderRes = await createPropertySubscriptionOrder(result.id, selectedMonths)
+          if (orderRes.error || !orderRes.orderId || !orderRes.key) {
+            setPaymentError(orderRes.error || 'Failed to initialize payment gateway')
+            setUnpaidDraft({
+              id: result.id,
+              name: result.propertyName || 'New Property',
+              amount: totalAmount,
+              months: selectedMonths,
+            })
+            setIsLoading(false)
+            return
+          }
+
+          const options = {
+            key: orderRes.key,
+            amount: orderRes.amount,
+            currency: 'INR',
+            name: 'FixyStays Property Subscription',
+            description: `${result.propertyName || 'Property'} - ${selectedMonths} Month Subscription`,
+            order_id: orderRes.orderId,
+            prefill: {
+              contact: phoneVal,
+              email: orderRes.userEmail || '',
+            },
+            theme: { color: '#4F46E5' },
+            handler: async function (response: any) {
+              setIsLoading(true)
+              const verifyRes = await verifyPropertyPayment({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              })
+
+              if (verifyRes.success) {
+                window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+              } else {
+                alert(`Payment recorded. Redirecting: ${verifyRes.error || 'Done'}`)
+                window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+              }
+            },
+            modal: {
+              ondismiss: function () {
+                setIsLoading(false)
+                setUnpaidDraft({
+                  id: result.id,
+                  name: result.propertyName || 'New Property',
+                  amount: orderRes.totalAmount || totalAmount,
+                  months: selectedMonths,
+                })
+              },
+            },
+          }
+
+          const rzp = new (window as any).Razorpay(options)
+          rzp.open()
+        } catch (payErr: any) {
+          console.error('Payment checkout error:', payErr)
+          setPaymentError(payErr.message || 'Payment initiation failed')
+          setUnpaidDraft({
+            id: result.id,
+            name: result.propertyName || 'New Property',
+            amount: totalAmount,
+            months: selectedMonths,
+          })
+          setIsLoading(false)
+        }
       }
     } catch (err: any) {
       console.error(err)
       alert(err?.message || 'An unexpected error occurred. Please try again.')
+      setIsLoading(false)
+    }
+  }
+
+  const handlePayDraftProperty = async () => {
+    if (!unpaidDraft) return
+    setIsLoading(true)
+    setPaymentError(null)
+
+    try {
+      const orderRes = await createPropertySubscriptionOrder(unpaidDraft.id, unpaidDraft.months)
+      if (orderRes.error || !orderRes.orderId || !orderRes.key) {
+        setPaymentError(orderRes.error || 'Failed to initialize payment gateway')
+        setIsLoading(false)
+        return
+      }
+
+      const options = {
+        key: orderRes.key,
+        amount: orderRes.amount,
+        currency: 'INR',
+        name: 'FixyStays Property Subscription',
+        description: `${unpaidDraft.name} - ${unpaidDraft.months} Month Subscription`,
+        order_id: orderRes.orderId,
+        theme: { color: '#4F46E5' },
+        handler: async function (response: any) {
+          setIsLoading(true)
+          const verifyRes = await verifyPropertyPayment({
+            orderId: response.razorpay_order_id,
+            paymentId: response.razorpay_payment_id,
+            signature: response.razorpay_signature,
+          })
+          if (verifyRes.success) {
+            window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+          } else {
+            alert(`Payment recorded. Redirecting: ${verifyRes.error || 'Done'}`)
+            window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsLoading(false)
+          },
+        },
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
+    } catch (err: any) {
+      setPaymentError(err.message || 'Payment initiation failed')
       setIsLoading(false)
     }
   }
@@ -557,7 +712,133 @@ export default function CreatePropertyForm({ initialPhone }: { initialPhone?: st
         )}
       </div>
 
+      {/* Subscription Plan & Rentable Room Count */}
+      <div className="space-y-4 p-5 bg-indigo-50/60 border border-indigo-100 rounded-2xl">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="roomCount" className="font-bold text-gray-900 text-base flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-indigo-600" />
+            Rentable Rooms & Subscription Plan
+          </Label>
+          <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200">
+            Pay-First Model
+          </span>
+        </div>
+
+        <p className="text-xs text-gray-600 leading-relaxed">
+          FixyStays subscriptions are strictly priced by declared rentable room count. Adding an additional property requires an active subscription before admin approval.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="roomCountInput" className="text-xs font-semibold text-gray-700">
+              Total Rentable Rooms (1–100)
+            </Label>
+            <Input
+              id="roomCountInput"
+              name="roomCountInput"
+              type="number"
+              min={1}
+              max={100}
+              value={roomCount}
+              onChange={(e) => setRoomCount(parseInt(e.target.value, 10) || 1)}
+              required
+              className="bg-white font-bold text-lg"
+            />
+            <p className="text-[11px] text-gray-400">Total rentable room keys in this property</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-gray-700 block">
+              Subscription Duration
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              {DURATION_OPTIONS.map((opt) => {
+                const isSelected = selectedMonths === opt.months
+                return (
+                  <button
+                    key={opt.months}
+                    type="button"
+                    onClick={() => setSelectedMonths(opt.months)}
+                    className={`py-2 px-2.5 rounded-xl border text-center transition-all ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-600 text-white font-bold shadow-sm'
+                        : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700 text-xs font-medium'
+                    }`}
+                  >
+                    <div>{opt.label}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Live Tier Fee Preview */}
+        <div className="mt-3 p-4 bg-white rounded-xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+          <div>
+            <div className="text-xs text-gray-500 font-medium">
+              Rate for <span className="font-bold text-gray-800">{safeRooms} Rooms</span>:
+            </div>
+            <div className="text-sm font-semibold text-indigo-700">
+              ₹{monthlyFee} / month <span className="text-[11px] text-gray-400 font-normal">(Inclusive of GST)</span>
+            </div>
+          </div>
+
+          <div className="sm:text-right">
+            <div className="text-xs text-gray-400">Total Subscription Fee ({selectedMonths} mo)</div>
+            <div className="text-2xl font-black text-gray-900">
+              ₹{totalAmount.toLocaleString('en-IN')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Unpaid Draft Prompt if payment was cancelled / failed */}
+      {unpaidDraft && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <div className="text-sm font-bold text-amber-900">
+                Listing Drafted: {unpaidDraft.name}
+              </div>
+              <div className="text-xs text-amber-800 mt-0.5">
+                Payment of ₹{unpaidDraft.amount} is pending. FixyStays requires subscription activation before submitting to admin.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              onClick={handlePayDraftProperty}
+              disabled={isLoading}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow"
+            >
+              Pay ₹{unpaidDraft.amount} Now
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              asChild
+              className="text-xs h-10 px-3 rounded-xl border-amber-300 text-amber-900 hover:bg-amber-100"
+            >
+              <a href="/renew">View Renewals</a>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Error banner */}
+      {paymentError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{paymentError}</span>
+        </div>
+      )}
+
       <div className="mt-8 pb-12 border-t pt-8">
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <Button 
           type="submit" 
           className="w-full h-16 text-xl font-black bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-[0.98] rounded-2xl" 
@@ -568,10 +849,15 @@ export default function CreatePropertyForm({ initialPhone }: { initialPhone?: st
                <span className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                Processing...
              </div>
-          ) : '🚀 Create Property Listing'}
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <CreditCard className="w-6 h-6" />
+              Pay ₹{totalAmount.toLocaleString('en-IN')} & Submit Property
+            </div>
+          )}
         </Button>
         <p className="text-center text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-widest italic">
-          * Your property will go live after admin approval
+          * Your property subscription will activate immediately upon payment, and submit for admin approval
         </p>
       </div>
     </form>

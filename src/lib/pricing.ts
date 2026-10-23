@@ -30,13 +30,13 @@ export interface PricingBracket {
 }
 
 export const PRICING_BRACKETS: PricingBracket[] = [
-  { minRooms: 1, maxRooms: 6, nonMetroFee: 199, metroFee: 299, label: '1–6 Rooms' },
-  { minRooms: 7, maxRooms: 12, nonMetroFee: 299, metroFee: 399, label: '7–12 Rooms' },
-  { minRooms: 13, maxRooms: 20, nonMetroFee: 399, metroFee: 499, label: '13–20 Rooms' },
-  { minRooms: 21, maxRooms: 30, nonMetroFee: 499, metroFee: 599, label: '21–30 Rooms' },
-  { minRooms: 31, maxRooms: 50, nonMetroFee: 599, metroFee: 899, label: '31–50 Rooms' },
-  { minRooms: 51, maxRooms: 75, nonMetroFee: 999, metroFee: 1299, label: '51–75 Rooms' },
-  { minRooms: 76, maxRooms: 100, nonMetroFee: 1399, metroFee: 1599, label: '76–100 Rooms' },
+  { minRooms: 1, maxRooms: 6, nonMetroFee: 100, metroFee: 100, label: '1–6 Rooms' },
+  { minRooms: 7, maxRooms: 12, nonMetroFee: 150, metroFee: 150, label: '7–12 Rooms' },
+  { minRooms: 13, maxRooms: 20, nonMetroFee: 250, metroFee: 250, label: '13–20 Rooms' },
+  { minRooms: 21, maxRooms: 30, nonMetroFee: 350, metroFee: 350, label: '21–30 Rooms' },
+  { minRooms: 31, maxRooms: 50, nonMetroFee: 500, metroFee: 500, label: '31–50 Rooms' },
+  { minRooms: 51, maxRooms: 75, nonMetroFee: 750, metroFee: 750, label: '51–75 Rooms' },
+  { minRooms: 76, maxRooms: 100, nonMetroFee: 1000, metroFee: 1000, label: '76–100 Rooms' },
 ]
 
 // Recognized Metro City / District keywords

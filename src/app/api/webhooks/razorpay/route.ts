@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { activateBulkPropertyPayment } from '@/app/pricing/business/actions'
 
 export async function POST(req: NextRequest) {
   try {
@@ -115,7 +116,23 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ received: true, already_processed: true })
         }
 
-        // Atomic activation via DB function
+        const notes =
+          event.payload?.order?.entity?.notes ||
+          event.payload?.payment?.entity?.notes ||
+          {}
+        const isBulk = notes?.type === 'bulk_property_subscription'
+
+        if (isBulk) {
+          const bulkRes = await activateBulkPropertyPayment(orderId, paymentId)
+          if (bulkRes.error) {
+            console.error('[RazorpayWebhook] Bulk activation error:', bulkRes.error)
+            return NextResponse.json({ error: bulkRes.error }, { status: 500 })
+          }
+          console.log(`[RazorpayWebhook] Bulk order ${orderId} activated for ${bulkRes.count} properties`)
+          return NextResponse.json({ received: true, activated: true, bulk: true, result: bulkRes })
+        }
+
+        // Atomic activation via DB function for single property
         const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc(
           'activate_property_payment',
           {

@@ -278,7 +278,7 @@ export async function submitOnboarding(data: OnboardingInput) {
       room_count: val.roomCount,
       helpdesk_number: helpdeskPhone,
       image_url: val.photos[0],
-      images: val.photos,
+      image_urls: val.photos,
       room_categories: val.roomCategories,
       approval_status: 'draft',
       approved: false,

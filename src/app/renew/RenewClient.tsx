@@ -17,9 +17,14 @@ import {
   Loader2,
   CheckCircle2,
   Phone,
+  Sparkles,
 } from 'lucide-react'
 import Script from 'next/script'
-import { createPropertySubscriptionOrder, verifyPropertyPayment } from '@/app/pricing/business/actions'
+import {
+  createPropertySubscriptionOrder,
+  createBulkPropertySubscriptionOrder,
+  verifyPropertyPayment,
+} from '@/app/pricing/business/actions'
 
 interface PropertyRenewData {
   id: string
@@ -58,6 +63,9 @@ const MONTH_OPTIONS = [
 export default function RenewClient({ owner, properties }: RenewClientProps) {
   const [isNative, setIsNative] = useState(false)
   const [selectedMonths, setSelectedMonths] = useState<Record<string, number>>({})
+  const [bulkMonths, setBulkMonths] = useState<number>(1)
+  const [isBulkLoading, setIsBulkLoading] = useState<boolean>(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
   const [customRooms, setCustomRooms] = useState<Record<string, number>>({})
   const [loadingPropertyId, setLoadingPropertyId] = useState<string | null>(null)
   const [errorMap, setErrorMap] = useState<Record<string, string>>({})
@@ -80,6 +88,91 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
     })
     setSelectedMonths(defaults)
   }, [properties])
+
+  const getProjectedExpiry = (prop: PropertyRenewData, months: number): string => {
+    let baseDate = new Date()
+    if (prop.subscription?.status === 'active' && new Date(prop.subscription.end_date) > new Date()) {
+      baseDate = new Date(prop.subscription.end_date)
+    }
+    const newDate = new Date(baseDate)
+    newDate.setMonth(newDate.getMonth() + months)
+    return newDate.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
+  const totalBulkAmount = properties.reduce(
+    (acc, p) => acc + (p.monthly_fee || 100) * bulkMonths,
+    0
+  )
+
+  const handleBulkPay = async () => {
+    setIsBulkLoading(true)
+    setBulkError(null)
+
+    try {
+      const durations = properties.map((p) => ({
+        propertyId: p.id,
+        months: bulkMonths,
+      }))
+
+      const res = await createBulkPropertySubscriptionOrder(durations)
+      if (res.error) {
+        setBulkError(res.error || 'Failed to initialize bulk renewal order')
+        setIsBulkLoading(false)
+        return
+      }
+
+      if (!res.orderId || !res.key) {
+        setBulkError('Invalid response from payment server')
+        setIsBulkLoading(false)
+        return
+      }
+
+      const options = {
+        key: res.key,
+        amount: res.amount,
+        currency: 'INR',
+        name: 'FixyStays Subscriptions',
+        description: `Bulk Renewal for ${properties.length} Properties (${bulkMonths} Months)`,
+        order_id: res.orderId,
+        prefill: {
+          name: owner.name,
+          email: owner.email,
+          contact: owner.phone || '',
+        },
+        theme: { color: '#4F46E5' },
+        handler: async function (response: any) {
+          setIsBulkLoading(true)
+          const verifyRes = await verifyPropertyPayment({
+            orderId: response.razorpay_order_id,
+            paymentId: response.razorpay_payment_id,
+            signature: response.razorpay_signature,
+          })
+
+          if (verifyRes.success) {
+            window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+          } else {
+            alert(`Payment recorded. Redirecting: ${verifyRes.error || 'Done'}`)
+            window.location.href = `/onboarding/success?session_id=${response.razorpay_order_id}`
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsBulkLoading(false)
+          },
+        },
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
+    } catch (err: any) {
+      setBulkError(err.message || 'Bulk renewal initiation failed')
+      setIsBulkLoading(false)
+    }
+  }
 
   const handlePay = async (property: PropertyRenewData) => {
     const months = selectedMonths[property.id] || 1
@@ -166,6 +259,133 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
         </div>
       )}
 
+      {/* BULK RECHARGE CARD (All Properties) */}
+      {!isNative && properties.length >= 1 && (
+        <Card className="mb-8 border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-white to-blue-50/50 shadow-md rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-indigo-100/70 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-sm">
+                    <Sparkles className="w-4 h-4" />
+                  </span>
+                  <CardTitle className="text-xl font-black text-gray-900">
+                    Recharge All Properties ({properties.length})
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs text-gray-600 mt-1">
+                  Renew active status for all your properties in a single transaction with tier pricing.
+                </CardDescription>
+              </div>
+
+              <div className="text-right">
+                <div className="text-xs text-gray-500">Total Combined Payable</div>
+                <div className="text-2xl font-black text-indigo-700">
+                  ₹{totalBulkAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-5 space-y-4">
+            {/* Properties summary chips */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Properties Included in Recharge
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {properties.map((p) => {
+                  const fee = p.monthly_fee || 100
+                  const isSubActive =
+                    p.subscription?.status === 'active' &&
+                    new Date(p.subscription.end_date) > new Date()
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-2.5 rounded-xl bg-white border border-gray-200/80 flex items-center justify-between text-xs shadow-xs"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-gray-800 truncate">{p.name}</div>
+                        <div className="text-[11px] text-gray-400">
+                          {p.effective_rooms} Rooms &bull; {isSubActive ? 'Active' : 'Expired/Draft'}
+                        </div>
+                      </div>
+                      <div className="text-right font-bold text-gray-700 shrink-0">
+                        ₹{fee * bulkMonths}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Duration Selector for Bulk */}
+            <div>
+              <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 block">
+                Select Renewal Period for All Properties
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {MONTH_OPTIONS.map((opt) => {
+                  const isSelected = bulkMonths === opt.months
+                  return (
+                    <button
+                      key={opt.months}
+                      type="button"
+                      onClick={() => setBulkMonths(opt.months)}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-600 text-white font-bold shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700 text-sm'
+                      }`}
+                    >
+                      <div className="text-xs sm:text-sm font-semibold">{opt.label}</div>
+                      <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
+                        ₹{(properties.reduce((acc, p) => acc + (p.monthly_fee || 100) * opt.months, 0)).toLocaleString('en-IN')} total
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Bulk Error Alert */}
+            {bulkError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{bulkError}</span>
+              </div>
+            )}
+
+            {/* Action Bar */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-indigo-100">
+              <div className="text-xs text-gray-500">
+                All subscriptions will extend by <span className="font-bold text-gray-800">{bulkMonths} month{bulkMonths > 1 ? 's' : ''}</span> (inclusive of GST).
+              </div>
+
+              <Button
+                onClick={handleBulkPay}
+                disabled={isBulkLoading}
+                className="h-12 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {isBulkLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing Bulk Payment...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4" />
+                    Recharge All ({properties.length}) Properties &bull; ₹{totalBulkAmount.toLocaleString('en-IN')}
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Properties List */}
       <div className="space-y-6">
         {properties.length === 0 ? (
@@ -183,6 +403,8 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
             const isSubActive =
               prop.subscription?.status === 'active' &&
               new Date(prop.subscription.end_date) > new Date()
+            const isSubExpired = Boolean(prop.subscription && !isSubActive)
+            const isUnpaid = !prop.subscription
             const months = selectedMonths[prop.id] || 1
             const effectiveRooms = prop.effective_rooms || 1
             const monthlyFee = prop.monthly_fee || 100
@@ -199,9 +421,13 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
                             Active Subscription
                           </span>
-                        ) : (
+                        ) : isSubExpired ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
                             Subscription Expired
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                            Unpaid / Draft
                           </span>
                         )}
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-gray-200 text-gray-600 capitalize">
@@ -213,21 +439,24 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                       </CardDescription>
                     </div>
 
-                    {prop.subscription && (
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500 flex items-center gap-1 justify-end">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>Valid Until:</span>
-                        </div>
-                        <div className="font-semibold text-sm text-gray-800">
-                          {new Date(prop.subscription.end_date).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500 flex items-center gap-1 justify-end">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{isSubActive ? 'Valid Until:' : isSubExpired ? 'Expired On:' : 'Status:'}</span>
                       </div>
-                    )}
+                      <div className="font-semibold text-sm text-gray-800">
+                        {prop.subscription
+                          ? new Date(prop.subscription.end_date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : 'Payment Required'}
+                      </div>
+                      <div className="text-[11px] text-indigo-600 font-medium mt-0.5">
+                        Projected: {getProjectedExpiry(prop, months)}
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -327,7 +556,11 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                           ) : (
                             <>
                               <CreditCard className="w-4 h-4" />
-                              {isSubActive ? 'Extend Subscription' : 'Renew Subscription'}
+                              {isSubActive
+                                ? 'Extend Subscription'
+                                : isSubExpired
+                                ? 'Renew Subscription'
+                                : 'Activate & Submit'}
                               <ArrowRight className="w-4 h-4 ml-1" />
                             </>
                           )}

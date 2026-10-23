@@ -190,22 +190,8 @@ export async function createProperty(formData: FormData) {
     return { error: `Owner profile not found. Contact support. (uid: ${user.id})` }
   }
 
-  // 2.5 Strict Subscription Gate: Superadmin or valid property creation flow
+  // 2.5 Ensure Owner exists (every property is drafted and requires payment before admin approval)
   const isSuperAdmin = isSuperAdminUser(user)
-  if (!isSuperAdmin) {
-    const { data: activeSubs } = await supabaseAdmin
-      .from('property_subscriptions')
-      .select('id')
-      .eq('owner_id', owner.id)
-      .eq('status', 'active')
-      .gt('end_date', new Date().toISOString())
-
-    const isPaid = (activeSubs && activeSubs.length > 0)
-
-    if (!isPaid) {
-      return { error: 'Your subscription is inactive or unpaid. Please activate your subscription before adding new properties.' }
-    }
-  }
 
   // 3. Extract form fields
   const name = formData.get('name') as string
@@ -241,6 +227,8 @@ export async function createProperty(formData: FormData) {
   const pincode = (formData.get('pincode') as string || '').trim()
   const cityArea = formData.get('cityArea') as string
   const city = (formData.get('city') as string) || 'Raigad'
+  const roomCountRaw = parseInt(formData.get('roomCount') as string, 10)
+  const roomCount = !isNaN(roomCountRaw) && roomCountRaw >= 1 ? roomCountRaw : 1
   const helpdeskNumber = (formData.get('helpdeskNumber') as string || '').trim()
   const cleanPhone = helpdeskNumber.replace(/\D/g, '')
   if (!helpdeskNumber || cleanPhone.length < 10) {
@@ -357,13 +345,15 @@ export async function createProperty(formData: FormData) {
       latitude: geoData?.lat || null,
       longitude: geoData?.lng || null,
       approved: false,
+      approval_status: 'draft',
+      room_count: roomCount,
       uid: propertyUid,
       max_guests,
       max_capacity,
       extra_per_pax,
       room_categories: initialCategories
     })
-    .select('id')
+    .select('id, name')
     .single()
 
   if (insertError) {
@@ -417,7 +407,7 @@ export async function createProperty(formData: FormData) {
   }
 
   revalidatePath('/dashboard/owner')
-  return { success: true, id: property.id }
+  return { success: true, id: property.id, roomCount, propertyName: property.name }
   } catch (err: any) {
     console.error('UNEXPECTED ERROR in createProperty:', err)
     return { error: `Server Error: ${err.message || String(err)}` }

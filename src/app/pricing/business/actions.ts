@@ -23,6 +23,58 @@ export interface CreatePropertyOrderResult {
   contactUs?: boolean
 }
 
+export interface BulkPropertyOrderItem {
+  propertyId: string
+  propertyName: string
+  months: number
+  roomCount: number
+  monthlyFee: number
+  subtotal: number
+}
+
+export interface CreateBulkPropertyOrderResult {
+  orderId?: string
+  amount?: number
+  currency?: string
+  key?: string
+  totalAmount?: number
+  items?: BulkPropertyOrderItem[]
+  userEmail?: string
+  error?: string
+}
+
+/**
+ * Calculates effective monthly fee for a room count using DB pricing_tiers with fallback.
+ */
+export async function getEffectiveMonthlyFee(
+  supabaseAdmin: any,
+  effectiveRooms: number,
+  city?: string | null,
+  state?: string | null,
+  pincode?: string | null
+): Promise<number> {
+  const { data: tier } = await supabaseAdmin
+    .from('pricing_tiers')
+    .select('monthly_fee_inr')
+    .lte('min_rooms', effectiveRooms)
+    .gte('max_rooms', effectiveRooms)
+    .eq('active', true)
+    .maybeSingle()
+
+  if (tier?.monthly_fee_inr) {
+    return Number(tier.monthly_fee_inr)
+  }
+
+  const feeRes = calculateMonthlyFee({
+    roomCount: effectiveRooms,
+    city,
+    state,
+    pincode,
+  })
+
+  return feeRes.monthlyFee ?? 100
+}
+
 /**
  * Creates a Razorpay order for a property subscription based on effective room count & DB pricing tiers.
  * Snapshot is persisted into public.owner_payments with status 'created'.
@@ -108,22 +160,35 @@ export async function createPropertySubscriptionOrder(
       }
     }
 
-    // 3. Compute subscription fee based on effective rooms and location
-    const feeRes = calculateMonthlyFee({
-      roomCount: effectiveRooms,
-      city: property.city,
-      state: property.state,
-      pincode: property.pincode,
-    })
+    // 3. Compute subscription fee based on effective rooms from DB pricing_tiers or pricing bracket
+    let monthlyFee = 100
+    const { data: tier } = await supabaseAdmin
+      .from('pricing_tiers')
+      .select('monthly_fee_inr')
+      .lte('min_rooms', effectiveRooms)
+      .gte('max_rooms', effectiveRooms)
+      .eq('active', true)
+      .maybeSingle()
 
-    if (feeRes.overLimit || !feeRes.monthlyFee) {
-      return {
-        error: feeRes.error || 'Properties with more than 100 rooms require manual onboarding. Please contact support.',
-        contactUs: true,
+    if (tier?.monthly_fee_inr) {
+      monthlyFee = Number(tier.monthly_fee_inr)
+    } else {
+      const feeRes = calculateMonthlyFee({
+        roomCount: effectiveRooms,
+        city: property.city,
+        state: property.state,
+        pincode: property.pincode,
+      })
+
+      if (feeRes.overLimit || !feeRes.monthlyFee) {
+        return {
+          error: feeRes.error || 'Properties with more than 100 rooms require manual onboarding. Please contact support.',
+          contactUs: true,
+        }
       }
+      monthlyFee = feeRes.monthlyFee
     }
 
-    const monthlyFee = feeRes.monthlyFee
     const totalAmount = monthlyFee * months // Prices are INCLUSIVE of GST; server computes amount
 
     // 4. Create Order in Razorpay
@@ -188,8 +253,306 @@ export async function createPropertySubscriptionOrder(
 }
 
 /**
- * Verifies property payment and executes atomic activation via activate_property_payment SQL function.
- * May ONLY call activate_property_payment; never creates users, owners, properties, or rooms.
+ * Creates a single combined Razorpay order to recharge multiple properties at once.
+ * Calculates exact fees based on each property's verified room count & DB pricing tiers.
+ */
+export async function createBulkPropertySubscriptionOrder(
+  propertyDurations: Array<{ propertyId: string; months: number }>
+): Promise<CreateBulkPropertyOrderResult> {
+  try {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('[createBulkPropertySubscriptionOrder] Razorpay API keys missing in environment')
+      return { error: 'Payment gateway is currently unavailable. Please contact support.' }
+    }
+
+    if (!propertyDurations || propertyDurations.length === 0) {
+      return { error: 'No properties selected for renewal.' }
+    }
+
+    const validMonths = [1, 3, 6, 12]
+    for (const item of propertyDurations) {
+      if (!validMonths.includes(item.months)) {
+        return { error: `Invalid subscription duration: ${item.months} months. Must be 1, 3, 6, or 12.` }
+      }
+    }
+
+    const supabase = await createClient()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    if (authErr || !user) {
+      return { error: 'You must be logged in to initiate renewal payment.' }
+    }
+
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch Owner Profile
+    const { data: owner } = await supabaseAdmin
+      .from('owners')
+      .select('id, user_id, email, name')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!owner) {
+      return { error: 'Owner profile not found.' }
+    }
+
+    const isAdmin = isSuperAdminUser(user) || user.app_metadata?.role === 'admin'
+
+    // 2. Process each property and compute fee
+    const items: BulkPropertyOrderItem[] = []
+    let grandTotal = 0
+
+    for (const item of propertyDurations) {
+      const { data: prop, error: propErr } = await supabaseAdmin
+        .from('properties')
+        .select('id, owner_id, name, room_count, city, state, pincode')
+        .eq('id', item.propertyId)
+        .maybeSingle()
+
+      if (propErr || !prop) {
+        return { error: `Property not found: ${item.propertyId}` }
+      }
+
+      if (!isAdmin && prop.owner_id !== owner.id) {
+        return { error: `Unauthorized: You do not own property "${prop.name}".` }
+      }
+
+      const { count: physicalRoomsCount } = await supabaseAdmin
+        .from('property_rooms')
+        .select('*', { count: 'exact', head: true })
+        .eq('property_id', item.propertyId)
+
+      const declaredRooms = prop.room_count || 0
+      const physicalRooms = physicalRoomsCount || 0
+      const effectiveRooms = Math.max(declaredRooms, physicalRooms, 1)
+
+      if (effectiveRooms > 100) {
+        return {
+          error: `Property "${prop.name}" has more than 100 rooms and requires manual onboarding. Please contact support.`,
+        }
+      }
+
+      const monthlyFee = await getEffectiveMonthlyFee(
+        supabaseAdmin,
+        effectiveRooms,
+        prop.city,
+        prop.state,
+        prop.pincode
+      )
+
+      const subtotal = monthlyFee * item.months
+      grandTotal += subtotal
+
+      items.push({
+        propertyId: prop.id,
+        propertyName: prop.name,
+        months: item.months,
+        roomCount: effectiveRooms,
+        monthlyFee,
+        subtotal,
+      })
+    }
+
+    if (grandTotal <= 0) {
+      return { error: 'Invalid total amount calculated for bulk renewal.' }
+    }
+
+    // 3. Create Combined Order in Razorpay
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+
+    const receipt = `bulk_${owner.id.slice(0, 8)}_${Date.now()}`.slice(0, 40)
+    const options = {
+      amount: Math.round(grandTotal * 100),
+      currency: 'INR',
+      receipt,
+      notes: {
+        type: 'bulk_property_subscription',
+        owner_id: owner.id,
+        property_count: String(items.length),
+        items: JSON.stringify(
+          items.map((i) => ({
+            id: i.propertyId,
+            m: i.months,
+            r: i.roomCount,
+            f: i.monthlyFee,
+          }))
+        ),
+      },
+    }
+
+    const order = await razorpay.orders.create(options)
+
+    // 4. Persist Master Payment snapshot in owner_payments
+    const { error: paymentErr } = await supabaseAdmin.from('owner_payments').insert({
+      owner_id: owner.id,
+      property_id: items[0].propertyId,
+      amount: grandTotal,
+      months: items[0].months,
+      room_count: items.reduce((acc, i) => acc + i.roomCount, 0),
+      monthly_fee: items.reduce((acc, i) => acc + i.monthlyFee, 0),
+      payment_method: 'Razorpay',
+      payment_ref: order.id,
+      razorpay_order_id: order.id,
+      status: 'created',
+      plan_duration_months: items[0].months,
+    })
+
+    if (paymentErr) {
+      console.error('[createBulkPropertySubscriptionOrder] Snapshot insert error:', paymentErr)
+      return { error: `Failed to record payment snapshot: ${paymentErr.message}` }
+    }
+
+    return {
+      orderId: order.id,
+      amount: order.amount as number,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+      totalAmount: grandTotal,
+      items,
+      userEmail: owner.email || user.email,
+    }
+  } catch (err: any) {
+    console.error('[createBulkPropertySubscriptionOrder] Unexpected error:', err)
+    return { error: err.message || 'Failed to initialize bulk renewal order' }
+  }
+}
+
+/**
+ * Executes atomic bulk activation for multiple property subscriptions in a single order.
+ */
+export async function activateBulkPropertyPayment(
+  orderId: string,
+  paymentId?: string | null
+) {
+  try {
+    const supabaseAdmin = createAdminClient()
+
+    // 1. Fetch Master Payment record
+    const { data: masterPayment, error: payErr } = await supabaseAdmin
+      .from('owner_payments')
+      .select('*')
+      .eq('razorpay_order_id', orderId)
+      .maybeSingle()
+
+    if (payErr) {
+      console.error('[activateBulkPropertyPayment] DB error:', payErr)
+      return { error: `Payment record query error: ${payErr.message}` }
+    }
+
+    if (!masterPayment) {
+      return { error: `Master payment not found for order ${orderId}` }
+    }
+
+    if (masterPayment.status === 'refunded') {
+      return { error: 'Payment has been refunded; cannot activate subscriptions.' }
+    }
+
+    if (masterPayment.status === 'paid') {
+      return { success: true, alreadyProcessed: true }
+    }
+
+    // 2. Fetch Razorpay order to inspect notes and item breakdown
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    })
+    const rzpOrder = await razorpay.orders.fetch(orderId)
+    const rawItems = rzpOrder?.notes?.items as string | undefined
+
+    if (!rawItems) {
+      return { error: 'Bulk order items metadata missing on Razorpay order.' }
+    }
+
+    const items: Array<{ id: string; m: number; r: number; f: number }> = JSON.parse(rawItems)
+
+    // 3. Mark master payment row as paid
+    await supabaseAdmin
+      .from('owner_payments')
+      .update({
+        status: 'paid',
+        razorpay_payment_id: paymentId || masterPayment.razorpay_payment_id || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', masterPayment.id)
+
+    // 4. Update each property subscription
+    const updatedProperties: string[] = []
+
+    for (const item of items) {
+      const { data: currentSub } = await supabaseAdmin
+        .from('property_subscriptions')
+        .select('*')
+        .eq('property_id', item.id)
+        .maybeSingle()
+
+      let baseDate = new Date()
+      if (currentSub?.status === 'active' && new Date(currentSub.end_date) > new Date()) {
+        baseDate = new Date(currentSub.end_date)
+      }
+
+      const newEndDate = new Date(baseDate)
+      newEndDate.setMonth(newEndDate.getMonth() + item.m)
+
+      const effectiveRooms = item.r || currentSub?.room_count || 1
+      const monthlyFee = item.f || currentSub?.monthly_fee || 100
+
+      await supabaseAdmin.from('property_subscriptions').upsert(
+        {
+          property_id: item.id,
+          owner_id: masterPayment.owner_id,
+          plan_name: `${item.m} Months Plan`,
+          room_count: effectiveRooms,
+          monthly_fee: monthlyFee,
+          months: item.m,
+          start_date: new Date().toISOString(),
+          end_date: newEndDate.toISOString(),
+          status: 'active',
+          source: 'razorpay',
+          payment_id: masterPayment.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'property_id' }
+      )
+
+      // Transition draft properties to pending (submitted for admin approval)
+      const { data: prop } = await supabaseAdmin
+        .from('properties')
+        .select('approval_status')
+        .eq('id', item.id)
+        .maybeSingle()
+
+      if (prop?.approval_status === 'draft' || prop?.approval_status === null) {
+        await supabaseAdmin
+          .from('properties')
+          .update({
+            approval_status: 'pending',
+            submitted_at: new Date().toISOString(),
+            room_count: effectiveRooms,
+          })
+          .eq('id', item.id)
+      }
+
+      updatedProperties.push(item.id)
+    }
+
+    return {
+      success: true,
+      alreadyProcessed: false,
+      isBulk: true,
+      propertyIds: updatedProperties,
+      count: updatedProperties.length,
+    }
+  } catch (err: any) {
+    console.error('[activateBulkPropertyPayment] Exception:', err)
+    return { error: err.message || 'Bulk activation failed' }
+  }
+}
+
+/**
+ * Verifies property payment and executes atomic activation.
+ * Automatically detects whether an order is a single property order or a bulk order.
  */
 export async function verifyPropertyPayment(params: {
   orderId: string
@@ -217,7 +580,35 @@ export async function verifyPropertyPayment(params: {
 
     const supabaseAdmin = createAdminClient()
 
-    // Call the atomic SECURITY DEFINER DB function
+    // 1. Check if this is a bulk subscription order
+    let isBulk = false
+    try {
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID!,
+        key_secret: process.env.RAZORPAY_KEY_SECRET!,
+      })
+      const rzpOrder = await razorpay.orders.fetch(orderId)
+      if (rzpOrder?.notes?.type === 'bulk_property_subscription') {
+        isBulk = true
+      }
+    } catch (e) {
+      // Continue with standard single RPC if fetch fails
+    }
+
+    if (isBulk) {
+      const bulkResult = await activateBulkPropertyPayment(orderId, paymentId)
+      if (bulkResult.error) {
+        return { error: bulkResult.error }
+      }
+      return {
+        success: true,
+        alreadyProcessed: Boolean(bulkResult.alreadyProcessed),
+        isBulk: true,
+        propertiesCount: bulkResult.count,
+      }
+    }
+
+    // 2. Call the atomic SECURITY DEFINER DB function for single property
     const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc(
       'activate_property_payment',
       {

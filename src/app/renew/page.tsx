@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { calculateMonthlyFee } from '@/lib/pricing'
+import { getEffectiveMonthlyFee } from '@/app/pricing/business/actions'
 import RenewClient from './RenewClient'
 
 export const metadata = {
@@ -50,14 +51,14 @@ export default async function RenewPage() {
       const physicalRooms = physicalRoomsCount || 0
       const effectiveRooms = Math.max(declaredRooms, physicalRooms, 1)
 
-      // Active tier fee based on rooms and location
-      const feeRes = calculateMonthlyFee({
-        roomCount: effectiveRooms,
-        city: prop.city,
-        state: prop.state,
-        pincode: prop.pincode,
-      })
-      const monthlyFee = feeRes.monthlyFee ?? 199
+      // Active tier fee based on DB pricing_tiers (1-6: 100, 7-12: 150, etc.)
+      const monthlyFee = await getEffectiveMonthlyFee(
+        supabaseAdmin,
+        effectiveRooms,
+        prop.city,
+        prop.state,
+        prop.pincode
+      )
 
       // Property subscription
       const { data: sub } = await supabaseAdmin
