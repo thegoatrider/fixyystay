@@ -35,6 +35,7 @@ export default function OwnerDashboardClient({
   hasGoogleDrive = false,
   googleEmail = null,
   initialOwner = null,
+  userPhone = '',
   initialSubscription = null
 }: { 
   userId: string; 
@@ -44,6 +45,7 @@ export default function OwnerDashboardClient({
   hasGoogleDrive?: boolean;
   googleEmail?: string | null;
   initialOwner?: any;
+  userPhone?: string;
   initialSubscription?: any;
 }) {
   console.log('OwnerDashboardClient Rendered:', { userId, email, ownerId, isSuperAdmin })
@@ -178,17 +180,24 @@ export default function OwnerDashboardClient({
       </div>
 
       {/* Non-blocking Missing Phone Notification */}
-      {!(data as any)?.owner?.phone && !initialOwner?.phone && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-semibold shadow-sm">
-          <div className="flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Your owner WhatsApp number is missing. Please add it to your profile for guest check-in updates and instant support.</span>
+      {(() => {
+        const phone = (data as any)?.owner?.phone || initialOwner?.phone || userPhone
+        const isPhoneMissing = !phone || String(phone).replace(/\D/g, '').length < 10
+
+        if (!isPhoneMissing) return null
+
+        return (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-semibold shadow-sm">
+            <div className="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Your owner WhatsApp number is missing. Please add it to your profile for guest check-in updates and instant support.</span>
+            </div>
+            <Link href="/dashboard/owner/profile" className="text-amber-700 underline font-bold uppercase shrink-0">
+              Update Profile &rarr;
+            </Link>
           </div>
-          <Link href="/dashboard/owner/profile" className="text-amber-700 underline font-bold uppercase shrink-0">
-            Update Profile &rarr;
-          </Link>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Tabs / Navigation (Only visible on Mobile, hidden on tablet/desktop mode) */}
       <div className="md:hidden flex flex-wrap border-b border-gray-100 w-full mb-2">

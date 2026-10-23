@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { User, Mail, Phone, Edit3, CheckCircle2, AlertCircle, Loader2, X, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +22,8 @@ export default function OwnerProfileCard({
   email,
   createdAt,
 }: OwnerProfileCardProps) {
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const [name, setName] = useState(initialName || 'Partner')
   const [phone, setPhone] = useState(initialPhone || '')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -63,13 +67,16 @@ export default function OwnerProfileCard({
     try {
       const res = await updateOwnerProfile(formData)
       if (res.success) {
+        const formatted = clean.length === 10 ? `+91${clean}` : `+${clean}`
         setName(editName.trim())
-        setPhone(clean.length === 10 ? `+91${clean}` : `+${clean}`)
+        setPhone(formatted)
         setSuccessMsg('Profile updated successfully!')
+        queryClient.invalidateQueries({ queryKey: ['dashboard_data'] })
+        router.refresh()
         setTimeout(() => {
           setIsModalOpen(false)
           setSuccessMsg('')
-        }, 1200)
+        }, 1000)
       } else {
         setErrorMsg(res.error || 'Failed to update profile.')
       }

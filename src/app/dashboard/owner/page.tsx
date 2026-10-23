@@ -15,8 +15,8 @@ export default async function OwnerDashboard() {
 
   const isSuperAdmin = isSuperAdminUser(user)
   
-  // 2. Initial owner lookup (fast)
-  let { data: owner } = await supabase.from('owners').select('id, created_at, name').eq('user_id', user?.id).maybeSingle()
+  // 2. Initial owner lookup (fast) with phone number
+  let { data: owner } = await supabase.from('owners').select('id, created_at, name, phone').eq('user_id', user?.id).maybeSingle()
   
   if (!owner && user?.email) {
     const supabaseAdmin = createAdminClient()
@@ -27,7 +27,7 @@ export default async function OwnerDashboard() {
       .from('owners')
       .update({ user_id: user.id })
       .eq('email', lowerEmail)
-      .select('id, created_at, name')
+      .select('id, created_at, name, phone')
       .maybeSingle()
     
     if (linkError) {
@@ -36,6 +36,16 @@ export default async function OwnerDashboard() {
 
     if (updatedOwner) {
       owner = updatedOwner
+    }
+  }
+
+  // Self-heal: ensure phone is populated from auth user metadata if present
+  const metaPhone = user?.user_metadata?.phone
+  if (owner) {
+    if (!owner.phone && metaPhone) {
+      const supabaseAdmin = createAdminClient()
+      await supabaseAdmin.from('owners').update({ phone: metaPhone }).eq('id', owner.id)
+      owner.phone = metaPhone
     }
   }
 
@@ -94,6 +104,7 @@ export default async function OwnerDashboard() {
         hasGoogleDrive={hasGoogleDrive}
         googleEmail={googleEmail}
         initialOwner={owner}
+        userPhone={owner?.phone || user.user_metadata?.phone || ''}
         initialSubscription={initialSubscription}
       />
     </Suspense>

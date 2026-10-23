@@ -957,10 +957,17 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
     if (ownerId) {
       const { data: o } = await supabaseAdmin
         .from('owners')
-        .select('id, name, created_at, user_id')
+        .select('id, name, phone, created_at, user_id')
         .eq('id', ownerId)
         .maybeSingle()
       owner = o
+    }
+
+    if (owner && !owner.phone && owner.user_id) {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(owner.user_id)
+      if (authUser?.user?.user_metadata?.phone) {
+        owner.phone = authUser.user.user_metadata.phone
+      }
     }
 
     if (!owner && !isSuperAdmin) {
@@ -1055,6 +1062,8 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
         subscription,
         owner: owner ? {
           id: owner.id,
+          name: owner.name,
+          phone: owner.phone || null,
           created_at: owner.created_at
         } : undefined
       }

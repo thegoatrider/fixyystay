@@ -18,6 +18,8 @@ export type DashboardData = {
   }
   owner?: {
     id: string
+    name?: string
+    phone?: string | null
     free_tier_enabled?: boolean
     created_at: string
   }
@@ -43,7 +45,14 @@ export function useDashboardData(
         })
 
         if (!error && data) {
-          return data as DashboardData
+          const res = data as DashboardData
+          if (res.owner && !res.owner.phone && ownerId) {
+            const { data: o } = await supabase.from('owners').select('phone').eq('id', ownerId).maybeSingle()
+            if (o?.phone) {
+              res.owner.phone = o.phone
+            }
+          }
+          return res
         }
         console.warn('[useDashboardData] RPC call failed, engaging direct server action fallback:', error?.message)
       } catch (rpcErr: any) {
