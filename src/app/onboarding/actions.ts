@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { ensureOwner } from '@/lib/ensure-owner'
 import { generatePropertyUid } from '@/app/dashboard/owner/actions'
+import { calculateMonthlyFee } from '@/lib/pricing'
 import { z } from 'zod'
 
 // Domain typo list
@@ -103,34 +104,26 @@ function normalizeIndianPhone(input: string): string {
 }
 
 /**
- * Fetches the monthly fee from public.pricing_tiers for a given room count.
+ * Calculates the monthly fee based on room count and location (metro vs non-metro / Alibag).
  */
-export async function getMonthlyFeeForRooms(roomCount: number): Promise<{
+export async function getMonthlyFeeForRooms(
+  roomCount: number,
+  city?: string | null,
+  state?: string | null,
+  pincode?: string | null
+): Promise<{
   monthlyFee: number | null
   overLimit?: boolean
   error?: string
 }> {
-  if (roomCount > 100) {
-    return { monthlyFee: null, overLimit: true }
+  const result = calculateMonthlyFee({ roomCount, city, state, pincode })
+  if (result.overLimit) {
+    return { monthlyFee: null, overLimit: true, error: result.error }
   }
-  if (roomCount < 1) {
-    return { monthlyFee: null, error: 'Room count must be at least 1' }
+  if (result.monthlyFee === null) {
+    return { monthlyFee: null, error: result.error || 'Unable to determine fee' }
   }
-
-  const supabaseAdmin = createAdminClient()
-  const { data: tier, error } = await supabaseAdmin
-    .from('pricing_tiers')
-    .select('monthly_fee_inr')
-    .eq('active', true)
-    .lte('min_rooms', roomCount)
-    .gte('max_rooms', roomCount)
-    .maybeSingle()
-
-  if (error || !tier) {
-    return { monthlyFee: null, error: 'No matching tier' }
-  }
-
-  return { monthlyFee: Number(tier.monthly_fee_inr) }
+  return { monthlyFee: result.monthlyFee }
 }
 
 /**
@@ -350,8 +343,8 @@ export async function submitOnboarding(data: OnboardingInput) {
       }
     }
 
-    // 6. Look up Monthly Fee for the declared room count
-    const feeInfo = await getMonthlyFeeForRooms(val.roomCount)
+    // 6. Look up Monthly Fee for the declared room count & location
+    const feeInfo = await getMonthlyFeeForRooms(val.roomCount, val.city, val.state, val.pincode)
     if (!feeInfo.monthlyFee) {
       return { error: feeInfo.error || 'Unable to determine pricing for declared rooms.' }
     }

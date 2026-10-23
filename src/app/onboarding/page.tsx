@@ -36,6 +36,7 @@ import {
   createPropertySubscriptionOrder,
   verifyPropertyPayment,
 } from '@/app/pricing/business/actions'
+import { calculateMonthlyFee } from '@/lib/pricing'
 
 const PROPERTY_TYPES = [
   'Villa',
@@ -74,7 +75,8 @@ export default function OnboardingPage() {
 
   // Rooms & Live Pricing
   const [roomCount, setRoomCount] = useState<number | ''>(1)
-  const [monthlyFee, setMonthlyFee] = useState<number>(100)
+  const [monthlyFee, setMonthlyFee] = useState<number>(199)
+  const [pricingTierName, setPricingTierName] = useState<string>('Alibag / Non-Metro')
   const [isOverLimit, setIsOverLimit] = useState<boolean>(false)
 
   // Room Categories
@@ -108,24 +110,28 @@ export default function OnboardingPage() {
   const [selectedMonths, setSelectedMonths] = useState<number>(1)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
-  // Live Tier Fee Computation based on roomCount
+  // Live Tier Fee Computation based on roomCount & location
   useEffect(() => {
     const count = typeof roomCount === 'number' ? roomCount : (parseInt(String(roomCount), 10) || 1)
-    if (count > 100) {
+    const result = calculateMonthlyFee({
+      roomCount: count,
+      city,
+      state,
+      pincode,
+    })
+
+    if (result.overLimit) {
       setIsOverLimit(true)
       setMonthlyFee(0)
       return
     }
-    setIsOverLimit(false)
 
-    if (count <= 6) setMonthlyFee(100)
-    else if (count <= 12) setMonthlyFee(150)
-    else if (count <= 20) setMonthlyFee(250)
-    else if (count <= 30) setMonthlyFee(350)
-    else if (count <= 50) setMonthlyFee(500)
-    else if (count <= 75) setMonthlyFee(750)
-    else setMonthlyFee(1000)
-  }, [roomCount])
+    setIsOverLimit(false)
+    if (result.monthlyFee !== null) {
+      setMonthlyFee(result.monthlyFee)
+      setPricingTierName(result.tierName)
+    }
+  }, [roomCount, city, state, pincode])
 
   // Pincode auto-lookup
   const handlePincodeChange = async (val: string) => {
@@ -616,7 +622,9 @@ export default function OnboardingPage() {
                         </span>
                       ) : (
                         <div className="bg-white border border-indigo-200 px-4 py-2 rounded-xl text-center">
-                          <span className="text-xs text-gray-500 block">Monthly Fee</span>
+                          <span className="text-[10px] text-gray-500 font-medium block">
+                            {pricingTierName}
+                          </span>
                           <span className="text-lg font-black text-indigo-600">
                             ₹{monthlyFee}
                             <span className="text-xs font-normal text-gray-400">/mo</span>

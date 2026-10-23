@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
+import { calculateMonthlyFee } from '@/lib/pricing'
 import RenewClient from './RenewClient'
 
 export const metadata = {
@@ -32,7 +33,7 @@ export default async function RenewPage() {
   // 2. Fetch Owner's Properties
   const { data: properties } = await supabaseAdmin
     .from('properties')
-    .select('id, name, city, room_count, approval_status')
+    .select('id, name, city, state, pincode, room_count, approval_status')
     .eq('owner_id', owner.id)
     .order('created_at', { ascending: false })
 
@@ -49,14 +50,14 @@ export default async function RenewPage() {
       const physicalRooms = physicalRoomsCount || 0
       const effectiveRooms = Math.max(declaredRooms, physicalRooms, 1)
 
-      // Active tier fee
-      const { data: tier } = await supabaseAdmin
-        .from('pricing_tiers')
-        .select('monthly_fee_inr')
-        .eq('active', true)
-        .lte('min_rooms', effectiveRooms)
-        .gte('max_rooms', effectiveRooms)
-        .maybeSingle()
+      // Active tier fee based on rooms and location
+      const feeRes = calculateMonthlyFee({
+        roomCount: effectiveRooms,
+        city: prop.city,
+        state: prop.state,
+        pincode: prop.pincode,
+      })
+      const monthlyFee = feeRes.monthlyFee ?? 199
 
       // Property subscription
       const { data: sub } = await supabaseAdmin
@@ -72,7 +73,7 @@ export default async function RenewPage() {
         declared_room_count: prop.room_count,
         physical_rooms_count: physicalRooms,
         effective_rooms: effectiveRooms,
-        monthly_fee: tier ? Number(tier.monthly_fee_inr) : 100,
+        monthly_fee: monthlyFee,
         subscription: sub || null,
         approval_status: prop.approval_status || 'draft',
       }

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
+import { calculateMonthlyFee } from '@/lib/pricing'
 
 export interface CreatePropertyOrderResult {
   orderId?: string
@@ -52,7 +53,7 @@ export async function createPropertySubscriptionOrder(
     // 1. Fetch Property and verify ownership
     const { data: property, error: propErr } = await supabaseAdmin
       .from('properties')
-      .select('id, owner_id, name, room_count')
+      .select('id, owner_id, name, room_count, city, state, pincode')
       .eq('id', propertyId)
       .maybeSingle()
 
@@ -107,21 +108,22 @@ export async function createPropertySubscriptionOrder(
       }
     }
 
-    // 3. Look up server-side pricing from pricing_tiers
-    const { data: tier, error: tierErr } = await supabaseAdmin
-      .from('pricing_tiers')
-      .select('monthly_fee_inr')
-      .eq('active', true)
-      .lte('min_rooms', effectiveRooms)
-      .gte('max_rooms', effectiveRooms)
-      .maybeSingle()
+    // 3. Compute subscription fee based on effective rooms and location
+    const feeRes = calculateMonthlyFee({
+      roomCount: effectiveRooms,
+      city: property.city,
+      state: property.state,
+      pincode: property.pincode,
+    })
 
-    if (tierErr || !tier) {
-      console.error('[createPropertySubscriptionOrder] Tier lookup error:', tierErr)
-      return { error: 'Unable to determine pricing tier for this room count. Please contact support.' }
+    if (feeRes.overLimit || !feeRes.monthlyFee) {
+      return {
+        error: feeRes.error || 'Properties with more than 100 rooms require manual onboarding. Please contact support.',
+        contactUs: true,
+      }
     }
 
-    const monthlyFee = Number(tier.monthly_fee_inr)
+    const monthlyFee = feeRes.monthlyFee
     const totalAmount = monthlyFee * months // Prices are INCLUSIVE of GST; server computes amount
 
     // 4. Create Order in Razorpay

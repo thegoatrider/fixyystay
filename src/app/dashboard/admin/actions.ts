@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient, purgeUserAndRecordsByEmail, findAuthUserByEmail } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { revalidatePath } from 'next/cache'
+import { calculateMonthlyFee } from '@/lib/pricing'
 
 export async function approveProperty(propertyId: string) {
   try {
@@ -469,20 +470,14 @@ export async function onboardPartner(formData: FormData) {
     }
     expiryDate.setMonth(expiryDate.getMonth() + months)
 
-    // Compute monthly fee from pricing_tiers or fallback
+    // Compute monthly fee from calculateMonthlyFee or fallback
     let monthlyFee = Math.round(amount / months)
     if (monthlyFee <= 0) {
-      const { data: tier } = await supabaseAdmin
-        .from('pricing_tiers')
-        .select('monthly_fee_inr')
-        .lte('min_rooms', roomCount)
-        .gte('max_rooms', roomCount)
-        .eq('active', true)
-        .maybeSingle()
-      if (tier) {
-        monthlyFee = tier.monthly_fee_inr
+      const feeRes = calculateMonthlyFee({ roomCount })
+      if (feeRes.monthlyFee) {
+        monthlyFee = feeRes.monthlyFee
       } else {
-        monthlyFee = 100
+        monthlyFee = 199
       }
     }
     const finalAmount = amount > 0 ? amount : monthlyFee * months
