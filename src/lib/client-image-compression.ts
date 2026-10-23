@@ -22,12 +22,12 @@ export async function compressImageClient(
     return file
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader()
-    reader.onerror = reject
+    reader.onerror = () => resolve(file)
     reader.onload = (event) => {
       const img = document.createElement('img')
-      img.onerror = reject
+      img.onerror = () => resolve(file)
       img.onload = () => {
         let { width, height } = img
 
@@ -58,9 +58,10 @@ export async function compressImageClient(
               return
             }
 
-            // Derive new filename with .webp extension
+            // Derive new filename matching selected mimeType
+            const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : mimeType.includes('png') ? 'png' : 'webp'
             const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
-            const newFileName = `${originalName}.webp`
+            const newFileName = `${originalName}.${ext}`
 
             const compressedFile = new File([blob], newFileName, {
               type: mimeType,

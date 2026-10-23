@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import Script from 'next/script'
+import { compressImageClient } from '@/lib/client-image-compression'
 import {
   submitOnboarding,
   uploadOnboardingPhoto,
@@ -72,7 +73,7 @@ export default function OnboardingPage() {
   const [helpdeskNumber, setHelpdeskNumber] = useState('')
 
   // Rooms & Live Pricing
-  const [roomCount, setRoomCount] = useState<number>(5)
+  const [roomCount, setRoomCount] = useState<number | ''>(1)
   const [monthlyFee, setMonthlyFee] = useState<number>(100)
   const [isOverLimit, setIsOverLimit] = useState<boolean>(false)
 
@@ -109,19 +110,20 @@ export default function OnboardingPage() {
 
   // Live Tier Fee Computation based on roomCount
   useEffect(() => {
-    if (roomCount > 100) {
+    const count = typeof roomCount === 'number' ? roomCount : (parseInt(String(roomCount), 10) || 1)
+    if (count > 100) {
       setIsOverLimit(true)
       setMonthlyFee(0)
       return
     }
     setIsOverLimit(false)
 
-    if (roomCount <= 6) setMonthlyFee(100)
-    else if (roomCount <= 12) setMonthlyFee(150)
-    else if (roomCount <= 20) setMonthlyFee(250)
-    else if (roomCount <= 30) setMonthlyFee(350)
-    else if (roomCount <= 50) setMonthlyFee(500)
-    else if (roomCount <= 75) setMonthlyFee(750)
+    if (count <= 6) setMonthlyFee(100)
+    else if (count <= 12) setMonthlyFee(150)
+    else if (count <= 20) setMonthlyFee(250)
+    else if (count <= 30) setMonthlyFee(350)
+    else if (count <= 50) setMonthlyFee(500)
+    else if (count <= 75) setMonthlyFee(750)
     else setMonthlyFee(1000)
   }, [roomCount])
 
@@ -154,24 +156,36 @@ export default function OnboardingPage() {
     }
   }
 
-  // Handle Photo Upload
+  // Handle Photo Upload with client-side compression & multiple file support
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
+    const fileList = Array.from(e.target.files)
     setIsUploadingPhoto(true)
     setPhotoError(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await uploadOnboardingPhoto(formData)
-      if (res.error) {
-        setPhotoError(res.error)
-      } else if (res.url) {
-        setPhotos((prev) => [...prev, res.url])
+      for (const file of fileList) {
+        // Automatically compress on client to prevent 413 Payload Too Large on mobile
+        const compressed = await compressImageClient(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.8,
+          mimeType: 'image/jpeg',
+        })
+
+        const formData = new FormData()
+        formData.append('file', compressed)
+        const res = await uploadOnboardingPhoto(formData)
+        if (res.error) {
+          setPhotoError(res.error)
+          break
+        } else if (res.url) {
+          setPhotos((prev) => [...prev, res.url])
+        }
       }
-    } catch {
-      setPhotoError('Image upload failed. Please try again.')
+    } catch (err: any) {
+      console.error('[handlePhotoUpload] Upload error:', err)
+      setPhotoError(err?.message || 'Image upload failed. Please try again.')
     } finally {
       setIsUploadingPhoto(false)
       e.target.value = ''
@@ -222,6 +236,13 @@ export default function OnboardingPage() {
 
     setIsSubmitting(true)
 
+    const safeRoomCount = Math.max(1, Number(roomCount) || 1)
+    const safeCategories = roomCategories.map((c) => ({
+      name: c.name.trim() || 'Standard Room',
+      basePrice: Math.max(1, Number(c.basePrice) || 2500),
+      capacity: Math.max(1, Number(c.capacity) || 2),
+    }))
+
     const payload: OnboardingInput = {
       ownerName,
       phone,
@@ -233,8 +254,8 @@ export default function OnboardingPage() {
       city,
       state,
       pincode,
-      roomCount: Number(roomCount),
-      roomCategories,
+      roomCount: safeRoomCount,
+      roomCategories: safeCategories,
       photos,
       helpdeskNumber: samePhoneForHelpdesk ? phone : helpdeskNumber || phone,
     }
@@ -568,8 +589,24 @@ export default function OnboardingPage() {
                       type="number"
                       min={1}
                       max={120}
-                      value={roomCount || ''}
-                      onChange={(e) => setRoomCount(parseInt(e.target.value) || 1)}
+                      value={roomCount}
+                      placeholder="1"
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '') {
+                          setRoomCount('')
+                        } else {
+                          const parsed = parseInt(val, 10)
+                          if (!isNaN(parsed)) {
+                            setRoomCount(parsed)
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        if (roomCount === '' || Number(roomCount) < 1) {
+                          setRoomCount(1)
+                        }
+                      }}
                       className="w-28 h-12 text-center text-xl font-black rounded-xl border-indigo-300 bg-white"
                     />
                     <div className="text-right">
@@ -637,8 +674,16 @@ export default function OnboardingPage() {
                             type="number"
                             min={1}
                             placeholder="2500"
-                            value={cat.basePrice}
-                            onChange={(e) => updateCategory(idx, 'basePrice', parseInt(e.target.value) || 0)}
+                            value={cat.basePrice ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              updateCategory(idx, 'basePrice', val === '' ? ('' as any) : (parseInt(val, 10) || 0))
+                            }}
+                            onBlur={() => {
+                              if (!cat.basePrice || Number(cat.basePrice) < 1) {
+                                updateCategory(idx, 'basePrice', 2500)
+                              }
+                            }}
                             className="h-9 text-xs rounded-lg bg-white"
                           />
                         </div>
@@ -648,8 +693,16 @@ export default function OnboardingPage() {
                             type="number"
                             min={1}
                             placeholder="2"
-                            value={cat.capacity}
-                            onChange={(e) => updateCategory(idx, 'capacity', parseInt(e.target.value) || 1)}
+                            value={cat.capacity ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              updateCategory(idx, 'capacity', val === '' ? ('' as any) : (parseInt(val, 10) || 1))
+                            }}
+                            onBlur={() => {
+                              if (!cat.capacity || Number(cat.capacity) < 1) {
+                                updateCategory(idx, 'capacity', 2)
+                              }
+                            }}
                             className="h-9 text-xs rounded-lg bg-white"
                           />
                         </div>
@@ -708,17 +761,21 @@ export default function OnboardingPage() {
                   {/* Upload Box */}
                   <label className="border-2 border-dashed border-gray-300 hover:border-indigo-500 rounded-xl flex flex-col items-center justify-center p-4 cursor-pointer text-center bg-gray-50/50 hover:bg-indigo-50/30 transition-all aspect-video">
                     {isUploadingPhoto ? (
-                      <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                      <div className="flex flex-col items-center gap-1.5">
+                        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                        <span className="text-[11px] font-bold text-indigo-600">Uploading...</span>
+                      </div>
                     ) : (
                       <>
                         <Camera className="w-6 h-6 text-gray-400 mb-1" />
                         <span className="text-xs font-bold text-indigo-600">+ Upload Photo</span>
-                        <span className="text-[10px] text-gray-400">JPG, PNG (max 10MB)</span>
+                        <span className="text-[10px] text-gray-400">JPG, PNG, WebP (auto-optimized)</span>
                       </>
                     )}
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       disabled={isUploadingPhoto}
                       onChange={handlePhotoUpload}
                       className="hidden"

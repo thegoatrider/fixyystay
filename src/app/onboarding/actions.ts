@@ -143,9 +143,9 @@ export async function uploadOnboardingPhoto(formData: FormData) {
       return { error: 'No valid image file provided.' }
     }
 
-    // Limit file size to 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      return { error: 'Image size exceeds 10MB limit.' }
+    // Limit file size to 15MB
+    if (file.size > 15 * 1024 * 1024) {
+      return { error: 'Image size exceeds 15MB limit.' }
     }
 
     const supabaseAdmin = createAdminClient()
@@ -153,10 +153,14 @@ export async function uploadOnboardingPhoto(formData: FormData) {
     const fileExt = (rawExt || 'jpg').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg'
     const fileName = `onboard-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`
 
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
     const { error: uploadError } = await supabaseAdmin.storage
       .from('property_images')
-      .upload(fileName, file, {
+      .upload(fileName, buffer, {
         contentType: file.type || 'image/jpeg',
+        cacheControl: '31536000',
         upsert: false,
       })
 
