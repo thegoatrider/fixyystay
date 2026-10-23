@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { updatePassword } from '../actions'
 import { format } from 'date-fns'
 import ChangePasswordForm from './ChangePasswordForm'
-import CreatePropertyForm from '../CreatePropertyForm'
+import OwnerProfileCard from './OwnerProfileCard'
 import GoogleDriveSyncCard from './GoogleDriveSyncCard'
+import { ensureOwner } from '@/lib/ensure-owner'
 import { cn } from '@/lib/utils'
 
 export default async function OwnerProfilePage() {
@@ -32,7 +33,7 @@ export default async function OwnerProfilePage() {
     const { data: matchedOwner } = await supabaseAdmin
       .from('owners')
       .select('id, name, email, created_at, phone')
-      .eq('email', user.email.toLowerCase().trim())
+      .ilike('email', user.email.toLowerCase().trim())
       .maybeSingle()
 
     if (matchedOwner) {
@@ -44,7 +45,19 @@ export default async function OwnerProfilePage() {
     }
   }
 
-  if (!owner) redirect('/onboarding')
+  if (!owner) {
+    const ensured = await ensureOwner(supabaseAdmin, {
+      userId: user.id,
+      email: user.email || '',
+      name: user.user_metadata?.name || 'Partner',
+      phone: user.user_metadata?.phone || null,
+    })
+    owner = ensured.owner as any
+  }
+
+  if (!owner) {
+    redirect('/onboarding')
+  }
 
   // 2. Fetch property subscriptions
   const { data: propSubs } = await supabaseAdmin
@@ -297,10 +310,12 @@ export default async function OwnerProfilePage() {
 
           {/* Right: Profile & Security */}
           <div className="space-y-8">
-            <div className="space-y-4">
-              <h3 className="text-xl font-black text-gray-900 tracking-tight">Property Management</h3>
-              <CreatePropertyForm initialPhone={user.user_metadata?.phone || ""} />
-            </div>
+            <OwnerProfileCard
+              initialName={owner.name || user.user_metadata?.name || 'Partner'}
+              initialPhone={owner.phone || user.user_metadata?.phone || ''}
+              email={owner.email || user.email || ''}
+              createdAt={owner.created_at}
+            />
 
             <ChangePasswordForm />
 

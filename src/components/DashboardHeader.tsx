@@ -11,6 +11,7 @@ type DashboardHeaderProps = {
 export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
   const isGuest = !userRole || userRole === 'guest'
   const dashboardLink = isGuest ? '/guest' : `/dashboard/${userRole}`
+  const profileLink = userRole === 'owner' ? '/dashboard/owner/profile' : '/guest/profile'
 
   return (
     <header className="bg-white border-b sticky top-0 z-50 w-full shadow-sm pt-[env(safe-area-inset-top)] pt-10 md:pt-0">
@@ -72,12 +73,12 @@ export function DashboardHeader({ userEmail, userRole }: DashboardHeaderProps) {
 
             {/* Profile Link */}
             <Link 
-              href="/guest/profile"
+              href={profileLink}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all group"
-              title="Profile"
+              title={userRole === 'owner' ? "Profile & Plan" : "Profile"}
             >
               <User className="w-5 h-5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Profile</span>
+              <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">{userRole === 'owner' ? "Profile & Plan" : "Profile"}</span>
             </Link>
 
             {/* Logout Action */}

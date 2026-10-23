@@ -374,7 +374,7 @@ export default function GuestHubSection({
         <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <h3 className="text-xl font-black text-gray-900">No Properties Found</h3>
         <p className="text-sm text-gray-500 mt-1 mb-6">
-          Add your property first in Profile &amp; Plan, or onboard directly on the standalone Guest Hub page.
+          Add your property first in the Properties tab, or onboard directly on the standalone Guest Hub page.
         </p>
         <Link href="/pricing/guest-hub">
           <Button className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl">

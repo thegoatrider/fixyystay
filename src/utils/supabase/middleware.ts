@@ -93,6 +93,7 @@ export async function updateSession(request: NextRequest) {
     request.headers.set('x-user-email', user.email || '')
     request.headers.set('x-user-role', getEffectiveUserRole(user))
     request.headers.set('x-is-admin', String(isSuperAdminUser(user)))
+    request.headers.set('x-pathname', request.nextUrl.pathname)
     supabaseResponse = NextResponse.next({
       request: {
         headers: request.headers,

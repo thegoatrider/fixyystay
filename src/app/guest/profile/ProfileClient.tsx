@@ -120,7 +120,7 @@ export default function ProfileClient({ initialProfile, initialBookings }: Profi
             </div>
 
             <h2 className="text-2xl font-black text-gray-900 mb-1">{profile.full_name}</h2>
-            <p className="text-sm text-gray-400 font-medium mb-6">Guest Member since {format(new Date(profile.created_at), 'MMMM yyyy')}</p>
+            <p className="text-sm text-gray-400 font-medium mb-6">Guest Member since {profile.created_at ? format(new Date(profile.created_at), 'MMMM yyyy') : 'Recently joined'}</p>
 
             <div className="w-full space-y-4 mb-8">
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100/50">

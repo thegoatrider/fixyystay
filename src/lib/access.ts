@@ -186,10 +186,36 @@ export async function getOwnerAccess(user: User | null): Promise<OwnerAccessResu
     }
   }
 
+  // 4. Query Legacy Owner Subscriptions & Standalone Guest Hub Subscriptions
+  const [legacySubRes, guestHubRes] = await Promise.all([
+    owner?.id
+      ? supabaseAdmin
+          .from('owner_subscriptions')
+          .select('status, end_date')
+          .eq('owner_id', owner.id)
+          .eq('status', 'active')
+          .gt('end_date', now.toISOString())
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    owner?.id
+      ? supabaseAdmin
+          .from('guest_hub_settings')
+          .select('id, subscription_status, subscription_end_date, properties!inner(owner_id)')
+          .eq('properties.owner_id', owner.id)
+          .eq('subscription_status', 'active')
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null })
+  ])
+
+  const hasLegacyActive = Boolean(legacySubRes.data?.status === 'active' && new Date(legacySubRes.data.end_date) > now)
+  const hasGuestHubActive = Boolean(guestHubRes.data?.subscription_status === 'active' && (!guestHubRes.data.subscription_end_date || new Date(guestHubRes.data.subscription_end_date) > now))
+
   const missingPhone = !owner?.phone || owner.phone.trim().length === 0
 
   return {
-    hasAccess: activeIds.length > 0,
+    hasAccess: activeIds.length > 0 || hasLegacyActive || hasGuestHubActive,
     owner,
     properties: propList,
     activePropertyIds: activeIds,

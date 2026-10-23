@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { getOwnerAccess } from '@/lib/access'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { DashboardHeader } from '@/components/DashboardHeader'
 import SupportWidget from '@/components/SupportWidget'
 import OwnerSidebar from '@/components/OwnerSidebar'
@@ -23,8 +24,12 @@ export default async function OwnerLayout({
     redirect('/')
   }
 
-  // Enforce access: If owner has zero active properties, redirect to /renew
-  if (!isSuperAdmin) {
+  // Enforce access: If owner has zero active properties, redirect to /renew (exempting Profile & Plan page)
+  const headerList = await headers()
+  const pathname = headerList.get('x-pathname') || ''
+  const isProfileRoute = pathname.includes('/dashboard/owner/profile')
+
+  if (!isSuperAdmin && !isProfileRoute) {
     const access = await getOwnerAccess(user)
     if (!access.hasAccess) {
       if (access.properties.length > 0) {

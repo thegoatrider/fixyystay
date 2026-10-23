@@ -1064,3 +1064,79 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
     return { success: false, error: err.message || 'Unknown error fetching dashboard data' }
   }
 }
+
+export async function updateOwnerProfile(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated. Please log in again.' }
+  }
+
+  const name = (formData.get('name') as string || '').trim()
+  const rawPhone = (formData.get('phone') as string || '').trim()
+  const cleanPhone = rawPhone.replace(/\D/g, '')
+
+  if (!name) {
+    return { success: false, error: 'Full name is required.' }
+  }
+
+  if (cleanPhone.length < 10) {
+    return { success: false, error: 'A valid WhatsApp phone number with at least 10 digits is required.' }
+  }
+
+  const normalizedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`
+  const supabaseAdmin = createAdminClient()
+
+  // 1. Update owners record (by user_id or by email)
+  const { data: existingOwner } = await supabaseAdmin
+    .from('owners')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (existingOwner) {
+    const { error: ownerError } = await supabaseAdmin
+      .from('owners')
+      .update({ name, phone: normalizedPhone })
+      .eq('id', existingOwner.id)
+
+    if (ownerError) {
+      console.error('[updateOwnerProfile] Failed to update owners table:', ownerError)
+    }
+  } else if (user.email) {
+    const { data: matchedOwner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .ilike('email', user.email.toLowerCase().trim())
+      .maybeSingle()
+
+    if (matchedOwner) {
+      const { error: ownerError } = await supabaseAdmin
+        .from('owners')
+        .update({ user_id: user.id, name, phone: normalizedPhone })
+        .eq('id', matchedOwner.id)
+
+      if (ownerError) {
+        console.error('[updateOwnerProfile] Failed to update matched owner table:', ownerError)
+      }
+    }
+  }
+
+  // 2. Always sync name and phone to auth user metadata
+  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    user_metadata: {
+      ...(user.user_metadata || {}),
+      name,
+      phone: normalizedPhone,
+    },
+  })
+
+  if (authError) {
+    console.warn('[updateOwnerProfile] Could not sync user metadata:', authError.message)
+  }
+
+  revalidatePath('/dashboard/owner/profile')
+  revalidatePath('/dashboard/owner')
+
+  return { success: true }
+}

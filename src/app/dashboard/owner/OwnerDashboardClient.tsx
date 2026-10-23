@@ -25,6 +25,7 @@ const InfluencerRequestsInbox = dynamic(() => import('./InfluencerRequestsInbox'
 const EmployeeSection = dynamic(() => import('./EmployeeSection'), { loading: () => <DashboardSkeleton /> })
 const MarketingSection = dynamic(() => import('./MarketingSection'), { loading: () => <DashboardSkeleton /> })
 const GuestHubSection = dynamic(() => import('./GuestHubSection'), { loading: () => <DashboardSkeleton /> })
+const CreatePropertyForm = dynamic(() => import('./CreatePropertyForm'), { loading: () => <div className="p-4 bg-white rounded-xl border text-sm text-gray-400">Loading property form...</div> })
 
 export default function OwnerDashboardClient({ 
   userId, 
@@ -254,6 +255,7 @@ export default function OwnerDashboardClient({
               <AddLeadTile ownerId={ownerId} properties={properties || []} />
               <QuickCheckin properties={properties || []} />
               <DigitizeRegisterTile properties={properties || []} />
+              <CreatePropertyForm initialPhone={initialOwner?.phone || (data as any)?.owner?.phone || ""} />
             </div>
 
             {/* Properties Grid Portfolio */}
@@ -268,10 +270,13 @@ export default function OwnerDashboardClient({
                   <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 w-full">
                     <Home className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-gray-900">No properties yet</h3>
-                    <p className="text-gray-500 mb-6 max-w-xs mx-auto">Go to Profile &amp; Plan to add your first property.</p>
-                    <Link href="/dashboard/owner/profile" prefetch={false}>
-                      <Button>Go to Profile &amp; Plan</Button>
-                    </Link>
+                    <p className="text-gray-500 mb-6 max-w-xs mx-auto">Use the Add New Property form above to register your first property listing.</p>
+                    <Button onClick={() => {
+                      const el = document.getElementById('dashboard-forms')
+                      el?.scrollIntoView({ behavior: 'smooth' })
+                    }}>
+                      Add New Property
+                    </Button>
                   </div>
                 )}
               </div>

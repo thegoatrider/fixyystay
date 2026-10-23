@@ -197,11 +197,11 @@ export default function OwnerSidebar({ userEmail, userRole }: OwnerSidebarProps)
               ? 'bg-blue-600 text-white shadow-md' 
               : 'text-gray-500 hover:bg-blue-50/50 hover:text-blue-600'
           }`}
-          title="Account & Plan Settings"
+          title="Profile & Plan Settings"
         >
           <Settings className={`w-5 h-5 flex-shrink-0 ${isProfileActive ? 'text-white' : 'text-gray-400 group-hover:text-blue-600'}`} />
           <span className="hidden lg:inline-block text-xs truncate">
-            Account & Plan
+            Profile & Plan
           </span>
         </Link>
 
