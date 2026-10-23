@@ -633,13 +633,16 @@ WHERE p.approval_status = 'draft'
   AND NOT EXISTS (
     SELECT 1 FROM public.owner_payments op WHERE op.property_id = p.id
   )
+  AND NOT EXISTS (
+    SELECT 1 FROM public.property_payments pp WHERE pp.property_id = p.id
+  )
   -- Exclude properties with leads
   AND NOT EXISTS (
     SELECT 1 FROM public.leads l WHERE l.property_id = p.id
   )
   -- Exclude properties with check-ins
   AND NOT EXISTS (
-    SELECT 1 FROM public.checkins c WHERE c.property_id = p.id
+    SELECT 1 FROM public.guest_checkins c WHERE c.property_id = p.id
   )
   -- Exclude properties with bookings
   AND NOT EXISTS (
