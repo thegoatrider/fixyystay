@@ -226,8 +226,6 @@ export async function createPropertySubscriptionOrder(
       razorpay_order_id: order.id,
       status: 'pending',
       plan_duration_months: months,
-      email: owner?.email || user.email || '',
-      plan_name: `${months} Months Plan`,
     })
 
     if (paymentErr) {
@@ -399,8 +397,6 @@ export async function createBulkPropertySubscriptionOrder(
       razorpay_order_id: order.id,
       status: 'pending',
       plan_duration_months: items[0].months,
-      email: owner.email || user.email || '',
-      plan_name: `${items[0].months} Months Bulk Plan`,
     })
 
     if (paymentErr) {
@@ -774,8 +770,6 @@ export async function createOwnerOrder(
         razorpay_order_id: order.id,
         status: 'pending',
         plan_duration_months: months,
-        email: email.toLowerCase(),
-        plan_name: planName,
       })
     }
 
