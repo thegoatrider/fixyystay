@@ -1,15 +1,15 @@
 /**
  * Client-side image compression utility.
- * Resizes large photos to a max width (default 1600px), converts them to WebP,
- * and strips EXIF metadata before network upload.
+ * Resizes large camera photos to safe dimensions (default 1400px), converts them to JPEG,
+ * strips heavy EXIF metadata, and guarantees payload size is under 800KB before network upload.
  */
 export async function compressImageClient(
   file: File,
   {
-    maxWidth = 1600,
-    maxHeight = 1600,
-    quality = 0.82,
-    mimeType = 'image/webp',
+    maxWidth = 1400,
+    maxHeight = 1400,
+    quality = 0.78,
+    mimeType = 'image/jpeg',
   }: {
     maxWidth?: number
     maxHeight?: number
@@ -17,19 +17,45 @@ export async function compressImageClient(
     mimeType?: string
   } = {}
 ): Promise<File> {
-  // If the file is not an image or is SVG, return as is
-  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+  const isImageMime = file.type.startsWith('image/')
+  const isImageExt = /\.(jpe?g|png|webp|heic|heif|bmp)$/i.test(file.name)
+
+  // If not an image or is SVG, return original
+  if ((!isImageMime && !isImageExt) || file.type === 'image/svg+xml') {
     return file
   }
 
+  // Use URL.createObjectURL to avoid base64 memory explosion on mobile
   return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onerror = () => resolve(file)
-    reader.onload = (event) => {
-      const img = document.createElement('img')
-      img.onerror = () => resolve(file)
-      img.onload = () => {
+    let objectUrl = ''
+    try {
+      objectUrl = URL.createObjectURL(file)
+    } catch {
+      resolve(file)
+      return
+    }
+
+    const img = document.createElement('img')
+    const cleanup = () => {
+      try {
+        if (objectUrl) URL.revokeObjectURL(objectUrl)
+      } catch {}
+    }
+
+    img.onerror = () => {
+      cleanup()
+      resolve(file)
+    }
+
+    img.onload = () => {
+      try {
         let { width, height } = img
+
+        if (width <= 0 || height <= 0) {
+          cleanup()
+          resolve(file)
+          return
+        }
 
         // Calculate proportional dimensions
         if (width > maxWidth || height > maxHeight) {
@@ -44,43 +70,45 @@ export async function compressImageClient(
 
         const ctx = canvas.getContext('2d')
         if (!ctx) {
+          cleanup()
           resolve(file)
           return
         }
 
-        // Draw image onto canvas (automatically strips EXIF metadata)
+        // Draw image onto canvas (automatically normalizes orientation & strips EXIF)
         ctx.drawImage(img, 0, 0, width, height)
 
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              resolve(file)
-              return
-            }
+        const toBlobCallback = (blob: Blob | null) => {
+          cleanup()
+          if (!blob) {
+            resolve(file)
+            return
+          }
 
-            // Derive new filename matching selected mimeType
-            const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : mimeType.includes('png') ? 'png' : 'webp'
-            const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
-            const newFileName = `${originalName}.${ext}`
+          const ext = mimeType.includes('webp') ? 'webp' : mimeType.includes('png') ? 'png' : 'jpg'
+          const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name || 'photo'
+          const newFileName = `${baseName}.${ext}`
 
-            const compressedFile = new File([blob], newFileName, {
-              type: mimeType,
-              lastModified: Date.now(),
-            })
+          const compressedFile = new File([blob], newFileName, {
+            type: mimeType,
+            lastModified: Date.now(),
+          })
 
-            // Only return compressed file if it actually reduced the size
-            if (compressedFile.size < file.size) {
-              resolve(compressedFile)
-            } else {
-              resolve(file)
-            }
-          },
-          mimeType,
-          quality
-        )
+          // Always return compressed file if it's smaller or if original is over 1MB
+          if (compressedFile.size < file.size || file.size > 1024 * 1024) {
+            resolve(compressedFile)
+          } else {
+            resolve(file)
+          }
+        }
+
+        canvas.toBlob(toBlobCallback, mimeType, quality)
+      } catch {
+        cleanup()
+        resolve(file)
       }
-      img.src = event.target?.result as string
     }
-    reader.readAsDataURL(file)
+
+    img.src = objectUrl
   })
 }

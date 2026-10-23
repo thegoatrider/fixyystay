@@ -22,7 +22,7 @@ const COMMON_EMAIL_DOMAIN_TYPOS = [
 ]
 
 // Server-side Zod Validation Schema
-export const onboardingSchema = z.object({
+const onboardingSchema = z.object({
   ownerName: z
     .string()
     .trim()

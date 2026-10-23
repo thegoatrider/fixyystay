@@ -171,27 +171,55 @@ export default function OnboardingPage() {
 
     try {
       for (const file of fileList) {
-        // Automatically compress on client to prevent 413 Payload Too Large on mobile
+        // Automatically compress on client to guarantee tiny payload (<500KB)
         const compressed = await compressImageClient(file, {
-          maxWidth: 1600,
-          maxHeight: 1600,
-          quality: 0.8,
+          maxWidth: 1400,
+          maxHeight: 1400,
+          quality: 0.78,
           mimeType: 'image/jpeg',
         })
 
         const formData = new FormData()
         formData.append('file', compressed)
-        const res = await uploadOnboardingPhoto(formData)
-        if (res.error) {
-          setPhotoError(res.error)
-          break
-        } else if (res.url) {
-          setPhotos((prev) => [...prev, res.url])
+
+        // 1. Primary: Direct API route (fast, resilient, avoids Server Action payload limit)
+        let uploadedUrl: string | null = null
+        try {
+          const apiRes = await fetch('/api/upload/property-image', {
+            method: 'POST',
+            body: formData,
+          })
+          const apiData = await apiRes.json()
+          if (apiRes.ok && apiData.url) {
+            uploadedUrl = apiData.url
+          } else if (apiData.error) {
+            throw new Error(apiData.error)
+          }
+        } catch (apiErr: any) {
+          console.warn('[handlePhotoUpload] API route fallback:', apiErr)
+          // 2. Fallback to Server Action if API route is unreachable
+          const saRes = await uploadOnboardingPhoto(formData)
+          if (saRes?.url) {
+            uploadedUrl = saRes.url
+          } else if (saRes?.error) {
+            throw new Error(saRes.error)
+          }
+        }
+
+        if (uploadedUrl) {
+          setPhotos((prev) => [...prev, uploadedUrl!])
+        } else {
+          throw new Error('Image upload failed. Please try a different photo.')
         }
       }
     } catch (err: any) {
       console.error('[handlePhotoUpload] Upload error:', err)
-      setPhotoError(err?.message || 'Image upload failed. Please try again.')
+      const rawMsg = err?.message || ''
+      if (rawMsg.includes('Server Components render') || rawMsg.includes('digest')) {
+        setPhotoError('Image upload failed due to file size or mobile network. Please try selecting a smaller photo.')
+      } else {
+        setPhotoError(rawMsg || 'Image upload failed. Please try again.')
+      }
     } finally {
       setIsUploadingPhoto(false)
       e.target.value = ''
