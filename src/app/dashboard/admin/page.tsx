@@ -123,7 +123,77 @@ export default async function AdminDashboard() {
       if (owner) owner.phone = phone
     }
   }
-  const unpaidDrafts: any[] = []
+  // 1b. Incomplete Onboarding Leads: Fetch draft / unpaid properties that dropped off before paying
+  let unpaidDrafts: any[] = []
+  try {
+    const { data: draftProps } = await supabaseAdmin
+      .from('properties')
+      .select(`
+        id,
+        uid,
+        name,
+        type,
+        city,
+        state,
+        pincode,
+        room_count,
+        approval_status,
+        approved,
+        helpdesk_number,
+        created_at,
+        owner_id,
+        owners ( id, user_id, name, email, phone ),
+        property_subscriptions ( id, status, end_date ),
+        owner_payments ( id, status )
+      `)
+      .or('approval_status.eq.draft,approved.eq.false')
+      .not('approval_status', 'eq', 'approved')
+      .order('created_at', { ascending: false })
+
+    if (draftProps) {
+      const now = new Date()
+      const pendingIds = new Set(pendingProperties.map(p => p.id))
+
+      unpaidDrafts = draftProps.filter(p => {
+        if (pendingIds.has(p.id)) return false
+        if (p.approved === true || p.approval_status === 'approved') return false
+
+        const subs = Array.isArray(p.property_subscriptions)
+          ? p.property_subscriptions
+          : (p.property_subscriptions ? [p.property_subscriptions] : [])
+        const hasActiveSub = subs.some((s: any) => s.status === 'active' && s.end_date && new Date(s.end_date) > now)
+        if (hasActiveSub) return false
+
+        const payments = Array.isArray(p.owner_payments)
+          ? p.owner_payments
+          : (p.owner_payments ? [p.owner_payments] : [])
+        const hasPaid = payments.some((pay: any) => pay.status === 'paid' || pay.status === 'captured')
+        if (hasPaid) return false
+
+        return true
+      })
+
+      // Resolve contact phone numbers from auth metadata if not in owners/properties
+      for (const prop of unpaidDrafts) {
+        const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
+        const ownerEmail = (owner?.email || '').toLowerCase().trim()
+        const authUser = (owner?.user_id && authUsersMap.get(owner.user_id))
+          || (ownerEmail && authUsersByEmail.get(ownerEmail))
+          || null
+
+        const phone = prop.helpdesk_number 
+          || owner?.phone 
+          || authUser?.phone 
+          || authUser?.user_metadata?.phone 
+          || null
+
+        prop.helpdesk_number = phone
+        if (owner) owner.phone = phone
+      }
+    }
+  } catch (err) {
+    console.warn('Could not load unpaid drafts:', err)
+  }
 
   // 2. All Approved Properties
   const { data: approvedProperties } = await supabaseAdmin

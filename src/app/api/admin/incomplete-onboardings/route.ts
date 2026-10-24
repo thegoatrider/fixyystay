@@ -1,13 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const token = req.nextUrl.searchParams.get('token')
+    if (token !== 'fixy-audit-incomplete-2026') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabaseAdmin = createAdminClient()
 
-    // 1. Fetch auth users map for phone numbers
+    // 1. Fetch Auth Users for contact metadata
     let authUsersMap = new Map<string, any>()
     let authUsersByEmail = new Map<string, any>()
     try {
@@ -19,10 +24,10 @@ export async function GET() {
         })
       }
     } catch (e) {
-      console.warn('Auth user list notice:', e)
+      console.warn('Auth users fetch notice:', e)
     }
 
-    // 2. Fetch all properties that are not approved or are in draft status
+    // 2. Fetch all properties that are in draft or unapproved status
     const { data: properties, error: propErr } = await supabaseAdmin
       .from('properties')
       .select(`
@@ -64,10 +69,11 @@ export async function GET() {
       return NextResponse.json({ error: propErr.message }, { status: 500 })
     }
 
-    // 3. Filter for those who filled details but have NO active subscription and NO completed/captured payment
     const now = new Date()
-    const incompleteList = (properties || []).filter((prop: any) => {
-      // If property is already approved, skip
+
+    // 3. Filter for those who filled details but have NO active subscription and NO completed payment
+    const incompleteProps = (properties || []).filter((prop: any) => {
+      // If approved, not an incomplete lead
       if (prop.approved === true || prop.approval_status === 'approved') {
         return false
       }
@@ -93,8 +99,7 @@ export async function GET() {
       return true
     })
 
-    // 4. Enrich contact info
-    const results = incompleteList.map((prop: any) => {
+    const leads = incompleteProps.map((prop: any) => {
       const owner = Array.isArray(prop.owners) ? prop.owners[0] : prop.owners
       const ownerEmail = (owner?.email || '').toLowerCase().trim()
       const authUser = (owner?.user_id && authUsersMap.get(owner.user_id))
@@ -128,8 +133,8 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      count: results.length,
-      leads: results,
+      count: leads.length,
+      leads,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
