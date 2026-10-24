@@ -131,10 +131,33 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // 4. Also check for any owners in the owners table who have no properties at all
+    const { data: allOwners } = await supabaseAdmin
+      .from('owners')
+      .select('id, user_id, name, email, phone, created_at, properties(id, name)')
+
+    const ownersWithoutProperties = (allOwners || [])
+      .filter((o: any) => !o.properties || o.properties.length === 0)
+      .map((o: any) => {
+        const authUser = (o.user_id && authUsersMap.get(o.user_id))
+          || (o.email && authUsersByEmail.get(o.email.toLowerCase()))
+          || null
+        const phone = o.phone || authUser?.phone || authUser?.user_metadata?.phone || null
+        return {
+          ownerId: o.id,
+          ownerName: o.name || authUser?.user_metadata?.name || 'Unknown',
+          ownerEmail: o.email || authUser?.email,
+          phone,
+          cleanPhone: phone ? phone.replace(/\D/g, '') : null,
+          createdAt: o.created_at,
+        }
+      })
+
     return NextResponse.json({
       success: true,
       count: leads.length,
       leads,
+      ownersWithoutProperties,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
