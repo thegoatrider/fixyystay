@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     // Get template
     const { data: template, error: tmplErr } = await supabase
       .from('whatsapp_templates')
-      .select('id, name, template_name, language_code, components, header_type')
+      .select('id, template_name, language_code, components, category, status')
       .eq('id', templateId)
       .single();
 

@@ -127,7 +127,7 @@ export async function getUserBookings() {
       room_id,
       checkin_date,
       checkout_date,
-      total_amount,
+      amount,
       status,
       guest_name,
       guest_phone,
@@ -144,8 +144,13 @@ export async function getUserBookings() {
 
   const today = new Date().toISOString().split('T')[0]
   
-  const upcoming = bookings.filter(b => b.checkin_date && b.checkin_date >= today)
-  const past = bookings.filter(b => b.checkout_date && b.checkout_date < today)
+  const normalizedBookings = (bookings || []).map((b: any) => ({
+    ...b,
+    total_amount: b.amount,
+  }))
+
+  const upcoming = normalizedBookings.filter(b => b.checkin_date && b.checkin_date >= today)
+  const past = normalizedBookings.filter(b => b.checkout_date && b.checkout_date < today)
 
   return { data: { upcoming, past } }
 }

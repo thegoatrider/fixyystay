@@ -40,7 +40,7 @@ export async function getTopPropertyTypes() {
 export async function getPropertiesForSEO(citySlug: string, propertyTypeSlug?: string) {
   const supabase = createStaticClient()
   
-  let query = supabase.from('properties').select('id, name, slug, type, image_url, amenities, base_price, city_area, approved, is_guest_hub_only').eq('approved', true)
+  let query = supabase.from('properties').select('id, name, slug, type, image_url, amenities, rooms (id, base_price), city_area, approved, is_guest_hub_only').eq('approved', true)
   
   if (citySlug) {
     // In a real app, you might map citySlug to the exact city string in DB or use a relational link.
@@ -62,7 +62,10 @@ export async function getPropertiesForSEO(citySlug: string, propertyTypeSlug?: s
   }
   
   const { data } = await query.limit(100)
-  let properties = data || []
+  let properties = (data || []).map((p: any) => ({
+    ...p,
+    base_price: p.rooms?.[0]?.base_price || 0,
+  }))
 
   if (process.env.ENFORCE_PUBLIC_SUBSCRIPTION === 'true' && properties.length > 0) {
     const propIds = properties.map((p: any) => p.id)

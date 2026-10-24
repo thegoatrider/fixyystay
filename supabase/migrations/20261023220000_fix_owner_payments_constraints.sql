@@ -37,3 +37,9 @@ CHECK (status IN ('pending', 'created', 'paid', 'failed', 'refunded'));
 
 -- 5. Backfill any existing NULL status rows safely to 'paid'
 UPDATE public.owner_payments SET status = 'paid' WHERE status IS NULL;
+
+-- 6. Ensure optional helper columns exist
+ALTER TABLE public.properties ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.properties ADD COLUMN IF NOT EXISTS image_urls TEXT[] DEFAULT '{}';
+ALTER TABLE public.influencers ADD COLUMN IF NOT EXISTS instagram TEXT;
+

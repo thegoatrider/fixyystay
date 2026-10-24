@@ -29,7 +29,7 @@ export default function MarketingSection({ ownerId }: { ownerId: string }) {
       // Load WhatsApp Account
       const { data: account } = await supabase
         .from('whatsapp_accounts')
-        .select('id, owner_id, phone_number_id, waba_id, display_phone_number, verified_name, quality_rating, status')
+        .select('id, owner_id, phone_number_id, waba_id, whatsapp_phone_number, business_name, status, verified')
         .eq('owner_id', ownerId)
         .single();
       

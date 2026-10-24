@@ -102,17 +102,19 @@ export async function createBookingOrder(
         calculatedTotal += pricePerNight * selection.quantity * numDays
       }
     } else {
-      const { data: prop, error: propError } = await supabaseAdmin
-        .from('properties')
+      const { data: propRooms, error: propError } = await supabaseAdmin
+        .from('rooms')
         .select('id, base_price')
-        .eq('id', propertyId)
-        .single()
+        .eq('property_id', propertyId)
+        .order('base_price', { ascending: true })
+        .limit(1)
 
-      if (propError || !prop || prop.base_price === null || prop.base_price === undefined || Number(prop.base_price) <= 0) {
+      const defaultPrice = Number(propRooms?.[0]?.base_price || 0)
+      if (propError || defaultPrice <= 0) {
         return { error: 'Unable to verify pricing, please try again.' }
       }
 
-      calculatedTotal = Number(prop.base_price) * numDays
+      calculatedTotal = defaultPrice * numDays
     }
 
     if (calculatedTotal <= 0) {
@@ -289,7 +291,7 @@ export async function confirmBooking(
           owner_id: prop.owner_id,
           property_id: propertyId,
           guest_name: guestData.name,
-          guest_email: guestData.email,
+          email: guestData.email,
           phone_number: guestData.phone,
           checkin_date: checkinDate,
           checkout_date: checkoutDate,

@@ -30,13 +30,13 @@ export interface PricingBracket {
 }
 
 export const PRICING_BRACKETS: PricingBracket[] = [
-  { minRooms: 1, maxRooms: 6, nonMetroFee: 100, metroFee: 100, label: '1–6 Rooms' },
-  { minRooms: 7, maxRooms: 12, nonMetroFee: 150, metroFee: 150, label: '7–12 Rooms' },
-  { minRooms: 13, maxRooms: 20, nonMetroFee: 250, metroFee: 250, label: '13–20 Rooms' },
-  { minRooms: 21, maxRooms: 30, nonMetroFee: 350, metroFee: 350, label: '21–30 Rooms' },
-  { minRooms: 31, maxRooms: 50, nonMetroFee: 500, metroFee: 500, label: '31–50 Rooms' },
-  { minRooms: 51, maxRooms: 75, nonMetroFee: 750, metroFee: 750, label: '51–75 Rooms' },
-  { minRooms: 76, maxRooms: 100, nonMetroFee: 1000, metroFee: 1000, label: '76–100 Rooms' },
+  { minRooms: 1, maxRooms: 6, nonMetroFee: 199, metroFee: 299, label: '1–6 Rooms' },
+  { minRooms: 7, maxRooms: 12, nonMetroFee: 299, metroFee: 399, label: '7–12 Rooms' },
+  { minRooms: 13, maxRooms: 20, nonMetroFee: 399, metroFee: 499, label: '13–20 Rooms' },
+  { minRooms: 21, maxRooms: 30, nonMetroFee: 499, metroFee: 599, label: '21–30 Rooms' },
+  { minRooms: 31, maxRooms: 50, nonMetroFee: 599, metroFee: 899, label: '31–50 Rooms' },
+  { minRooms: 51, maxRooms: 75, nonMetroFee: 999, metroFee: 1299, label: '51–75 Rooms' },
+  { minRooms: 76, maxRooms: 100, nonMetroFee: 1399, metroFee: 1599, label: '76–100 Rooms' },
 ]
 
 // Recognized Metro City / District keywords
@@ -194,5 +194,45 @@ export function calculateMonthlyFee({
     tierName,
     bracket,
     overLimit: false,
+  }
+}
+
+export interface InvoiceBreakdown {
+  monthlyFee: number
+  months: number
+  subtotal: number
+  gstRate: number
+  gstAmount: number
+  totalAmount: number
+}
+
+/**
+ * Calculates GST (18%) and total payable on the whole invoice value.
+ * Per tax rule: 18% GST is calculated ONCE on the entire invoice subtotal,
+ * never multiplied per month.
+ *
+ * Example: 3 months @ ₹250/mo = ₹750 subtotal -> 18% GST on ₹750 = ₹135 -> Total = ₹885
+ */
+export function calculateSubscriptionInvoice({
+  monthlyFee,
+  months,
+}: {
+  monthlyFee: number
+  months: number
+}): InvoiceBreakdown {
+  const safeMonths = Math.max(1, months)
+  const safeFee = Math.max(0, monthlyFee)
+  const subtotal = safeFee * safeMonths
+  // 18% GST calculated strictly once on the whole invoice value
+  const gstAmount = Math.round(subtotal * 0.18)
+  const totalAmount = subtotal + gstAmount
+
+  return {
+    monthlyFee: safeFee,
+    months: safeMonths,
+    subtotal,
+    gstRate: 0.18,
+    gstAmount,
+    totalAmount,
   }
 }

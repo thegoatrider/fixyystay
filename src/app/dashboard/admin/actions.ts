@@ -175,7 +175,7 @@ export async function deleteProperty(propertyId: string) {
 
     const { data: rooms } = await supabaseAdmin
       .from('rooms')
-      .select('image_url, image_urls')
+      .select('image_url')
       .eq('property_id', propertyId)
 
     const imagesToDelete: string[] = []
@@ -506,7 +506,7 @@ export async function onboardPartner(formData: FormData) {
 
     const propId = prop?.id
 
-    // 5. Create property_subscriptions and property_payments (with source: 'admin_manual')
+    // 5. Create property_subscriptions and owner_payments (with source: 'admin_manual')
     if (propId) {
       await supabaseAdmin
         .from('property_subscriptions')
@@ -519,25 +519,7 @@ export async function onboardPartner(formData: FormData) {
           room_count: roomCount,
           monthly_fee: monthlyFee,
           months,
-          amount: finalAmount,
-          razorpay_order_id: 'ADMIN_MANUAL',
-          razorpay_payment_id: paymentRef
-        })
-
-      await supabaseAdmin
-        .from('property_payments')
-        .insert({
-          property_id: propId,
-          owner_id: ownerId,
-          amount: finalAmount,
-          currency: 'INR',
-          status: 'paid',
-          payment_method: 'admin_manual',
-          razorpay_order_id: 'ADMIN_MANUAL',
-          razorpay_payment_id: paymentRef,
-          months,
-          room_count: roomCount,
-          monthly_fee: monthlyFee
+          source: 'admin_manual'
         })
     }
 
@@ -555,9 +537,14 @@ export async function onboardPartner(formData: FormData) {
       .from('owner_payments')
       .insert({
         owner_id: ownerId,
+        property_id: propId || null,
         amount: finalAmount,
         payment_method: 'Manual/Admin',
         payment_ref: paymentRef,
+        status: 'paid',
+        months,
+        room_count: roomCount,
+        monthly_fee: monthlyFee,
         plan_duration_months: months
       })
 

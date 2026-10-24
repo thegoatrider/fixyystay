@@ -205,13 +205,13 @@ export default async function AdminDashboard() {
   // 3. Influencers (Approved)
   const { data: influencers } = await supabase
     .from('influencers')
-    .select('id, name, email, instagram, approved, commission_rate, created_at')
+    .select('id, name, email, approved, commission_rate, created_at')
     .eq('approved', true)
 
   // 3b. Pending Influencers
   const { data: pendingInfluencers } = await supabase
     .from('influencers')
-    .select('id, name, email, instagram, approved, commission_rate, created_at')
+    .select('id, name, email, approved, commission_rate, created_at')
     .eq('approved', false)
     .order('created_at', { ascending: false })
 
@@ -226,7 +226,7 @@ export default async function AdminDashboard() {
       influencers(name, commission_rate)
     `)
 
-  const { data: clicks } = await supabase.from('influencer_clicks').select('id, property_id, influencer_id, created_at')
+  const { data: clicks } = await supabase.from('influencer_clicks').select('id, property_id, influencer_id, timestamp')
   const { data: bookings } = await supabase.from('bookings').select('id, property_id, influencer_id, amount, status, created_at')
 
   const promotions = promotionData?.map(promo => {
@@ -313,7 +313,7 @@ export default async function AdminDashboard() {
       influencer_id,
       property_id,
       status,
-      pitch,
+      proposal_text,
       created_at,
       influencers(name, email),
       properties(name)

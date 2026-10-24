@@ -59,7 +59,7 @@ export default async function OwnerDashboard() {
   // Run property subscription check and Google drive token lookup concurrently
   const [subResult, legacySubResult, googleTokenResult] = await Promise.all([
     owner
-      ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee, amount').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
+      ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
     owner
       ? supabaseAdmin.from('owner_subscriptions').select('plan_name, status, end_date').eq('owner_id', owner.id).order('created_at', { ascending: false }).limit(1).maybeSingle()

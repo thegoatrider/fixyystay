@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
-import { calculateMonthlyFee } from '@/lib/pricing'
+import { calculateMonthlyFee, calculateSubscriptionInvoice } from '@/lib/pricing'
 
 export interface CreatePropertyOrderResult {
   orderId?: string
@@ -53,6 +53,17 @@ export async function getEffectiveMonthlyFee(
   state?: string | null,
   pincode?: string | null
 ): Promise<number> {
+  const feeRes = calculateMonthlyFee({
+    roomCount: effectiveRooms,
+    city,
+    state,
+    pincode,
+  })
+
+  if (feeRes.monthlyFee) {
+    return feeRes.monthlyFee
+  }
+
   const { data: tier } = await supabaseAdmin
     .from('pricing_tiers')
     .select('monthly_fee_inr')
@@ -65,14 +76,7 @@ export async function getEffectiveMonthlyFee(
     return Number(tier.monthly_fee_inr)
   }
 
-  const feeRes = calculateMonthlyFee({
-    roomCount: effectiveRooms,
-    city,
-    state,
-    pincode,
-  })
-
-  return feeRes.monthlyFee ?? 100
+  return 199
 }
 
 /**
@@ -160,36 +164,21 @@ export async function createPropertySubscriptionOrder(
       }
     }
 
-    // 3. Compute subscription fee based on effective rooms from DB pricing_tiers or pricing bracket
-    let monthlyFee = 100
-    const { data: tier } = await supabaseAdmin
-      .from('pricing_tiers')
-      .select('monthly_fee_inr')
-      .lte('min_rooms', effectiveRooms)
-      .gte('max_rooms', effectiveRooms)
-      .eq('active', true)
-      .maybeSingle()
+    // 3. Compute subscription fee based on effective rooms and location
+    const monthlyFee = await getEffectiveMonthlyFee(
+      supabaseAdmin,
+      effectiveRooms,
+      property.city,
+      property.state,
+      property.pincode
+    )
 
-    if (tier?.monthly_fee_inr) {
-      monthlyFee = Number(tier.monthly_fee_inr)
-    } else {
-      const feeRes = calculateMonthlyFee({
-        roomCount: effectiveRooms,
-        city: property.city,
-        state: property.state,
-        pincode: property.pincode,
-      })
-
-      if (feeRes.overLimit || !feeRes.monthlyFee) {
-        return {
-          error: feeRes.error || 'Properties with more than 100 rooms require manual onboarding. Please contact support.',
-          contactUs: true,
-        }
-      }
-      monthlyFee = feeRes.monthlyFee
-    }
-
-    const totalAmount = monthlyFee * months // Prices are INCLUSIVE of GST; server computes amount
+    // Calculate 18% GST once on the whole invoice value (subtotal)
+    const invoice = calculateSubscriptionInvoice({
+      monthlyFee,
+      months,
+    })
+    const totalAmount = invoice.totalAmount
 
     // 4. Create Order in Razorpay
     const razorpay = new Razorpay({
@@ -207,6 +196,8 @@ export async function createPropertySubscriptionOrder(
         months: String(months),
         room_count: String(effectiveRooms),
         monthly_fee: String(monthlyFee),
+        subtotal: String(invoice.subtotal),
+        gst_amount: String(invoice.gstAmount),
         type: 'property_subscription',
       },
     }
@@ -299,7 +290,6 @@ export async function createBulkPropertySubscriptionOrder(
 
     // 2. Process each property and compute fee
     const items: BulkPropertyOrderItem[] = []
-    let grandTotal = 0
 
     for (const item of propertyDurations) {
       const { data: prop, error: propErr } = await supabaseAdmin
@@ -340,7 +330,6 @@ export async function createBulkPropertySubscriptionOrder(
       )
 
       const subtotal = monthlyFee * item.months
-      grandTotal += subtotal
 
       items.push({
         propertyId: prop.id,
@@ -352,9 +341,14 @@ export async function createBulkPropertySubscriptionOrder(
       })
     }
 
-    if (grandTotal <= 0) {
+    const bulkSubtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
+    if (bulkSubtotal <= 0) {
       return { error: 'Invalid total amount calculated for bulk renewal.' }
     }
+
+    // Apply 18% GST once on the entire invoice value
+    const bulkGst = Math.round(bulkSubtotal * 0.18)
+    const grandTotal = bulkSubtotal + bulkGst
 
     // 3. Create Combined Order in Razorpay
     const razorpay = new Razorpay({

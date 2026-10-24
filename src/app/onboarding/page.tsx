@@ -36,7 +36,7 @@ import {
   createPropertySubscriptionOrder,
   verifyPropertyPayment,
 } from '@/app/pricing/business/actions'
-import { calculateMonthlyFee } from '@/lib/pricing'
+import { calculateMonthlyFee, calculateSubscriptionInvoice } from '@/lib/pricing'
 
 const PROPERTY_TYPES = [
   'Villa',
@@ -865,7 +865,10 @@ export default function OnboardingPage() {
                   <div className="grid grid-cols-2 gap-3">
                     {MONTH_OPTIONS.map((opt) => {
                       const isSelected = selectedMonths === opt.months
-                      const cost = createdProperty.monthlyFee * opt.months
+                      const inv = calculateSubscriptionInvoice({
+                        monthlyFee: createdProperty.monthlyFee,
+                        months: opt.months,
+                      })
                       return (
                         <button
                           key={opt.months}
@@ -878,9 +881,9 @@ export default function OnboardingPage() {
                           }`}
                         >
                           <div className="text-sm font-bold">{opt.label}</div>
-                          <div className="text-xl font-black text-gray-900 mt-1">₹{cost.toLocaleString('en-IN')}</div>
+                          <div className="text-xl font-black text-gray-900 mt-1">₹{inv.totalAmount.toLocaleString('en-IN')}</div>
                           <div className="text-[11px] text-gray-500 font-normal">
-                            ₹{createdProperty.monthlyFee}/mo &times; {opt.months} mo
+                            ₹{inv.subtotal.toLocaleString('en-IN')} + ₹{inv.gstAmount} GST (18%)
                           </div>
                         </button>
                       )
@@ -888,26 +891,38 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-gray-100 text-sm">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Base Tier Rate</span>
-                    <span>₹{createdProperty.monthlyFee} / month</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Duration</span>
-                    <span>{selectedMonths} Month(s)</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>GST (18%)</span>
-                    <span>Included</span>
-                  </div>
-                  <div className="border-t border-gray-200 pt-2 flex justify-between font-extrabold text-base text-gray-900">
-                    <span>Total Payable</span>
-                    <span className="text-indigo-600">
-                      ₹{(createdProperty.monthlyFee * selectedMonths).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
+                {(() => {
+                  const invoice = calculateSubscriptionInvoice({
+                    monthlyFee: createdProperty.monthlyFee,
+                    months: selectedMonths,
+                  })
+                  return (
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-gray-100 text-sm">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Base Tier Rate</span>
+                        <span>₹{invoice.monthlyFee.toLocaleString('en-IN')} / month</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Duration</span>
+                        <span>{selectedMonths} Month(s)</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Base Subtotal</span>
+                        <span>₹{invoice.subtotal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>GST (18% on ₹{invoice.subtotal.toLocaleString('en-IN')})</span>
+                        <span className="font-semibold text-gray-900">+ ₹{invoice.gstAmount.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-2 flex justify-between font-extrabold text-base text-gray-900">
+                        <span>Total Payable</span>
+                        <span className="text-indigo-600">
+                          ₹{invoice.totalAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 <div className="flex flex-col gap-3">
                   <Button
@@ -923,7 +938,7 @@ export default function OnboardingPage() {
                     ) : (
                       <>
                         <CreditCard className="w-5 h-5" />
-                        Pay ₹{(createdProperty.monthlyFee * selectedMonths).toLocaleString('en-IN')} & Submit for Approval
+                        Pay ₹{calculateSubscriptionInvoice({ monthlyFee: createdProperty.monthlyFee, months: selectedMonths }).totalAmount.toLocaleString('en-IN')} & Submit for Approval
                       </>
                     )}
                   </Button>

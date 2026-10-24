@@ -991,7 +991,7 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
           ? supabaseAdmin.from('guest_checkins').select('*, properties(name), identities:guest_identity(*)').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(200)
           : Promise.resolve({ data: [] }),
       ownerId
-        ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee, amount').eq('owner_id', ownerId).order('end_date', { ascending: false }).limit(1).maybeSingle()
+        ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee').eq('owner_id', ownerId).order('end_date', { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       supabaseAdmin.from('property_rooms').select('*').limit(500),
       supabaseAdmin.from('influencer_promotion_requests').select('*').limit(50),

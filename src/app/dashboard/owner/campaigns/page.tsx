@@ -23,7 +23,7 @@ export default function CampaignsOverviewPage() {
 
       const { data } = await supabase
         .from('campaigns')
-        .select('id, owner_id, name, template_name, audience_type, status, total_recipients, total_sent, total_failed, scheduled_at, created_at')
+        .select('id, owner_id, name, template_name, audience_filter, status, total_recipients, total_sent, total_delivered, total_read, total_replies, created_at')
         .eq('owner_id', owner.id)
         .order('created_at', { ascending: false });
 

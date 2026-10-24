@@ -25,6 +25,7 @@ import {
   createBulkPropertySubscriptionOrder,
   verifyPropertyPayment,
 } from '@/app/pricing/business/actions'
+import { calculateSubscriptionInvoice } from '@/lib/pricing'
 
 interface PropertyRenewData {
   id: string
@@ -103,10 +104,12 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
     })
   }
 
-  const totalBulkAmount = properties.reduce(
-    (acc, p) => acc + (p.monthly_fee || 100) * bulkMonths,
+  const bulkSubtotal = properties.reduce(
+    (acc, p) => acc + (p.monthly_fee || 199) * bulkMonths,
     0
   )
+  const bulkGst = Math.round(bulkSubtotal * 0.18)
+  const totalBulkAmount = bulkSubtotal + bulkGst
 
   const handleBulkPay = async () => {
     setIsBulkLoading(true)
@@ -341,7 +344,11 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                     >
                       <div className="text-xs sm:text-sm font-semibold">{opt.label}</div>
                       <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
-                        ₹{(properties.reduce((acc, p) => acc + (p.monthly_fee || 100) * opt.months, 0)).toLocaleString('en-IN')} total
+                        {(() => {
+                          const sub = properties.reduce((acc, p) => acc + (p.monthly_fee || 199) * opt.months, 0)
+                          const total = sub + Math.round(sub * 0.18)
+                          return `₹${total.toLocaleString('en-IN')} total`
+                        })()}
                       </div>
                     </button>
                   )
@@ -407,8 +414,8 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
             const isUnpaid = !prop.subscription
             const months = selectedMonths[prop.id] || 1
             const effectiveRooms = prop.effective_rooms || 1
-            const monthlyFee = prop.monthly_fee || 100
-            const totalFee = monthlyFee * months
+            const monthlyFee = prop.monthly_fee || 199
+            const inv = calculateSubscriptionInvoice({ monthlyFee, months })
 
             return (
               <Card key={prop.id} className="border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
@@ -500,6 +507,7 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {MONTH_OPTIONS.map((opt) => {
                             const isSelected = months === opt.months
+                            const optInv = calculateSubscriptionInvoice({ monthlyFee, months: opt.months })
                             return (
                               <button
                                 key={opt.months}
@@ -515,7 +523,7 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                               >
                                 <div className="text-sm font-semibold">{opt.label}</div>
                                 <div className="text-xs text-gray-500 mt-0.5">
-                                  ₹{monthlyFee * opt.months}
+                                  ₹{optInv.totalAmount.toLocaleString('en-IN')}
                                 </div>
                               </button>
                             )
@@ -534,11 +542,13 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                       {/* Summary & Checkout Action */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100 gap-4">
                         <div>
-                          <div className="text-xs text-gray-400">Total payable (inclusive of GST)</div>
+                          <div className="text-xs text-gray-500">
+                            Base: ₹{inv.subtotal.toLocaleString('en-IN')} + 18% GST: ₹{inv.gstAmount.toLocaleString('en-IN')}
+                          </div>
                           <div className="text-2xl font-black text-gray-900">
-                            ₹{totalFee.toLocaleString('en-IN')}
+                            ₹{inv.totalAmount.toLocaleString('en-IN')}
                             <span className="text-xs text-gray-400 font-normal ml-1">
-                              for {months} {months === 1 ? 'month' : 'months'}
+                              Total ({months} {months === 1 ? 'month' : 'months'})
                             </span>
                           </div>
                         </div>
