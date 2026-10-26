@@ -76,7 +76,7 @@ export async function getEffectiveMonthlyFee(
     return Number(tier.monthly_fee_inr)
   }
 
-  return 199
+  return 99
 }
 
 /**

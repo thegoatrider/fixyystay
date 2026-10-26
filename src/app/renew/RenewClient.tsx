@@ -105,7 +105,7 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
   }
 
   const bulkSubtotal = properties.reduce(
-    (acc, p) => acc + (p.monthly_fee || 199) * bulkMonths,
+    (acc, p) => acc + (p.monthly_fee || 99) * bulkMonths,
     0
   )
   const bulkGst = Math.round(bulkSubtotal * 0.18)
@@ -345,7 +345,7 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
                       <div className="text-xs sm:text-sm font-semibold">{opt.label}</div>
                       <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
                         {(() => {
-                          const sub = properties.reduce((acc, p) => acc + (p.monthly_fee || 199) * opt.months, 0)
+                          const sub = properties.reduce((acc, p) => acc + (p.monthly_fee || 99) * opt.months, 0)
                           const total = sub + Math.round(sub * 0.18)
                           return `₹${total.toLocaleString('en-IN')} total`
                         })()}
@@ -414,7 +414,7 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
             const isUnpaid = !prop.subscription
             const months = selectedMonths[prop.id] || 1
             const effectiveRooms = prop.effective_rooms || 1
-            const monthlyFee = prop.monthly_fee || 199
+            const monthlyFee = prop.monthly_fee || 99
             const inv = calculateSubscriptionInvoice({ monthlyFee, months })
 
             return (

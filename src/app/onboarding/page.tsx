@@ -75,7 +75,7 @@ export default function OnboardingPage() {
 
   // Rooms & Live Pricing
   const [roomCount, setRoomCount] = useState<number | ''>(1)
-  const [monthlyFee, setMonthlyFee] = useState<number>(199)
+  const [monthlyFee, setMonthlyFee] = useState<number>(99)
   const [pricingTierName, setPricingTierName] = useState<string>('Alibag / Non-Metro')
   const [isOverLimit, setIsOverLimit] = useState<boolean>(false)
 

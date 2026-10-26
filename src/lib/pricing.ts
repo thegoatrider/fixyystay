@@ -3,7 +3,7 @@
  *
  * Rate Structure:
  * 1. Alibag / Raigad district & Non-Metro Cities:
- *    - 1–6 rooms:   ₹199 / month
+ *    - 1–6 rooms:   ₹99 / month
  *    - 7–12 rooms:  ₹299 / month
  *    - 13–20 rooms: ₹399 / month
  *    - 21–30 rooms: ₹499 / month
@@ -30,7 +30,7 @@ export interface PricingBracket {
 }
 
 export const PRICING_BRACKETS: PricingBracket[] = [
-  { minRooms: 1, maxRooms: 6, nonMetroFee: 199, metroFee: 299, label: '1–6 Rooms' },
+  { minRooms: 1, maxRooms: 6, nonMetroFee: 99, metroFee: 299, label: '1–6 Rooms' },
   { minRooms: 7, maxRooms: 12, nonMetroFee: 299, metroFee: 399, label: '7–12 Rooms' },
   { minRooms: 13, maxRooms: 20, nonMetroFee: 399, metroFee: 499, label: '13–20 Rooms' },
   { minRooms: 21, maxRooms: 30, nonMetroFee: 499, metroFee: 599, label: '21–30 Rooms' },

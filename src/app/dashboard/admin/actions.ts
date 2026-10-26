@@ -477,7 +477,7 @@ export async function onboardPartner(formData: FormData) {
       if (feeRes.monthlyFee) {
         monthlyFee = feeRes.monthlyFee
       } else {
-        monthlyFee = 199
+        monthlyFee = 99
       }
     }
     const finalAmount = amount > 0 ? amount : monthlyFee * months
