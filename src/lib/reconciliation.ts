@@ -89,7 +89,7 @@ export async function reconcileOwnerSubscriptions(ownerId: string): Promise<Reco
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString(),
             status: 'active',
-            source: 'razorpay_upi',
+            source: 'razorpay',
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'property_id' }
