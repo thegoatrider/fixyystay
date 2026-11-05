@@ -6,6 +6,7 @@ import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
 import { calculateMonthlyFee, calculateSubscriptionInvoice } from '@/lib/pricing'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 
 export interface CreatePropertyOrderResult {
   orderId?: string
@@ -455,11 +456,45 @@ export async function activateBulkPropertyPayment(
     const rzpOrder = await razorpay.orders.fetch(orderId)
     const rawItems = rzpOrder?.notes?.items as string | undefined
 
-    if (!rawItems) {
-      return { error: 'Bulk order items metadata missing on Razorpay order.' }
+    let items: Array<{ id: string; m: number; r: number; f: number }> = []
+    if (rawItems) {
+      try {
+        items = JSON.parse(rawItems)
+      } catch (e) {
+        console.warn('[activateBulkPropertyPayment] Failed to parse rawItems JSON:', e)
+      }
     }
 
-    const items: Array<{ id: string; m: number; r: number; f: number }> = JSON.parse(rawItems)
+    // Robust Fallback: Check masterPayment.notes or query owner properties directly
+    if (!items || items.length === 0) {
+      if ((masterPayment as any).notes) {
+        try {
+          items = JSON.parse((masterPayment as any).notes)
+        } catch (e) {}
+      }
+    }
+
+    if (!items || items.length === 0) {
+      const { data: ownerProps } = await supabaseAdmin
+        .from('properties')
+        .select('id, room_count')
+        .eq('owner_id', masterPayment.owner_id)
+
+      const durationMonths = masterPayment.months || masterPayment.plan_duration_months || 1
+      const count = (ownerProps && ownerProps.length > 0) ? ownerProps.length : 1
+      const baseMonthlyFee = Math.round(Number(masterPayment.amount) / (count * 1.18 * durationMonths)) || 99
+
+      items = (ownerProps || []).map((p) => ({
+        id: p.id,
+        m: durationMonths,
+        r: p.room_count || 1,
+        f: baseMonthlyFee,
+      }))
+    }
+
+    if (!items || items.length === 0) {
+      return { error: 'No properties found to activate for this bulk payment order.' }
+    }
 
     // 3. Mark master payment row as paid
     await supabaseAdmin
@@ -674,6 +709,48 @@ export async function checkPaymentActivation(orderId: string) {
       return { status: 'failed', propertyId: targetPayment.property_id }
     }
 
+    // Proactively check with Razorpay if status in DB is not yet marked paid
+    if (targetPayment.status !== 'paid') {
+      try {
+        if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+          const razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+          })
+          const rzpOrder = await razorpay.orders.fetch(orderId)
+          const isPaid =
+            rzpOrder.status === 'paid' ||
+            (typeof rzpOrder.amount_paid === 'number' && rzpOrder.amount_paid >= Number(rzpOrder.amount))
+
+          if (isPaid) {
+            let capturedPaymentId: string | undefined
+            try {
+              const payments = await razorpay.orders.fetchPayments(orderId)
+              const captured = payments?.items?.find((p: any) => p.status === 'captured')
+              capturedPaymentId = captured?.id
+            } catch (e) {}
+
+            const isBulk = rzpOrder?.notes?.type === 'bulk_property_subscription'
+            if (isBulk) {
+              await activateBulkPropertyPayment(orderId, capturedPaymentId)
+            } else {
+              await supabaseAdmin.rpc('activate_property_payment', {
+                p_order_id: orderId,
+                p_payment_id: capturedPaymentId || null,
+              })
+            }
+
+            return {
+              status: 'active',
+              propertyId: targetPayment.property_id,
+            }
+          }
+        }
+      } catch (checkErr) {
+        console.warn('[checkPaymentActivation] Proactive Razorpay check error:', checkErr)
+      }
+    }
+
     // 2. Check property subscription status
     if (targetPayment.property_id) {
       const { data: sub, error: subErr } = await supabaseAdmin
@@ -775,5 +852,48 @@ export async function createOwnerOrder(
   } catch (err: any) {
     console.error('[createOwnerOrder] Deprecated fallback error:', err)
     return { error: err.message || 'Failed to create order' }
+  }
+}
+
+/**
+ * Triggers authoritative Razorpay payment reconciliation for the current authenticated user.
+ */
+export async function triggerReconcileForCurrentUser() {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Authentication required' }
+
+    const supabaseAdmin = createAdminClient()
+    let { data: owner } = await supabaseAdmin
+      .from('owners')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!owner && user.email) {
+      const { data: matched } = await supabaseAdmin
+        .from('owners')
+        .select('id')
+        .eq('email', user.email.toLowerCase().trim())
+        .maybeSingle()
+
+      if (matched) {
+        await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matched.id)
+        owner = matched
+      }
+    }
+
+    if (!owner) return { error: 'Owner record not found' }
+
+    const recon = await reconcileOwnerSubscriptions(owner.id)
+    return {
+      success: true,
+      activated: recon.activated,
+      message: recon.message || 'Reconciliation completed',
+    }
+  } catch (err: any) {
+    console.error('[triggerReconcileForCurrentUser] Error:', err)
+    return { error: err.message || 'Reconciliation failed' }
   }
 }

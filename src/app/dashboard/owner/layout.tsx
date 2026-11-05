@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { isSuperAdminUser, getEffectiveUserRole } from '@/utils/supabase/auth-roles'
 import { getOwnerAccess } from '@/lib/access'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { DashboardHeader } from '@/components/DashboardHeader'
@@ -30,7 +31,14 @@ export default async function OwnerLayout({
   const isProfileRoute = pathname.includes('/dashboard/owner/profile')
 
   if (!isSuperAdmin && !isProfileRoute) {
-    const access = await getOwnerAccess(user)
+    let access = await getOwnerAccess(user)
+    if (!access.hasAccess && access.owner?.id) {
+      // Proactive Reconciliation: Check if owner has a completed Razorpay / UPI payment that wasn't activated yet
+      const recon = await reconcileOwnerSubscriptions(access.owner.id)
+      if (recon.activated) {
+        access = await getOwnerAccess(user)
+      }
+    }
     if (!access.hasAccess) {
       if (access.properties.length > 0) {
         redirect('/renew')

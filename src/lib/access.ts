@@ -56,7 +56,12 @@ export async function getPropertyAccess(
   // 2. Ownership Verification
   const owner = property.owners
   if (!isSuperAdmin && owner?.user_id !== user.id) {
-    return { allowed: false, reason: 'unauthorized', property }
+    if (owner?.email && user.email && owner.email.toLowerCase().trim() === user.email.toLowerCase().trim()) {
+      await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', owner.id)
+      owner.user_id = user.id
+    } else {
+      return { allowed: false, reason: 'unauthorized', property }
+    }
   }
 
   if (isSuperAdmin) {
@@ -117,11 +122,27 @@ export async function getOwnerAccess(user: User | null): Promise<OwnerAccessResu
   const supabaseAdmin = createAdminClient()
 
   // 1. Fetch Owner Profile
-  const { data: owner } = await supabaseAdmin
+  let { data: owner } = await supabaseAdmin
     .from('owners')
     .select('id, user_id, name, email, phone')
     .eq('user_id', user.id)
     .maybeSingle()
+
+  if (!owner && user.email) {
+    const { data: matchedOwner } = await supabaseAdmin
+      .from('owners')
+      .select('id, user_id, name, email, phone')
+      .eq('email', user.email.toLowerCase().trim())
+      .maybeSingle()
+
+    if (matchedOwner) {
+      await supabaseAdmin
+        .from('owners')
+        .update({ user_id: user.id })
+        .eq('id', matchedOwner.id)
+      owner = { ...matchedOwner, user_id: user.id }
+    }
+  }
 
   if (!owner && !isSuperAdmin) {
     return {

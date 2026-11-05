@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 import OwnerDashboardClient from './OwnerDashboardClient'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -69,11 +70,29 @@ export default async function OwnerDashboard() {
       : Promise.resolve({ data: null })
   ])
 
-  const initialSubscription = subResult.data || legacySubResult.data
+  let initialSubscription = subResult.data || legacySubResult.data
 
   if (!isSuperAdmin && owner) {
-    const isSubActive = initialSubscription?.status === 'active' && !!initialSubscription?.end_date && new Date(initialSubscription.end_date) > new Date()
+    let isSubActive = initialSubscription?.status === 'active' && !!initialSubscription?.end_date && new Date(initialSubscription.end_date) > new Date()
     
+    if (!isSubActive) {
+      // Reconcile pending/unlinked Razorpay payments before bouncing
+      const recon = await reconcileOwnerSubscriptions(owner.id)
+      if (recon.activated) {
+        const { data: refreshedSub } = await supabaseAdmin
+          .from('property_subscriptions')
+          .select('status, end_date, months, monthly_fee')
+          .eq('owner_id', owner.id)
+          .order('end_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (refreshedSub?.status === 'active' && refreshedSub.end_date && new Date(refreshedSub.end_date) > new Date()) {
+          isSubActive = true
+          initialSubscription = refreshedSub
+        }
+      }
+    }
+
     if (!isSubActive) {
       // Also allow owners who purchased standalone Guest Hub
       const { data: activeHub } = await supabaseAdmin

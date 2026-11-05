@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { getPropertyAccess } from '@/lib/access'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -20,17 +21,27 @@ export default async function EditPropertyPage(
 
   const isAdmin = isSuperAdminUser(user)
 
+  const email = user.email?.toLowerCase().trim() || ''
+  const supabaseAdmin = createAdminClient()
+
   // 1b. Gating: Require active property subscription
   if (!isAdmin) {
-    const access = await getPropertyAccess(propertyId, user)
+    let access = await getPropertyAccess(propertyId, user)
+    if (!access.allowed && user) {
+      let { data: owner } = await supabaseAdmin.from('owners').select('id').eq('user_id', user.id).maybeSingle()
+      if (!owner && user.email) {
+        const { data: matchedOwner } = await supabaseAdmin.from('owners').select('id').eq('email', user.email.toLowerCase().trim()).maybeSingle()
+        owner = matchedOwner
+      }
+      if (owner?.id) {
+        await reconcileOwnerSubscriptions(owner.id)
+        access = await getPropertyAccess(propertyId, user)
+      }
+    }
     if (!access.allowed) {
       redirect('/renew')
     }
   }
-
-  const email = user.email?.toLowerCase().trim() || ''
-
-  const supabaseAdmin = createAdminClient()
 
   let property: any = null
 

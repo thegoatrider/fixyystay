@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { calculateMonthlyFee } from '@/lib/pricing'
 import { getEffectiveMonthlyFee } from '@/app/pricing/business/actions'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 import RenewClient from './RenewClient'
 
 export const metadata = {
@@ -20,16 +21,33 @@ export default async function RenewPage() {
 
   const supabaseAdmin = createAdminClient()
 
-  // 1. Fetch Owner record
-  const { data: owner } = await supabaseAdmin
+  // 1. Fetch Owner record (with self-healing email fallback)
+  let { data: owner } = await supabaseAdmin
     .from('owners')
     .select('id, name, email, phone')
     .eq('user_id', user.id)
     .maybeSingle()
 
+  if (!owner && user.email) {
+    const { data: matchedOwner } = await supabaseAdmin
+      .from('owners')
+      .select('id, name, email, phone')
+      .eq('email', user.email.toLowerCase().trim())
+      .maybeSingle()
+
+    if (matchedOwner) {
+      await supabaseAdmin.from('owners').update({ user_id: user.id }).eq('id', matchedOwner.id)
+      owner = matchedOwner
+    }
+  }
+
   if (!owner) {
     redirect('/onboarding')
   }
+
+  // Self-healing auto-reconciliation: If user paid via UPI/Razorpay and arrived at /renew,
+  // reconcile and activate subscriptions immediately.
+  await reconcileOwnerSubscriptions(owner.id)
 
   // 2. Fetch Owner's Properties
   const { data: properties } = await supabaseAdmin

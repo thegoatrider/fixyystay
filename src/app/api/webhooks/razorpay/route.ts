@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import Razorpay from 'razorpay'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { activateBulkPropertyPayment } from '@/app/pricing/business/actions'
 
@@ -120,7 +121,22 @@ export async function POST(req: NextRequest) {
           event.payload?.order?.entity?.notes ||
           event.payload?.payment?.entity?.notes ||
           {}
-        const isBulk = notes?.type === 'bulk_property_subscription'
+        let isBulk = notes?.type === 'bulk_property_subscription'
+
+        if (!isBulk && orderId && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+          try {
+            const razorpay = new Razorpay({
+              key_id: process.env.RAZORPAY_KEY_ID,
+              key_secret: process.env.RAZORPAY_KEY_SECRET,
+            })
+            const rzpOrder = await razorpay.orders.fetch(orderId)
+            if (rzpOrder?.notes?.type === 'bulk_property_subscription') {
+              isBulk = true
+            }
+          } catch (e) {
+            // Safe fallback
+          }
+        }
 
         if (isBulk) {
           const bulkRes = await activateBulkPropertyPayment(orderId, paymentId)

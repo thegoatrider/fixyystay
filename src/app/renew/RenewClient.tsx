@@ -20,10 +20,12 @@ import {
   Sparkles,
 } from 'lucide-react'
 import Script from 'next/script'
+import Link from 'next/link'
 import {
   createPropertySubscriptionOrder,
   createBulkPropertySubscriptionOrder,
   verifyPropertyPayment,
+  triggerReconcileForCurrentUser,
 } from '@/app/pricing/business/actions'
 import { calculateSubscriptionInvoice } from '@/lib/pricing'
 
@@ -70,6 +72,37 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
   const [customRooms, setCustomRooms] = useState<Record<string, number>>({})
   const [loadingPropertyId, setLoadingPropertyId] = useState<string | null>(null)
   const [errorMap, setErrorMap] = useState<Record<string, string>>({})
+  const [isReconciling, setIsReconciling] = useState<boolean>(false)
+  const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
+
+  const handleManualReconcile = async () => {
+    setIsReconciling(true)
+    setReconcileMsg(null)
+    try {
+      const res = await triggerReconcileForCurrentUser()
+      if (res.activated) {
+        setReconcileMsg('Payment confirmed! Subscriptions activated. Redirecting...')
+        setTimeout(() => {
+          window.location.href = '/dashboard/owner'
+        }, 1200)
+      } else {
+        setReconcileMsg(res.message || 'Status verified. All records are up to date.')
+      }
+    } catch (e: any) {
+      setReconcileMsg(e.message || 'Verification check failed')
+    } finally {
+      setIsReconciling(false)
+    }
+  }
+
+  const allActive =
+    properties.length > 0 &&
+    properties.every(
+      (p) =>
+        p.subscription?.status === 'active' &&
+        p.subscription.end_date &&
+        new Date(p.subscription.end_date) > new Date()
+    )
 
   useEffect(() => {
     // Check if running on Android/iOS Capacitor native wrapper
@@ -245,12 +278,72 @@ export default function RenewClient({ owner, properties }: RenewClientProps) {
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Property Subscriptions & Renewal</h1>
-        <p className="text-gray-500 mt-2 text-base">
-          Manage per-property access and renew subscriptions. Each property subscription is priced strictly by verified rentable room count.
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Property Subscriptions & Renewal</h1>
+          <p className="text-gray-500 mt-2 text-base">
+            Manage per-property access and renew subscriptions. Each property subscription is priced strictly by verified rentable room count.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleManualReconcile}
+            disabled={isReconciling}
+            className="text-xs font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+          >
+            {isReconciling ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                Checking Razorpay...
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                Already Paid? Verify
+              </>
+            )}
+          </Button>
+          {allActive && (
+            <Button asChild size="sm" className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs">
+              <Link href="/dashboard/owner">
+                Go to Dashboard &rarr;
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
+
+      {reconcileMsg && (
+        <div className="mb-6 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-2xl p-4 text-xs font-semibold flex items-center justify-between">
+          <span>{reconcileMsg}</span>
+          <Button variant="ghost" size="sm" onClick={() => setReconcileMsg(null)} className="text-xs h-7">Dismiss</Button>
+        </div>
+      )}
+
+      {allActive && (
+        <div className="mb-8 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="p-2 rounded-xl bg-green-600 text-white mt-0.5">
+              <CheckCircle2 className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="font-extrabold text-green-950 text-base">All Properties Active & Verified</h3>
+              <p className="text-xs text-green-800 mt-0.5">
+                All {properties.length} properties in your account have active subscriptions. You have full access to manage rooms, bookings, and guest check-ins.
+              </p>
+            </div>
+          </div>
+          <Button asChild className="bg-green-700 hover:bg-green-800 text-white font-bold text-sm h-11 px-5 rounded-xl shrink-0">
+            <Link href="/dashboard/owner">
+              Open Dashboard
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Owner Phone Notification if missing */}
       {!owner.phone && (
