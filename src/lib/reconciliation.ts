@@ -140,12 +140,74 @@ export async function reconcileOwnerSubscriptions(ownerId: string): Promise<Reco
         })
       }
 
+      // Synchronize legacy owner_subscriptions so all RPCs and components see active status and dates
+      const { data: legacyOwnerSub } = await supabaseAdmin
+        .from('owner_subscriptions')
+        .select('id')
+        .eq('owner_id', ownerId)
+        .maybeSingle()
+
+      if (legacyOwnerSub) {
+        await supabaseAdmin
+          .from('owner_subscriptions')
+          .update({
+            status: 'active',
+            plan_name: 'FixyStays Partner Plan',
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString(),
+          })
+          .eq('id', legacyOwnerSub.id)
+      } else {
+        await supabaseAdmin.from('owner_subscriptions').insert({
+          owner_id: ownerId,
+          status: 'active',
+          plan_name: 'FixyStays Partner Plan',
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+        })
+      }
+
       activatedAny = true
       return {
         reconciled: true,
         activated: true,
         message: 'Successfully reconciled and activated 2 properties for the23villa@gmail.com',
         properties: propList,
+      }
+    }
+
+    // Ensure legacy owner_subscriptions is kept in sync with active property subscriptions
+    if (activeSubs.length > 0) {
+      const maxSub = [...activeSubs].sort(
+        (a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
+      )[0]
+
+      if (maxSub?.end_date) {
+        const { data: legacyOwnerSub } = await supabaseAdmin
+          .from('owner_subscriptions')
+          .select('id, end_date, status')
+          .eq('owner_id', ownerId)
+          .maybeSingle()
+
+        if (legacyOwnerSub) {
+          if (legacyOwnerSub.status !== 'active' || new Date(legacyOwnerSub.end_date).getTime() < new Date(maxSub.end_date).getTime()) {
+            await supabaseAdmin
+              .from('owner_subscriptions')
+              .update({
+                status: 'active',
+                plan_name: maxSub.plan_name || 'FixyStays Partner Plan',
+                end_date: maxSub.end_date,
+              })
+              .eq('id', legacyOwnerSub.id)
+          }
+        } else {
+          await supabaseAdmin.from('owner_subscriptions').insert({
+            owner_id: ownerId,
+            status: 'active',
+            plan_name: maxSub.plan_name || 'FixyStays Partner Plan',
+            end_date: maxSub.end_date,
+          })
+        }
       }
     }
 
@@ -237,6 +299,46 @@ export async function reconcileOwnerSubscriptions(ownerId: string): Promise<Reco
           } catch (rzpErr: any) {
             console.warn(`[reconcileOwnerSubscriptions] Razorpay check error for order ${orderId}:`, rzpErr.message)
           }
+        }
+      }
+    }
+
+    if (activatedAny) {
+      const { data: updatedSubs } = await supabaseAdmin
+        .from('property_subscriptions')
+        .select('status, end_date, start_date, plan_name')
+        .eq('owner_id', ownerId)
+        .eq('status', 'active')
+        .gt('end_date', new Date().toISOString())
+        .order('end_date', { ascending: false })
+        .limit(1)
+
+      if (updatedSubs && updatedSubs[0]) {
+        const topSub = updatedSubs[0]
+        const { data: legacyOwnerSub } = await supabaseAdmin
+          .from('owner_subscriptions')
+          .select('id')
+          .eq('owner_id', ownerId)
+          .maybeSingle()
+
+        if (legacyOwnerSub) {
+          await supabaseAdmin
+            .from('owner_subscriptions')
+            .update({
+              status: 'active',
+              plan_name: topSub.plan_name || 'FixyStays Partner Plan',
+              start_date: topSub.start_date || new Date().toISOString(),
+              end_date: topSub.end_date,
+            })
+            .eq('id', legacyOwnerSub.id)
+        } else {
+          await supabaseAdmin.from('owner_subscriptions').insert({
+            owner_id: ownerId,
+            status: 'active',
+            plan_name: topSub.plan_name || 'FixyStays Partner Plan',
+            start_date: topSub.start_date || new Date().toISOString(),
+            end_date: topSub.end_date,
+          })
         }
       }
     }

@@ -13,6 +13,7 @@ import ChangePasswordForm from './ChangePasswordForm'
 import OwnerProfileCard from './OwnerProfileCard'
 import GoogleDriveSyncCard from './GoogleDriveSyncCard'
 import { ensureOwner } from '@/lib/ensure-owner'
+import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 import { cn } from '@/lib/utils'
 
 export default async function OwnerProfilePage() {
@@ -59,43 +60,65 @@ export default async function OwnerProfilePage() {
     redirect('/onboarding')
   }
 
-  // 2. Fetch property subscriptions
-  const { data: propSubs } = await supabaseAdmin
-    .from('property_subscriptions')
-    .select('id, property_id, plan_name, status, start_date, end_date, room_count, monthly_fee, properties(name)')
-    .eq('owner_id', owner.id)
-    .order('created_at', { ascending: false })
+  // 1b. Proactive self-healing reconciliation for any unlinked or completed payments
+  try {
+    await reconcileOwnerSubscriptions(owner.id)
+  } catch (reconErr) {
+    console.warn('[OwnerProfilePage] Auto-reconciliation check:', reconErr)
+  }
 
-  // Legacy fallback
-  const { data: subscription } = await supabaseAdmin
-    .from('owner_subscriptions')
-    .select('id, owner_id, plan_name, status, start_date, end_date')
-    .eq('owner_id', owner.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // 2. Fetch property subscriptions & owner properties concurrently
+  const [
+    { data: propSubs },
+    { data: ownerProps },
+    { data: subscription },
+    { data: activeHub },
+    { data: googleToken },
+    { data: payments }
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('property_subscriptions')
+      .select('id, property_id, plan_name, status, start_date, end_date, room_count, monthly_fee, months')
+      .eq('owner_id', owner.id)
+      .order('end_date', { ascending: false }),
+    supabaseAdmin
+      .from('properties')
+      .select('id, name, room_count')
+      .eq('owner_id', owner.id),
+    supabaseAdmin
+      .from('owner_subscriptions')
+      .select('id, owner_id, plan_name, status, start_date, end_date')
+      .eq('owner_id', owner.id)
+      .order('end_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('guest_hub_settings')
+      .select('id, subscription_status, subscription_end_date, properties!inner(id, owner_id)')
+      .eq('properties.owner_id', owner.id)
+      .eq('subscription_status', 'active')
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('owner_google_tokens')
+      .select('google_email')
+      .eq('owner_id', owner.id)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('owner_payments')
+      .select('id, owner_id, amount, payment_date, payment_method, payment_ref, plan_duration_months, status, room_count, monthly_fee')
+      .eq('owner_id', owner.id)
+      .order('payment_date', { ascending: false })
+  ])
 
-  // 3. Also check standalone guest_hub_settings subscription
-  const { data: activeHub } = await supabaseAdmin
-    .from('guest_hub_settings')
-    .select('id, subscription_status, subscription_end_date, properties!inner(id, owner_id)')
-    .eq('properties.owner_id', owner.id)
-    .eq('subscription_status', 'active')
-    .limit(1)
-    .maybeSingle()
-
-  const { data: googleToken } = await supabase
-    .from('owner_google_tokens')
-    .select('google_email')
-    .eq('owner_id', owner.id)
-    .maybeSingle()
-
-  // 4. Fetch payment history with exact database schema columns
-  const { data: payments } = await supabaseAdmin
-    .from('owner_payments')
-    .select('id, owner_id, amount, payment_date, payment_method, payment_ref, plan_duration_months, status, room_count, monthly_fee')
-    .eq('owner_id', owner.id)
-    .order('created_at', { ascending: false })
+  const propNameMap = new Map<string, string>()
+  const propRoomMap = new Map<string, number>()
+  if (ownerProps) {
+    for (const p of ownerProps) {
+      propNameMap.set(p.id, p.name)
+      if (p.room_count) propRoomMap.set(p.id, p.room_count)
+    }
+  }
 
   const { count: propertiesCount } = await supabaseAdmin.from('properties').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
   const { count: leadsCount } = await supabaseAdmin.from('leads').select('*', { count: 'exact', head: true }).eq('owner_id', owner.id)
@@ -104,11 +127,46 @@ export default async function OwnerProfilePage() {
   const { data: earningsData } = await supabaseAdmin.from('wallet_transactions').select('amount').eq('user_id', user.id).eq('transaction_type', 'earning')
   const earnings = earningsData?.reduce((acc, t) => acc + Number(t.amount), 0) || 0
 
-  const hasActivePropSub = (propSubs || []).some(
-    (s: any) => s.status === 'active' && new Date(s.end_date) > new Date()
+  const now = new Date()
+  const activePropSubs = (propSubs || []).filter(
+    (s: any) => s.status === 'active' && s.end_date && new Date(s.end_date) > now
   )
-  const isPaid = hasActivePropSub || (subscription?.status === 'active' && !!subscription?.end_date && new Date(subscription.end_date) > new Date())
-  const isHubActive = !isPaid && !!activeHub?.subscription_end_date && new Date(activeHub.subscription_end_date) > new Date()
+  const isLegacyActive = subscription?.status === 'active' && !!subscription?.end_date && new Date(subscription.end_date) > now
+  const isPaid = activePropSubs.length > 0 || isLegacyActive
+  const isHubActive = !isPaid && !!activeHub?.subscription_end_date && new Date(activeHub.subscription_end_date) > now
+
+  // Resolve authoritative subscription dates and plan
+  let effectiveEndDate: string | null = null
+  let effectiveStartDate: string | null = null
+  let effectivePlanName = 'FixyStays Partner Plan'
+
+  if (activePropSubs.length > 0) {
+    const latest = [...activePropSubs].sort(
+      (a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
+    )[0]
+    effectiveEndDate = latest.end_date
+    effectiveStartDate = latest.start_date
+    effectivePlanName = latest.plan_name || 'FixyStays Partner Plan'
+  } else if (isLegacyActive && subscription) {
+    effectiveEndDate = subscription.end_date
+    effectiveStartDate = subscription.start_date
+    effectivePlanName = subscription.plan_name || 'FixyStays Partner Plan'
+  } else {
+    const allSubs = [
+      ...(propSubs || []).filter((s: any) => s.end_date).map((s: any) => ({ end: s.end_date, start: s.start_date, plan: s.plan_name })),
+      ...(subscription?.end_date ? [{ end: subscription.end_date, start: subscription.start_date, plan: subscription.plan_name }] : [])
+    ].sort((a, b) => new Date(b.end).getTime() - new Date(a.end).getTime())
+
+    if (allSubs.length > 0) {
+      effectiveEndDate = allSubs[0].end
+      effectiveStartDate = allSubs[0].start
+      effectivePlanName = allSubs[0].plan || 'FixyStays Partner Plan'
+    }
+  }
+
+  const daysRemaining = effectiveEndDate && isPaid
+    ? Math.max(0, Math.ceil((new Date(effectiveEndDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0
 
   return (
     <main className="min-h-screen bg-gray-50/50 pb-12">
@@ -183,35 +241,62 @@ export default async function OwnerProfilePage() {
                       {isPaid ? 'Active Subscription' : isHubActive ? 'Active Guest Hub Plan' : 'Subscription Expired'}
                     </h3>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                      {isPaid ? (subscription?.plan_name || 'FixyStays Partner') : isHubActive ? 'Standalone Guest Hub Active' : subscription?.end_date ? 'Plan Expired' : 'Renewal Required'}
+                      {isPaid ? effectivePlanName : isHubActive ? 'Standalone Guest Hub Active' : effectiveEndDate ? 'Plan Expired' : 'Renewal Required'}
                     </p>
                   </div>
                </div>
 
                {isPaid ? (
-                 <div className="grid sm:grid-cols-2 gap-6">
-                    <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                       <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3 text-blue-600" /> Expiry Date &amp; Time</p>
-                       <p className="text-2xl font-black text-gray-900">{subscription?.end_date ? format(new Date(subscription.end_date), "MMMM dd, yyyy 'at' hh:mm a") : 'N/A'}</p>
-                       <p className={cn("text-xs font-bold mt-1", "text-green-600")}>
-                          Expires in {subscription?.end_date ? Math.max(0, Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0} days
-                       </p>
-                       {subscription?.start_date && (
-                         <p className="text-[10px] text-gray-400 mt-2 font-medium">
-                           Started on {format(new Date(subscription.start_date), "MMM dd, yyyy")}
+                 <div className="space-y-6">
+                   <div className="grid sm:grid-cols-2 gap-6">
+                      <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-1.5"><Calendar className="w-3 h-3 text-blue-600" /> Expiry Date &amp; Time</p>
+                         <p className="text-2xl font-black text-gray-900">{effectiveEndDate ? format(new Date(effectiveEndDate), "MMMM dd, yyyy 'at' hh:mm a") : 'N/A'}</p>
+                         <p className={cn("text-xs font-bold mt-1", "text-green-600")}>
+                            Expires in {daysRemaining} days
                          </p>
-                       )}
-                    </div>
-                    <div className="p-6 bg-blue-600 text-white rounded-2xl border border-blue-500 shadow-lg shadow-blue-600/20 flex flex-col justify-between">
-                       <div>
-                         <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-1">Plan Control</p>
-                         <p className="text-xl font-black italic uppercase">Manage Plan</p>
-                         <p className="text-xs text-blue-100 mt-1">Full premium partner access to leads, bookings, guests, and marketing.</p>
+                         {effectiveStartDate && (
+                           <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                             Started on {format(new Date(effectiveStartDate), "MMM dd, yyyy")}
+                           </p>
+                         )}
+                      </div>
+                      <div className="p-6 bg-blue-600 text-white rounded-2xl border border-blue-500 shadow-lg shadow-blue-600/20 flex flex-col justify-between">
+                         <div>
+                           <p className="text-[10px] font-black uppercase text-blue-200 tracking-widest mb-1">Plan Control</p>
+                           <p className="text-xl font-black italic uppercase">Manage Plan</p>
+                           <p className="text-xs text-blue-100 mt-1">Full premium partner access to leads, bookings, guests, and marketing.</p>
+                         </div>
+                         <Button asChild variant="secondary" className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
+                            <Link href="/renew">Manage / Renew</Link>
+                         </Button>
+                      </div>
+                   </div>
+
+                   {activePropSubs.length > 0 && (
+                     <div className="pt-6 border-t border-gray-100">
+                       <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3 flex items-center gap-1.5">
+                         <Home className="w-3.5 h-3.5 text-blue-600" /> Active Property Plans ({activePropSubs.length})
+                       </p>
+                       <div className="grid sm:grid-cols-2 gap-3">
+                         {activePropSubs.map((ps: any) => {
+                           const pName = propNameMap.get(ps.property_id) || 'Property'
+                           const pRooms = ps.room_count || propRoomMap.get(ps.property_id) || 1
+                           return (
+                             <div key={ps.id} className="p-3.5 bg-gray-50/80 rounded-xl border border-gray-100 flex items-center justify-between">
+                               <div>
+                                 <p className="text-xs font-bold text-gray-900">{pName}</p>
+                                 <p className="text-[10px] text-gray-400 font-medium">{pRooms} Room{pRooms > 1 ? 's' : ''} • Active</p>
+                               </div>
+                               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-green-100 text-green-700">
+                                 Valid till {format(new Date(ps.end_date), 'MMM dd, yyyy')}
+                               </span>
+                             </div>
+                           )
+                         })}
                        </div>
-                       <Button asChild variant="secondary" className="w-full mt-4 bg-white text-blue-600 hover:bg-blue-50 font-black uppercase text-[10px] tracking-widest h-10 rounded-xl">
-                          <Link href="/renew">Manage / Renew</Link>
-                       </Button>
-                    </div>
+                     </div>
+                   )}
                  </div>
                ) : isHubActive ? (
                  <div className="grid sm:grid-cols-2 gap-6">
@@ -237,16 +322,16 @@ export default async function OwnerProfilePage() {
                     <div className="p-6 bg-red-50/60 rounded-2xl border border-red-100">
                        <p className="text-[10px] font-black uppercase text-red-600 tracking-widest mb-2 flex items-center gap-1.5">
                          <Calendar className="w-3 h-3 text-red-600" />
-                         {subscription?.end_date ? 'Subscription Expiry Date' : 'Access Status'}
+                         {effectiveEndDate ? 'Subscription Expiry Date' : 'Access Status'}
                        </p>
                        <p className="text-xl sm:text-2xl font-black text-gray-900">
-                         {subscription?.end_date 
-                           ? format(new Date(subscription.end_date), "MMMM dd, yyyy 'at' hh:mm a") 
+                         {effectiveEndDate 
+                           ? format(new Date(effectiveEndDate), "MMMM dd, yyyy 'at' hh:mm a") 
                            : 'SUBSCRIPTION EXPIRED'}
                        </p>
                        <p className="text-xs font-semibold text-red-600 mt-1">
-                         {subscription?.end_date 
-                           ? `Subscription ended on ${format(new Date(subscription.end_date), "MMM dd, yyyy")}. Renew to keep access active.` 
+                         {effectiveEndDate 
+                           ? `Subscription ended on ${format(new Date(effectiveEndDate), "MMM dd, yyyy")}. Renew to keep access active.` 
                            : 'Subscription required to view full lead and guest details.'}
                        </p>
                     </div>
