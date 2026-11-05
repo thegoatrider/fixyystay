@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url)
-  const email = url.searchParams.get('email') || 'the23villa@gmail.com'
-  const token = url.searchParams.get('token')
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAdmin = isSuperAdminUser(user) || user?.app_metadata?.role === 'admin'
 
-  if (token !== 'fixy-reconcile-2026') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 })
+  }
+
+  const url = new URL(req.url)
+  const email = url.searchParams.get('email')
+
+  if (!email) {
+    return NextResponse.json({ error: 'Missing email query parameter' }, { status: 400 })
   }
 
   const supabaseAdmin = createAdminClient()
