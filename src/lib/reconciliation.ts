@@ -78,25 +78,20 @@ export async function reconcileOwnerSubscriptions(ownerId: string): Promise<Reco
       endDate.setDate(endDate.getDate() + 30)
 
       for (const prop of propList) {
-        const { error: subErr } = await supabaseAdmin.from('property_subscriptions').upsert(
-          {
-            property_id: prop.id,
-            owner_id: ownerId,
-            plan_name: '1 Month Plan (Bulk Recharge)',
-            room_count: prop.room_count || 1,
-            monthly_fee: 99,
-            months: durationMonths,
+        // Direct update on existing property_subscription record
+        const { error: subUpdateErr } = await supabaseAdmin
+          .from('property_subscriptions')
+          .update({
+            status: 'active',
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString(),
-            status: 'active',
-            source: 'razorpay',
+            months: durationMonths,
             updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'property_id' }
-        )
+          })
+          .eq('property_id', prop.id)
 
-        if (subErr) {
-          console.error('[reconcileOwnerSubscriptions] Error activating sub for the23villa:', subErr)
+        if (subUpdateErr) {
+          console.error('[reconcileOwnerSubscriptions] Error updating sub for the23villa:', subUpdateErr)
         }
 
         // Ensure property is approved and active
