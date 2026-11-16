@@ -132,17 +132,30 @@ BEGIN
     ) ir_complex;
   END IF;
 
-  -- 6. Get CURRENT subscription status
+  -- 6. Get CURRENT subscription status (Check property_subscriptions first, then fallback to owner_subscriptions)
   SELECT json_build_object(
-    'plan_name', s.plan_name,
-    'end_date', s.end_date,
-    'status', s.status,
-    'is_active', (s.status = 'active' AND s.end_date > NOW())
+    'plan_name', COALESCE(ps.months::text || ' Months Plan', 'FixyStays Partner'),
+    'end_date', ps.end_date,
+    'status', ps.status,
+    'is_active', (ps.status = 'active' AND ps.end_date > NOW())
   ) INTO v_subscription
-  FROM public.owner_subscriptions s
-  WHERE s.owner_id = p_owner_id
-  ORDER BY s.created_at DESC -- Ensure we get the latest one
+  FROM public.property_subscriptions ps
+  WHERE ps.owner_id = p_owner_id
+  ORDER BY (ps.status = 'active' AND ps.end_date > NOW()) DESC, ps.end_date DESC
   LIMIT 1;
+
+  IF v_subscription IS NULL OR (v_subscription->>'is_active')::boolean IS NOT TRUE THEN
+    SELECT json_build_object(
+      'plan_name', s.plan_name,
+      'end_date', s.end_date,
+      'status', s.status,
+      'is_active', (s.status = 'active' AND s.end_date > NOW())
+    ) INTO v_subscription
+    FROM public.owner_subscriptions s
+    WHERE s.owner_id = p_owner_id
+    ORDER BY (s.status = 'active' AND s.end_date > NOW()) DESC, s.end_date DESC
+    LIMIT 1;
+  END IF;
 
   RETURN json_build_object(
     'owner', COALESCE(v_owner_meta, json_build_object('free_tier_enabled', false, 'created_at', null)),

@@ -81,9 +81,29 @@ export default function OwnerDashboardClient({
   const { data, isLoading, error } = useDashboardData(ownerId, isSuperAdmin)
 
   // Subscription and status calculation (No free tier, no trial)
+  // Authoritative resolution across RPC data, SSR initialSubscription, and superadmin status
   const subscriptionInfo = useMemo(() => {
-    const sub = (data as any)?.subscription || initialSubscription
-    const isPaid = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
+    const now = new Date()
+    const rpcSub = (data as any)?.subscription
+    const ssrSub = initialSubscription
+
+    const isRpcActive = rpcSub?.status === 'active' && !!rpcSub?.end_date && new Date(rpcSub.end_date) > now
+    const isSsrActive = ssrSub?.status === 'active' && !!ssrSub?.end_date && new Date(ssrSub.end_date) > now
+
+    let sub = rpcSub || ssrSub
+    if (isRpcActive && isSsrActive) {
+      sub = new Date(ssrSub.end_date) > new Date(rpcSub.end_date) ? ssrSub : rpcSub
+    } else if (isSsrActive) {
+      sub = ssrSub
+    } else if (isRpcActive) {
+      sub = rpcSub
+    } else if (ssrSub?.end_date && (!rpcSub?.end_date || new Date(ssrSub.end_date) > new Date(rpcSub.end_date))) {
+      sub = ssrSub
+    }
+
+    const isPaid =
+      isSuperAdmin ||
+      (sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > now)
 
     let endDate: Date | null = null
     let daysRemaining = 0
@@ -93,6 +113,8 @@ export default function OwnerDashboardClient({
       endDate = new Date(sub.end_date)
       daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       planDisplayName = sub.plan_name ? sub.plan_name.toUpperCase() : 'ACTIVE SUBSCRIPTION'
+    } else if (isSuperAdmin) {
+      planDisplayName = 'SUPER ADMIN ACCESS'
     } else if (sub?.end_date) {
       endDate = new Date(sub.end_date)
       daysRemaining = 0
@@ -109,7 +131,7 @@ export default function OwnerDashboardClient({
         })
       : null
 
-    const isExpiringSoon = isPaid && daysRemaining <= 7
+    const isExpiringSoon = isPaid && !isSuperAdmin && daysRemaining <= 7
 
     return {
       isFreeTier: !isPaid,
@@ -120,7 +142,7 @@ export default function OwnerDashboardClient({
       isExpiringSoon,
       hasEndDate: !!endDate
     }
-  }, [data, initialOwner, initialSubscription])
+  }, [data, initialOwner, initialSubscription, isSuperAdmin])
 
   const isFreeTier = subscriptionInfo.isFreeTier
 

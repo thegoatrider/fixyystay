@@ -6,7 +6,10 @@ import { isSuperAdminUser } from '@/utils/supabase/auth-roles'
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
 import { calculateMonthlyFee, calculateSubscriptionInvoice } from '@/lib/pricing'
-import { reconcileOwnerSubscriptions } from '@/lib/reconciliation'
+import {
+  reconcileOwnerSubscriptions,
+  activateOrderPaymentDirect,
+} from '@/lib/reconciliation'
 
 export interface CreatePropertyOrderResult {
   orderId?: string
@@ -422,156 +425,16 @@ export async function activateBulkPropertyPayment(
   paymentId?: string | null
 ) {
   try {
-    const supabaseAdmin = createAdminClient()
-
-    // 1. Fetch Master Payment record
-    const { data: masterPayment, error: payErr } = await supabaseAdmin
-      .from('owner_payments')
-      .select('*')
-      .eq('razorpay_order_id', orderId)
-      .maybeSingle()
-
-    if (payErr) {
-      console.error('[activateBulkPropertyPayment] DB error:', payErr)
-      return { error: `Payment record query error: ${payErr.message}` }
+    const res = await activateOrderPaymentDirect(orderId, paymentId)
+    if (res.error) {
+      return { error: res.error }
     }
-
-    if (!masterPayment) {
-      return { error: `Master payment not found for order ${orderId}` }
-    }
-
-    if (masterPayment.status === 'refunded') {
-      return { error: 'Payment has been refunded; cannot activate subscriptions.' }
-    }
-
-    if (masterPayment.status === 'paid') {
-      return { success: true, alreadyProcessed: true }
-    }
-
-    // 2. Fetch Razorpay order to inspect notes and item breakdown
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID!,
-      key_secret: process.env.RAZORPAY_KEY_SECRET!,
-    })
-    const rzpOrder = await razorpay.orders.fetch(orderId)
-    const rawItems = rzpOrder?.notes?.items as string | undefined
-
-    let items: Array<{ id: string; m: number; r: number; f: number }> = []
-    if (rawItems) {
-      try {
-        items = JSON.parse(rawItems)
-      } catch (e) {
-        console.warn('[activateBulkPropertyPayment] Failed to parse rawItems JSON:', e)
-      }
-    }
-
-    // Robust Fallback: Check masterPayment.notes or query owner properties directly
-    if (!items || items.length === 0) {
-      if ((masterPayment as any).notes) {
-        try {
-          items = JSON.parse((masterPayment as any).notes)
-        } catch (e) {}
-      }
-    }
-
-    if (!items || items.length === 0) {
-      const { data: ownerProps } = await supabaseAdmin
-        .from('properties')
-        .select('id, room_count')
-        .eq('owner_id', masterPayment.owner_id)
-
-      const durationMonths = masterPayment.months || masterPayment.plan_duration_months || 1
-      const count = (ownerProps && ownerProps.length > 0) ? ownerProps.length : 1
-      const baseMonthlyFee = Math.round(Number(masterPayment.amount) / (count * 1.18 * durationMonths)) || 99
-
-      items = (ownerProps || []).map((p) => ({
-        id: p.id,
-        m: durationMonths,
-        r: p.room_count || 1,
-        f: baseMonthlyFee,
-      }))
-    }
-
-    if (!items || items.length === 0) {
-      return { error: 'No properties found to activate for this bulk payment order.' }
-    }
-
-    // 3. Mark master payment row as paid
-    await supabaseAdmin
-      .from('owner_payments')
-      .update({
-        status: 'paid',
-        razorpay_payment_id: paymentId || masterPayment.razorpay_payment_id || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', masterPayment.id)
-
-    // 4. Update each property subscription
-    const updatedProperties: string[] = []
-
-    for (const item of items) {
-      const { data: currentSub } = await supabaseAdmin
-        .from('property_subscriptions')
-        .select('*')
-        .eq('property_id', item.id)
-        .maybeSingle()
-
-      let baseDate = new Date()
-      if (currentSub?.status === 'active' && new Date(currentSub.end_date) > new Date()) {
-        baseDate = new Date(currentSub.end_date)
-      }
-
-      const newEndDate = new Date(baseDate)
-      newEndDate.setMonth(newEndDate.getMonth() + item.m)
-
-      const effectiveRooms = item.r || currentSub?.room_count || 1
-      const monthlyFee = item.f || currentSub?.monthly_fee || 100
-
-      await supabaseAdmin.from('property_subscriptions').upsert(
-        {
-          property_id: item.id,
-          owner_id: masterPayment.owner_id,
-          plan_name: `${item.m} Months Plan`,
-          room_count: effectiveRooms,
-          monthly_fee: monthlyFee,
-          months: item.m,
-          start_date: new Date().toISOString(),
-          end_date: newEndDate.toISOString(),
-          status: 'active',
-          source: 'razorpay',
-          payment_id: masterPayment.id,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'property_id' }
-      )
-
-      // Transition draft properties to pending (submitted for admin approval)
-      const { data: prop } = await supabaseAdmin
-        .from('properties')
-        .select('approval_status')
-        .eq('id', item.id)
-        .maybeSingle()
-
-      if (prop?.approval_status === 'draft' || prop?.approval_status === null) {
-        await supabaseAdmin
-          .from('properties')
-          .update({
-            approval_status: 'pending',
-            submitted_at: new Date().toISOString(),
-            room_count: effectiveRooms,
-          })
-          .eq('id', item.id)
-      }
-
-      updatedProperties.push(item.id)
-    }
-
     return {
       success: true,
-      alreadyProcessed: false,
+      alreadyProcessed: Boolean(res.alreadyProcessed),
       isBulk: true,
-      propertyIds: updatedProperties,
-      count: updatedProperties.length,
+      propertyIds: res.propertyIds || [],
+      count: res.count || 0,
     }
   } catch (err: any) {
     console.error('[activateBulkPropertyPayment] Exception:', err)
@@ -646,21 +509,24 @@ export async function verifyPropertyPayment(params: {
       }
     )
 
-    if (rpcError) {
+    // Always run direct activation & owner_subscriptions sync so both tables are guaranteed active
+    const directRes = await activateOrderPaymentDirect(orderId, paymentId)
+
+    if (rpcError && directRes.error) {
       console.error('[verifyPropertyPayment] activate_property_payment RPC error:', rpcError)
       return { error: `Payment activation failed: ${rpcError.message}` }
     }
 
-    if (!rpcResult?.success) {
+    if (!rpcResult?.success && !directRes.success) {
       console.warn('[verifyPropertyPayment] activate_property_payment returned failure:', rpcResult)
-      return { error: rpcResult?.error || 'Payment verification could not activate subscription.' }
+      return { error: rpcResult?.error || directRes.error || 'Payment verification could not activate subscription.' }
     }
 
     return {
       success: true,
-      alreadyProcessed: Boolean(rpcResult.already_processed),
-      propertyId: rpcResult.property_id,
-      newEndDate: rpcResult.new_end_date,
+      alreadyProcessed: Boolean(rpcResult?.already_processed && directRes.alreadyProcessed),
+      propertyId: rpcResult?.property_id || directRes.propertyIds?.[0],
+      newEndDate: rpcResult?.new_end_date,
     }
   } catch (err: any) {
     console.error('[verifyPropertyPayment] Exception:', err)
@@ -738,6 +604,7 @@ export async function checkPaymentActivation(orderId: string) {
                 p_order_id: orderId,
                 p_payment_id: capturedPaymentId || null,
               })
+              await activateOrderPaymentDirect(orderId, capturedPaymentId)
             }
 
             return {
@@ -768,8 +635,15 @@ export async function checkPaymentActivation(orderId: string) {
       }
     }
 
-    // If payment row marked paid but sub not yet populated
+    // If payment row marked paid but sub not yet populated, self-heal immediately
     if (targetPayment.status === 'paid') {
+      const healed = await activateOrderPaymentDirect(orderId)
+      if (healed.success) {
+        return {
+          status: 'active',
+          propertyId: targetPayment.property_id || healed.propertyIds?.[0],
+        }
+      }
       return { status: 'paid_activating', propertyId: targetPayment.property_id }
     }
 
@@ -808,7 +682,34 @@ export async function createOwnerOrder(
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     })
 
-    const propId = propertyDetails?.propertyId || null
+    const supabaseAdmin = createAdminClient()
+    let resolvedOwnerId = ownerId || null
+    let propId = propertyDetails?.propertyId || null
+
+    if (!resolvedOwnerId && email) {
+      const { data: matchedOwner } = await supabaseAdmin
+        .from('owners')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle()
+      if (matchedOwner) {
+        resolvedOwnerId = matchedOwner.id
+      }
+    }
+
+    if (resolvedOwnerId && !propId) {
+      const { data: firstProp } = await supabaseAdmin
+        .from('properties')
+        .select('id')
+        .eq('owner_id', resolvedOwnerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (firstProp) {
+        propId = firstProp.id
+      }
+    }
+
     let months = 1
     if (planName.includes('3 Month')) months = 3
     else if (planName.includes('6 Month')) months = 6
@@ -821,7 +722,7 @@ export async function createOwnerOrder(
       notes: {
         plan: planName,
         email: email.toLowerCase(),
-        owner_id: ownerId || '',
+        owner_id: resolvedOwnerId || '',
         property_id: propId || '',
         months: String(months),
       },
@@ -829,10 +730,9 @@ export async function createOwnerOrder(
 
     const order = await razorpay.orders.create(options)
 
-    if (ownerId) {
-      const supabaseAdmin = createAdminClient()
+    if (resolvedOwnerId) {
       await supabaseAdmin.from('owner_payments').insert({
-        owner_id: ownerId,
+        owner_id: resolvedOwnerId,
         property_id: propId,
         amount: amount,
         months: months,

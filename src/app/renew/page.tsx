@@ -81,8 +81,10 @@ export default async function RenewPage() {
       // Property subscription
       const { data: sub } = await supabaseAdmin
         .from('property_subscriptions')
-        .select('status, end_date, months, plan_name')
+        .select('*')
         .eq('property_id', prop.id)
+        .order('end_date', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       return {

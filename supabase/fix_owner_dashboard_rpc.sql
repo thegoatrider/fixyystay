@@ -183,17 +183,30 @@ BEGIN
     LIMIT 50;
   END IF;
 
-  -- 6. Subscription
+  -- 6. Subscription (Check property_subscriptions first, then fallback to owner_subscriptions)
   SELECT json_build_object(
-    'status', os.status,
-    'end_date', os.end_date,
-    'plan_name', COALESCE(os.plan_name, 'Pro'),
-    'is_active', (os.status = 'active' AND os.end_date > NOW())
+    'status', ps.status,
+    'end_date', ps.end_date,
+    'plan_name', COALESCE(ps.months::text || ' Months Plan', 'FixyStays Partner'),
+    'is_active', (ps.status = 'active' AND ps.end_date > NOW())
   ) INTO v_subscription
-  FROM public.owner_subscriptions os
-  WHERE os.owner_id = p_owner_id
-  ORDER BY os.created_at DESC
+  FROM public.property_subscriptions ps
+  WHERE ps.owner_id = p_owner_id
+  ORDER BY (ps.status = 'active' AND ps.end_date > NOW()) DESC, ps.end_date DESC
   LIMIT 1;
+
+  IF v_subscription IS NULL OR (v_subscription->>'is_active')::boolean IS NOT TRUE THEN
+    SELECT json_build_object(
+      'status', os.status,
+      'end_date', os.end_date,
+      'plan_name', COALESCE(os.plan_name, 'Pro'),
+      'is_active', (os.status = 'active' AND os.end_date > NOW())
+    ) INTO v_subscription
+    FROM public.owner_subscriptions os
+    WHERE os.owner_id = p_owner_id
+    ORDER BY (os.status = 'active' AND os.end_date > NOW()) DESC, os.end_date DESC
+    LIMIT 1;
+  END IF;
 
   -- 7. Influencer Requests
   IF p_is_superadmin THEN

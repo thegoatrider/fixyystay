@@ -991,7 +991,7 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
           ? supabaseAdmin.from('guest_checkins').select('*, properties(name), identities:guest_identity(*)').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(200)
           : Promise.resolve({ data: [] }),
       ownerId
-        ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee').eq('owner_id', ownerId).order('end_date', { ascending: false }).limit(1).maybeSingle()
+        ? supabaseAdmin.from('property_subscriptions').select('*').eq('owner_id', ownerId).order('end_date', { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       supabaseAdmin.from('property_rooms').select('*').limit(500),
       supabaseAdmin.from('influencer_promotion_requests').select('*').limit(50),
@@ -1008,24 +1008,29 @@ export async function getOwnerDashboardDataDirect(ownerId: string | undefined, i
     ])
 
     let sub: any = subRes?.data
-    if (!sub && ownerId) {
+    const now = new Date()
+    const isPropSubActive = sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > now
+
+    if (!isPropSubActive && ownerId) {
       const { data: legacySub } = await supabaseAdmin
         .from('owner_subscriptions')
         .select('status, end_date, plan_name')
         .eq('owner_id', ownerId)
-        .order('created_at', { ascending: false })
+        .order('end_date', { ascending: false })
         .limit(1)
         .maybeSingle()
-      if (legacySub) {
+
+      const isLegacyActive = legacySub?.status === 'active' && !!legacySub?.end_date && new Date(legacySub.end_date) > now
+      if (isLegacyActive || (!sub && legacySub)) {
         sub = legacySub
       }
     }
 
     const subscription = {
-      plan_name: (sub as any)?.plan_name || 'FixyStays Partner',
+      plan_name: (sub as any)?.plan_name || (sub?.months ? `${sub.months} Months Plan` : 'FixyStays Partner'),
       end_date: sub?.end_date || '',
       status: sub?.status || 'inactive',
-      is_active: sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > new Date()
+      is_active: sub?.status === 'active' && !!sub?.end_date && new Date(sub.end_date) > now
     }
 
     const properties = propsRes.data || []

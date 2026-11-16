@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import Razorpay from 'razorpay'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { activateBulkPropertyPayment } from '@/app/pricing/business/actions'
+import { activateOrderPaymentDirect } from '@/lib/reconciliation'
 
 export async function POST(req: NextRequest) {
   try {
@@ -111,12 +112,6 @@ export async function POST(req: NextRequest) {
     if (targetPayment) {
       // 1. Success events: order.paid or payment.captured
       if (eventType === 'order.paid' || eventType === 'payment.captured') {
-        // Idempotency: if already paid, return 200 fast
-        if (targetPayment.status === 'paid') {
-          console.log(`[RazorpayWebhook] Order ${orderId} already paid; skipping.`)
-          return NextResponse.json({ received: true, already_processed: true })
-        }
-
         const notes =
           event.payload?.order?.entity?.notes ||
           event.payload?.payment?.entity?.notes ||
@@ -157,13 +152,15 @@ export async function POST(req: NextRequest) {
           }
         )
 
-        if (rpcErr) {
+        const directRes = await activateOrderPaymentDirect(orderId, paymentId)
+
+        if (rpcErr && directRes.error) {
           console.error('[RazorpayWebhook] Error in activate_property_payment:', rpcErr)
           return NextResponse.json({ error: rpcErr.message }, { status: 500 })
         }
 
-        console.log(`[RazorpayWebhook] Order ${orderId} successfully activated:`, rpcRes)
-        return NextResponse.json({ received: true, activated: true, result: rpcRes })
+        console.log(`[RazorpayWebhook] Order ${orderId} successfully activated:`, rpcRes || directRes)
+        return NextResponse.json({ received: true, activated: true, result: rpcRes || directRes })
       }
 
       // 2. Failure event: payment.failed

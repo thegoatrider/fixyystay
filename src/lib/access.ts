@@ -81,18 +81,52 @@ export async function getPropertyAccess(
     }
   }
 
-  // 4. Per-Property Subscription Check (Source of Truth)
-  const { data: sub } = await supabaseAdmin
+  // 4. Per-Property Subscription Check (Source of Truth + Owner Fallback)
+  let { data: sub } = await supabaseAdmin
     .from('property_subscriptions')
     .select('*')
     .eq('property_id', propertyId)
+    .order('end_date', { ascending: false })
+    .limit(1)
     .maybeSingle()
+
+  const now = new Date()
+  let isSubActive = Boolean(sub && sub.status === 'active' && sub.end_date && new Date(sub.end_date) > now)
+
+  if (!isSubActive && owner?.id) {
+    // Check if the owner has an active subscription on their account (owner_subscriptions or another property_subscriptions row)
+    const [{ data: ownerPropSub }, { data: legacyOwnerSub }] = await Promise.all([
+      supabaseAdmin
+        .from('property_subscriptions')
+        .select('*')
+        .eq('owner_id', owner.id)
+        .eq('status', 'active')
+        .gt('end_date', now.toISOString())
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('owner_subscriptions')
+        .select('*')
+        .eq('owner_id', owner.id)
+        .eq('status', 'active')
+        .gt('end_date', now.toISOString())
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    const fallbackSub = ownerPropSub || legacyOwnerSub
+    if (fallbackSub) {
+      sub = fallbackSub
+      isSubActive = true
+    }
+  }
 
   if (!sub) {
     return { allowed: false, reason: 'unpaid', property, owner }
   }
 
-  const isSubActive = sub.status === 'active' && new Date(sub.end_date) > new Date()
   if (!isSubActive) {
     return { allowed: false, reason: 'expired', property, owner, subscription: sub }
   }
@@ -179,26 +213,41 @@ export async function getOwnerAccess(user: User | null): Promise<OwnerAccessResu
     }
   }
 
-  // 3. Query Property Subscriptions
+  // 3. Query Property Subscriptions (by property_id and owner_id)
   const propIds = propList.map((p) => p.id)
-  const { data: subscriptions } = await supabaseAdmin
-    .from('property_subscriptions')
-    .select('property_id, status, end_date')
-    .in('property_id', propIds.length > 0 ? propIds : ['00000000-0000-0000-0000-000000000000'])
+  const [propSubsById, propSubsByOwner] = await Promise.all([
+    supabaseAdmin
+      .from('property_subscriptions')
+      .select('property_id, owner_id, status, end_date')
+      .in('property_id', propIds.length > 0 ? propIds : ['00000000-0000-0000-0000-000000000000']),
+    owner?.id
+      ? supabaseAdmin
+          .from('property_subscriptions')
+          .select('property_id, owner_id, status, end_date')
+          .eq('owner_id', owner.id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const subscriptions = [...(propSubsById.data || []), ...(propSubsByOwner.data || [])]
 
   const activeIds: string[] = []
   const inactiveIds: string[] = []
   const missingRoomCount: string[] = []
 
   const now = new Date()
+  const hasAnyActiveOwnerPropSub = subscriptions.some(
+    (s) => s.status === 'active' && s.end_date && new Date(s.end_date) > now
+  )
 
   for (const prop of propList) {
     if (prop.room_count === null) {
       missingRoomCount.push(prop.id)
     }
 
-    const sub = (subscriptions || []).find((s) => s.property_id === prop.id)
-    const isSubActive = sub?.status === 'active' && new Date(sub.end_date) > now
+    const matchingSubs = subscriptions.filter((s) => s.property_id === prop.id)
+    const isSubActive = matchingSubs.some(
+      (s) => s.status === 'active' && s.end_date && new Date(s.end_date) > now
+    )
 
     if (isSubActive) {
       activeIds.push(prop.id)
@@ -236,7 +285,7 @@ export async function getOwnerAccess(user: User | null): Promise<OwnerAccessResu
   const missingPhone = !owner?.phone || owner.phone.trim().length === 0
 
   return {
-    hasAccess: activeIds.length > 0 || hasLegacyActive || hasGuestHubActive,
+    hasAccess: activeIds.length > 0 || hasAnyActiveOwnerPropSub || hasLegacyActive || hasGuestHubActive,
     owner,
     properties: propList,
     activePropertyIds: activeIds,

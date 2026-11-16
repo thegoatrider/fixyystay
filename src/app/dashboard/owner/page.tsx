@@ -60,50 +60,93 @@ export default async function OwnerDashboard() {
   // Run property subscription check and Google drive token lookup concurrently
   const [subResult, legacySubResult, googleTokenResult] = await Promise.all([
     owner
-      ? supabaseAdmin.from('property_subscriptions').select('status, end_date, months, monthly_fee').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
+      ? supabaseAdmin.from('property_subscriptions').select('*').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
     owner
-      ? supabaseAdmin.from('owner_subscriptions').select('plan_name, status, end_date').eq('owner_id', owner.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      ? supabaseAdmin.from('owner_subscriptions').select('plan_name, status, end_date').eq('owner_id', owner.id).order('end_date', { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
     owner
       ? supabase.from('owner_google_tokens').select('google_email').eq('owner_id', owner.id).maybeSingle()
       : Promise.resolve({ data: null })
   ])
 
-  let initialSubscription = subResult.data || legacySubResult.data
+  const now = new Date()
+  const isPropSubActive =
+    subResult.data?.status === 'active' &&
+    !!subResult.data?.end_date &&
+    new Date(subResult.data.end_date) > now
+  const isLegacySubActive =
+    legacySubResult.data?.status === 'active' &&
+    !!legacySubResult.data?.end_date &&
+    new Date(legacySubResult.data.end_date) > now
 
-  if (!isSuperAdmin && owner) {
-    let isSubActive = initialSubscription?.status === 'active' && !!initialSubscription?.end_date && new Date(initialSubscription.end_date) > new Date()
-    
-    if (!isSubActive) {
-      // Reconcile pending/unlinked Razorpay payments before bouncing
+  let initialSubscription: any = isPropSubActive
+    ? subResult.data
+    : isLegacySubActive
+      ? legacySubResult.data
+      : subResult.data || legacySubResult.data
+
+  if (owner) {
+    let isSubActive = isPropSubActive || isLegacySubActive
+    const needsSync = !isPropSubActive || !isLegacySubActive
+
+    if (!isSubActive || needsSync) {
+      // Reconcile pending/unlinked Razorpay payments and synchronize property_subscriptions <-> owner_subscriptions
       const recon = await reconcileOwnerSubscriptions(owner.id)
-      if (recon.activated) {
-        const { data: refreshedSub } = await supabaseAdmin
-          .from('property_subscriptions')
-          .select('status, end_date, months, monthly_fee')
-          .eq('owner_id', owner.id)
-          .order('end_date', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (refreshedSub?.status === 'active' && refreshedSub.end_date && new Date(refreshedSub.end_date) > new Date()) {
+      if (recon.activated || !isSubActive) {
+        const [{ data: refreshedSub }, { data: refreshedLegacy }] = await Promise.all([
+          supabaseAdmin
+            .from('property_subscriptions')
+            .select('*')
+            .eq('owner_id', owner.id)
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('owner_subscriptions')
+            .select('plan_name, status, end_date')
+            .eq('owner_id', owner.id)
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ])
+
+        const refreshedPropActive =
+          refreshedSub?.status === 'active' &&
+          !!refreshedSub?.end_date &&
+          new Date(refreshedSub.end_date) > now
+        const refreshedLegacyActive =
+          refreshedLegacy?.status === 'active' &&
+          !!refreshedLegacy?.end_date &&
+          new Date(refreshedLegacy.end_date) > now
+
+        if (refreshedPropActive) {
           isSubActive = true
           initialSubscription = refreshedSub
+        } else if (refreshedLegacyActive) {
+          isSubActive = true
+          initialSubscription = refreshedLegacy
         }
       }
     }
 
-    if (!isSubActive) {
+    if (!isSuperAdmin && !isSubActive) {
       // Also allow owners who purchased standalone Guest Hub
       const { data: activeHub } = await supabaseAdmin
         .from('guest_hub_settings')
-        .select('id, properties!inner(id, owner_id)')
+        .select('id, subscription_status, subscription_end_date, properties!inner(id, owner_id)')
         .eq('properties.owner_id', owner.id)
         .eq('subscription_status', 'active')
         .limit(1)
         .maybeSingle()
 
-      if (!activeHub) {
+      if (activeHub) {
+        initialSubscription = {
+          status: 'active',
+          end_date: activeHub.subscription_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          plan_name: 'Guest Hub Plan',
+        }
+      } else {
         redirect('/renew')
       }
     }

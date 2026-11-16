@@ -78,7 +78,7 @@ export default async function OwnerProfilePage() {
   ] = await Promise.all([
     supabaseAdmin
       .from('property_subscriptions')
-      .select('id, property_id, plan_name, status, start_date, end_date, room_count, monthly_fee, months')
+      .select('*')
       .eq('owner_id', owner.id)
       .order('end_date', { ascending: false }),
     supabaseAdmin

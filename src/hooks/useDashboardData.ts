@@ -52,6 +52,40 @@ export function useDashboardData(
               res.owner.phone = o.phone
             }
           }
+
+          // Cross-check property_subscriptions if the RPC's legacy owner_subscriptions lookup reported inactive/expired
+          const isRpcSubActive =
+            res.subscription?.status === 'active' &&
+            !!res.subscription?.end_date &&
+            new Date(res.subscription.end_date) > new Date()
+
+          if (!isRpcSubActive && ownerId) {
+            const { data: propSub } = await supabase
+              .from('property_subscriptions')
+              .select('*')
+              .eq('owner_id', ownerId)
+              .order('end_date', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (propSub && propSub.status === 'active' && propSub.end_date && new Date(propSub.end_date) > new Date()) {
+              res.subscription = {
+                plan_name: (propSub as any).plan_name || `${propSub.months || 1} Months Plan`,
+                end_date: propSub.end_date,
+                status: propSub.status,
+                is_active: true,
+              }
+            } else {
+              // Verify via service-role server action in case RLS hid property_subscriptions or reconciliation is needed
+              try {
+                const directCheck = await getOwnerDashboardDataDirect(ownerId, isSuperAdmin)
+                if (directCheck.success && directCheck.data?.subscription?.is_active) {
+                  res.subscription = directCheck.data.subscription
+                }
+              } catch (e) {}
+            }
+          }
+
           return res
         }
         console.warn('[useDashboardData] RPC call failed, engaging direct server action fallback:', error?.message)
